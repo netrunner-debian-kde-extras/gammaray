@@ -1,0 +1,14 @@
+<RCC>
+  <qresource prefix="gammaray">
+    <file>GammaRay-512x512.png</file>
+    <file>GammaRay-256x256.png</file>
+    <file>GammaRay-128x128.png</file>
+    <file>GammaRay-48x48.png</file>
+    <file>GammaRay-32x32.png</file>
+    <file>GammaRay-16x16.png</file>
+    <file>kdabproducts.png</file>
+    <file>kdablogo160.png</file>
+    <file>splashscreen.png</file>
+    <file>kdab-gammary-logo.png</file>
+  </qresource>
+</RCC>

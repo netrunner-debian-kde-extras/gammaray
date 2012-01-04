@@ -1,0 +1,106 @@
+=head1 NAME
+
+GammaRay - Qt-application inspection and manipulation tool.
+
+=head1 SYNOPSIS
+
+gammaray [--injector <injector>] [--pid <pid> | <application> <args>]
+
+
+=head1 DESCRIPTION
+
+GammaRay inspects runtime internals of a Qt-application, such as:
+    Object tree, properties, signal/slots, widgets, models,
+    graphics views, javascript debugger, resources,
+    state machines, meta types, fonts, codecs, text documents
+
+When run without any options, gammaray will present a list of running
+Qt-applications from which you can attach the selected injector.
+Else, you can attach to a running process by specifying its pid,
+or you can start a new Qt-application by specifying its name
+(and optional arguments).
+
+=head1 OPTIONS
+
+=over 4
+
+=item B<--help>
+
+Print help message and exit.
+
+=item B<--version>
+
+Print version information and exit.
+
+=item B<-p, --pid <pid>>
+
+Attach to running Qt application with the specified pid.
+
+=item B<-i, --injector <injector>> 
+
+Set the specified injection type.
+
+Supported injectors are:
+     preload (Linux, Mac OS)
+     gdb (Linux. requires gdb to be installed)
+     style
+     windll (Windows)
+
+=back
+
+=head1 EXAMPLES
+
+=over 4
+
+=item Run gammaray on the Qt-application C<qtfoo> with command line arguments
+'arg1' and 'arg2':
+
+ % gammaray /path/to/qtfoo arg1 arg2
+
+=item Invoke gammaray on the Qt-application running with pid 1234:
+
+ % gammaray --pid 1234
+
+=item Invoke gammaray on with injector gdb on Qt-application running with pid 1234:
+
+ % gammaray --injector gdb --pid 1234
+
+=back
+
+=head1 EXIT STATUS
+
+Exits with 0 under normal operation; otherwise, exists with a positive integer
+indicating a problem occurred while launching or attaching an injector.
+
+=head1 COPYRIGHT
+
+Copyright (C) 2010-2011 Klaralvdalens Datakonsult AB, a KDAB Group company, <info@kdab.com>
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along
+with this program; if not, write to the Free Software Foundation, Inc.,
+51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+=head1 AUTHORS
+
+ Volker Krause <volker.krause@kdab.com> (Head Engineer)
+ Allen Winter <allen.winter@kdab.com>
+ Andreas Holzammer <andreas.holzammer@kdab.com>
+ David Faure <david.faure@kdab.com>
+ Kevin Funk <kevin.funk@kdab.com>
+ Milian Wolff <milian.wolff@kdab.com>
+ Patrick Spendrin <patrick.spendrin@kdab.com>
+ Stephen Kelly <stephen.kelly@kdab.com>
+ Till Adam <till@kdab.com>
+ Tobias Koenig <tobias.koenig@kdab.com>
+
+=cut
