@@ -1,0 +1,124 @@
+Format: http://anonscm.debian.org/viewvc/dep/web/deps/dep5.mdwn?revision=202
+Upstream-Name: GammaRay
+
+Files: *
+Copyright: 2006, Bradley T. Hughes
+           2010-2011, Klarälvdalens Datakonsult AB, a KDAB Group company
+License: GPL-2+
+
+Files: qmljsdebugger_global.h
+Copyright: 2010-2011, Klarälvdalens Datakonsult AB, a KDAB Group company
+           2011, Nokia Corporation
+License: GPL-2+ or LGPL-2.1
+
+Files: 3rdparty/kde/*
+Copyright: 2007, David Faure <faure@kde.org>
+           2007-2008, Omat Holding B.V. <info@omat.nl>
+           2009, Stephen Kelly <steveire@gmail.com>
+License: LGPL-2+
+
+Files: 3rdparty/qt/*
+       attach/processlist.h
+       attach/processlist_win.cpp
+       attach/processlist_unix.cpp
+       qmldebugcontrol/*
+Copyright: 2011, Nokia Corporation and/or its subsidiary(-ies)
+License: LGPL-2.1
+
+Files: qmldebugcontrol/canvas/qdeclarativetiledcanvas.cpp
+Copyright: 2010, Nokia Corporation and/or its subsidiary(-ies)
+License: BSD-3-clause
+
+Files: tools/messagehandler/StackWalker.cpp
+       tools/messagehandler/StackWalker.h
+Copyright: 2005-2011, Jochen Kalmbach
+License: BSD-2-clause
+
+Files: tools/modelinspector/modeltest.cpp
+       tools/modelinspector/modeltest.h
+Copyright: 2007 Trolltech ASA
+License: GPL-2
+
+Files: tools/messagehandler/backtrace_unix.cpp
+Copyright: 2002 Holger Freyther (freyther@kde.org)
+           2010-2011, Klarälvdalens Datakonsult AB, a KDAB Group company
+           1997, Matthias Kalle Dalheimer (kalle@kde.org)
+License: GPL-2+ or LGPL-2+
+
+License: GPL-2
+ For full text of GNU General Public License v2 see
+ /usr/share/common-licenses/GPL-2.
+
+License: GPL-2+
+ You may use the software under the terms of GNU General Public License v2 or,
+ at your option, any later version.
+ .
+ For full text of GPL-2 see /usr/share/common-licenses/GPL-2.
+ For the latest version of the GPL see /usr/share/common-licenses/GPL.
+
+
+License: LGPL-2
+ For full text of GNU Library General Public License v2 see
+ /usr/share/common-licenses/LGPL-2.
+
+License: LGPL-2+
+ You may use the software under the terms of GNU Library General Public
+ License v2 or, at your option, any later version.
+ .
+ For full text of LGPL-2 see /usr/share/common-licenses/LGPL-2.
+ For the latest version of the LGPL see /usr/share/common-licenses/LGPL.
+
+License: LGPL-2.1
+ For full text of GNU Library General Public License v2.1 see
+ /usr/share/common-licenses/GPL-2.1.
+
+License: BSD-2-clause
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions are met:
+ .
+   * Redistributions of source code must retain the above copyright notice,
+     this list of conditions and the following disclaimer.
+   * Redistributions in binary form must reproduce the above copyright
+     notice, this list of conditions and the following disclaimer in the
+     documentation and/or other materials provided with the distribution.
+ .
+ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+ GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+License: BSD-3-clause
+ You may use this file under the terms of the BSD license as follows:
+ .
+ "Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions are
+ met:
+   * Redistributions of source code must retain the above copyright
+     notice, this list of conditions and the following disclaimer.
+   * Redistributions in binary form must reproduce the above copyright
+     notice, this list of conditions and the following disclaimer in
+     the documentation and/or other materials provided with the
+     distribution.
+   * Neither the name of Nokia Corporation and its Subsidiary(-ies) nor
+     the names of its contributors may be used to endorse or promote
+     products derived from this software without specific prior written
+     permission.
+ .
+ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE."
+

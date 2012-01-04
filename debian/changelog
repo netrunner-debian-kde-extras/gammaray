@@ -1,0 +1,5 @@
+gammaray (1.0.1-1) UNRELEASED; urgency=low
+
+  * Initial release. (Closes: #654667)
+
+ -- Jakub Adam <jakub.adam@ktknet.cz>  Wed, 04 Jan 2012 20:55:16 +0100

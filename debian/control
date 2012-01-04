@@ -1,0 +1,41 @@
+Source: gammaray
+Priority: optional
+Section: devel
+Maintainer: Jakub Adam <jakub.adam@ktknet.cz>
+Build-Depends: debhelper (>= 8~),
+               cmake,
+               libqt4-dev,
+               libqtwebkit-dev
+Standards-Version: 3.9.2
+Vcs-Git: git://git.debian.org/git/TODO.git
+Vcs-Browser: http://git.debian.org/TODO.git
+Homepage: http://www.kdab.com/gammaray
+
+Package: gammaray
+Architecture: any
+Depends: ${shlibs:Depends},
+         ${misc:Depends}
+Description: Tool for examining the internals of Qt application
+ GammaRay is a tool for examining the internals of a Qt application and
+ to some extent also manipulate it. GammaRay uses injection methods to
+ hook into an application at runtime and provide access to a wide variety
+ of interesting information. It provides easy ways of navigating through
+ the complex internal structures you find in some Qt frameworks, such as
+ QGraphicsView, model/view, QTextDocument, state machines and more.
+
+Package: gammaray-dbg
+Architecture: any
+Section: debug
+Priority: extra
+Depends:
+    gammaray (= ${binary:Version}),
+    ${misc:Depends}
+Description: debugging symbols for gammaray
+ GammaRay is a tool for examining the internals of a Qt application and
+ to some extent also manipulate it. GammaRay uses injection methods to
+ hook into an application at runtime and provide access to a wide variety
+ of interesting information. It provides easy ways of navigating through
+ the complex internal structures you find in some Qt frameworks, such as
+ QGraphicsView, model/view, QTextDocument, state machines and more.
+ .
+ This package contains the debugging symbols for gammaray.
