@@ -1,0 +1,49 @@
+From: Jakub Adam <jakub.adam@ktknet.cz>
+Date: Thu, 5 Jan 2012 00:57:49 +0100
+Subject: probe-lib-location
+
+Install gammaray_probe.so to /usr/lib/gammaray as it is application
+private library. Fixes lintian warnings/errors:
+
+package-name-doesnt-match-sonames
+shlib-without-versioned-soname
+postinst-must-call-ldconfig
+---
+ CMakeLists.txt          |    5 +++--
+ config-gammaray.h.cmake |    2 +-
+ 2 files changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 03bccdb..822168b 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -258,7 +258,7 @@ qt4_wrap_ui(gammaray_srcs
+   tools/widgetinspector/widgetinspector.ui
+ )
+ qt4_add_resources(gammaray_srcs resources/gammaray.qrc)
+-add_library(gammaray_probe SHARED ${gammaray_srcs})
++add_library(gammaray_probe MODULE ${gammaray_srcs})
+ target_link_libraries(gammaray_probe
+   ${QT_QTCORE_LIBRARY}
+   ${QT_QTGUI_LIBRARY}
+@@ -271,7 +271,8 @@ if(NOT WIN32)
+ endif()
+ set_target_properties(gammaray_probe PROPERTIES PREFIX "")
+ 
+-install(TARGETS gammaray gammaray_probe ${INSTALL_TARGETS_DEFAULT_ARGS})
++install(TARGETS gammaray_probe DESTINATION ${LIB_INSTALL_DIR}/gammaray)
++install(TARGETS gammaray ${INSTALL_TARGETS_DEFAULT_ARGS})
+ 
+ if(UNIX AND NOT APPLE)
+   set(XDG_APPS_INSTALL_DIR share/applications)
+diff --git a/config-gammaray.h.cmake b/config-gammaray.h.cmake
+index 026205e..1a776c5 100644
+--- a/config-gammaray.h.cmake
++++ b/config-gammaray.h.cmake
+@@ -1,4 +1,4 @@
+-#define GAMMARAY_LIB_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/${LIB_INSTALL_DIR}"
++#define GAMMARAY_LIB_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/${LIB_INSTALL_DIR}/gammaray"
+ #define GAMMARAY_PLUGIN_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/${PLUGIN_INSTALL_DIR}"
+ // for finding the probe during automatic tests
+ #define GAMMARAY_BUILD_DIR "${CMAKE_BINARY_DIR}"
+-- 
