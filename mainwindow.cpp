@@ -34,11 +34,11 @@
 
 #include <QCoreApplication>
 #include <qdebug.h>
-#include <QtGui/QStringListModel>
+#include <QStringListModel>
 #include <QtCore/qtextcodec.h>
-#include <QtGui/QMessageBox>
-#include <QtGui/QComboBox>
-#include <QtGui/QLabel>
+#include <QMessageBox>
+#include <QComboBox>
+#include <QLabel>
 #include <QTreeView>
 #include <QHBoxLayout>
 
@@ -80,7 +80,19 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent)
   // hide unused tool bar for now
   ui.mainToolBar->setHidden(true);
 
-  setWindowTitle(tr("%1 (%2)").arg(progName).arg(qApp->applicationName()));
+  QString appName = qApp->applicationName();
+  if (appName.isEmpty() && !qApp->arguments().isEmpty()) {
+    appName = qApp->arguments().first().remove(qApp->applicationDirPath());
+    if (appName.startsWith('.')) {
+        appName = appName.right(appName.length() - 1);
+    }
+    if (appName.startsWith('/')) {
+        appName = appName.right(appName.length() - 1);
+    }
+  } else {
+    appName = tr("PID %1").arg(qApp->applicationPid());
+  }
+  setWindowTitle(tr("%1 (%2)").arg(progName).arg(appName));
 
   selectInitialTool();
 
@@ -94,10 +106,9 @@ void MainWindow::about()
   mb.setWindowTitle(tr("About %1").arg(progName));
   mb.setText(tr("<b>%1 %2</b><p>%3").arg(progName).arg(progVersion).arg(progDesc));
   mb.setInformativeText(
-    trUtf8("<qt><p>Copyright (C) 2010-2011 Klarälvdalens Datakonsult AB, "
+    trUtf8("<qt><p>Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, "
        "a KDAB Group company, <a href='mailto:info@kdab.com'>info@kdab.com</a></p>"
        "<p><u>Authors:</u><br>"
-       "Volker Krause &lt;volker.krause@kdab.com&gt; (Head Engineer)<br>"
        "Allen Winter &lt;allen.winter@kdab.com&gt;<br>"
        "Andreas Holzammer &lt;andreas.holzammer@kdab.com&gt;<br>"
        "David Faure &lt;david.faure@kdab.com&gt;<br>"
@@ -106,7 +117,9 @@ void MainWindow::about()
        "Patrick Spendrin &lt;patrick.spendrin@kdab.com&gt;<br>"
        "Stephen Kelly &lt;stephen.kelly@kdab.com&gt;<br>"
        "Till Adam &lt;till@kdab.com&gt;<br>"
-       "Tobias Koenig &lt;tobias.koenig@kdab.com&gt;<br></p></qt>"));
+       "Thomas McGuire &lt;thomas.mcguire@kdab.com&gt;<br>"
+       "Tobias Koenig &lt;tobias.koenig@kdab.com&gt;<br>"
+       "Volker Krause &lt;volker.krause@kdab.com&gt;<br></p></qt>"));
   mb.setIconPixmap(QPixmap(":gammaray/GammaRay-128x128.png"));
   mb.addButton(QMessageBox::Close);
   mb.exec();
@@ -149,6 +162,7 @@ void MainWindow::selectInitialTool()
 
 void MainWindow::toolSelected()
 {
+  ui.actionsMenu->clear();
   const int row = ui.toolSelector->currentIndex().row();
   if (row == -1) {
     return;
@@ -162,11 +176,18 @@ void MainWindow::toolSelected()
 //     qDebug() << Q_FUNC_INFO << "creating new probe: "
 //              << toolIface->name() << toolIface->supportedTypes();
     toolWidget = toolIface->createWidget(Probe::instance(), this);
-    toolWidget->layout()->setContentsMargins(11, 0, 0, 0);
+    if (toolWidget->layout()) {
+      toolWidget->layout()->setContentsMargins(11, 0, 0, 0);
+    }
     ui.toolStack->addWidget(toolWidget);
     ui.toolSelector->model()->setData(mi, QVariant::fromValue(toolWidget));
   }
   ui.toolStack->setCurrentIndex(ui.toolStack->indexOf(toolWidget));
+
+  foreach (QAction *action, toolWidget->actions()) {
+    ui.actionsMenu->addAction(action);
+  }
+  ui.actionsMenu->setEnabled(!ui.actionsMenu->isEmpty());
 }
 
 #include "mainwindow.moc"

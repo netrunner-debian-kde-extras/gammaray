@@ -24,6 +24,7 @@
 #ifndef GAMMARAY_WIDGETINSPECTOR_H
 #define GAMMARAY_WIDGETINSPECTOR_H
 
+#include <qlibrary.h>
 #include <qwidget.h>
 #include <toolfactory.h>
 
@@ -41,13 +42,24 @@ class WidgetInspector : public QWidget
   public:
     explicit WidgetInspector(ProbeInterface *probe, QWidget *parent = 0);
 
+  private:
+    void setActionsEnabled(bool enabled);
+    QWidget *selectedWidget() const;
+    void callExternalExportAction(const char *name, QWidget *widget, const QString &fileName);
+
   private slots:
     void widgetSelected(const QModelIndex &index);
     void widgetSelected(QWidget *widget);
 
+    void saveAsImage();
+    void saveAsSvg();
+    void saveAsPdf();
+    void saveAsUiFile();
+
   private:
     OverlayWidget *m_overlayWidget;
     QScopedPointer<Ui::WidgetInspector> ui;
+    QLibrary m_externalExportActions;
 };
 
 class WidgetInspectorFactory

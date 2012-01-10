@@ -42,7 +42,7 @@ WinDllInjector::WinDllInjector() :
 }
 
 bool WinDllInjector::launch(const QStringList &programAndArgs,
-                           const QString &probeDll, const QString &probeFunc)
+                           const QString &probeDll, const QString &/*probeFunc*/)
 {
   DWORD dwCreationFlags = CREATE_NO_WINDOW;
   dwCreationFlags |= CREATE_UNICODE_ENVIRONMENT;
@@ -58,10 +58,15 @@ bool WinDllInjector::launch(const QStringList &programAndArgs,
   PROCESS_INFORMATION pid;
   memset(&pid, 0, sizeof(PROCESS_INFORMATION));
 
-  BOOL success = CreateProcess(0, (wchar_t *)programAndArgs.join(" ").utf16(),
+  const QString applicationName = programAndArgs.join(" ");
+  BOOL success = CreateProcess(0, (wchar_t *)applicationName.utf16(),
                                0, 0, TRUE, dwCreationFlags,
                                0, 0,
                                &startupInfo, &pid);
+  if (!success) {
+    return false;
+  }
+
   m_destProcess = pid.hProcess;
   m_destThread = pid.hThread;
   m_dllPath = probeDll;

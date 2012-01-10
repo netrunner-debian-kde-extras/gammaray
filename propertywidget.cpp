@@ -27,11 +27,14 @@
 #include "objectclassinfomodel.h"
 #include "objectmethodmodel.h"
 #include "objectenummodel.h"
+#include "metapropertymodel.h"
 #include "connectionmodel.h"
 #include "connectionfilterproxymodel.h"
 #include "probe.h"
 #include "methodinvocationdialog.h"
 #include "multisignalmapper.h"
+#include "proxydetacher.h"
+#include "propertyeditor/propertyeditorfactory.h"
 
 #include "kde/krecursivefilterproxymodel.h"
 
@@ -39,6 +42,7 @@
 #include <QStandardItemModel>
 #include <QtCore/QTime>
 #include <qmenu.h>
+#include <QStyledItemDelegate>
 
 using namespace GammaRay;
 
@@ -52,7 +56,9 @@ PropertyWidget::PropertyWidget(QWidget *parent)
     m_outboundConnectionModel(new ConnectionFilterProxyModel(this)),
     m_enumModel(new ObjectEnumModel(this)),
     m_signalMapper(0),
-    m_methodLogModel(new QStandardItemModel(this))
+    m_methodLogModel(new QStandardItemModel(this)),
+    m_metaPropertyModel(new MetaPropertyModel(this)),
+    m_editorFactory(new PropertyEditorFactory)
 {
   ui.setupUi(this);
 
@@ -63,6 +69,7 @@ PropertyWidget::PropertyWidget(QWidget *parent)
   ui.staticPropertyView->sortByColumn(0, Qt::AscendingOrder);
   ui.staticPropertyView->header()->setResizeMode(0, QHeaderView::ResizeToContents);
   ui.staticPropertySearchLine->setProxy(proxy);
+  setEditorFactory(ui.staticPropertyView);
 
   proxy = new QSortFilterProxyModel(this);
   proxy->setDynamicSortFilter(true);
@@ -70,6 +77,7 @@ PropertyWidget::PropertyWidget(QWidget *parent)
   ui.dynamicPropertyView->setModel(proxy);
   ui.dynamicPropertyView->sortByColumn(0, Qt::AscendingOrder);
   ui.dynamicPropertyView->header()->setResizeMode(0, QHeaderView::ResizeToContents);
+  setEditorFactory(ui.dynamicPropertyView);
   ui.dynamicPropertySearchLine->setProxy(proxy);
 
   proxy = new QSortFilterProxyModel(this);
@@ -93,12 +101,14 @@ PropertyWidget::PropertyWidget(QWidget *parent)
   ui.classInfoView->header()->setResizeMode(QHeaderView::ResizeToContents);
   ui.classInfoSearchLine->setProxy(proxy);
 
-  m_inboundConnectionModel->setSourceModel(Probe::instance()->connectionModel());
+  new ProxyDetacher(ui.inboundConnectionView, m_inboundConnectionModel,
+                    Probe::instance()->connectionModel());
   ui.inboundConnectionView->setModel(m_inboundConnectionModel);
   ui.inboundConnectionView->sortByColumn(0, Qt::AscendingOrder);
   ui.inboundConnectionSearchLine->setProxy(m_inboundConnectionModel);
 
-  m_outboundConnectionModel->setSourceModel(Probe::instance()->connectionModel());
+  new ProxyDetacher(ui.outboundConnectionView, m_outboundConnectionModel,
+                    Probe::instance()->connectionModel());
   ui.outboundConnectionView->setModel(m_outboundConnectionModel);
   ui.outboundConnectionView->sortByColumn(0, Qt::AscendingOrder);
   ui.outboundConnectionSearchLine->setProxy(m_outboundConnectionModel);
@@ -110,6 +120,9 @@ PropertyWidget::PropertyWidget(QWidget *parent)
   ui.enumView->sortByColumn(0, Qt::AscendingOrder);
   ui.enumView->header()->setResizeMode(QHeaderView::ResizeToContents);
   ui.enumSearchLine->setProxy(proxy);
+
+  ui.metaPropertyView->setModel(m_metaPropertyModel);
+  setEditorFactory(ui.metaPropertyView);
 }
 
 void GammaRay::PropertyWidget::setObject(QObject *object)
@@ -128,9 +141,20 @@ void GammaRay::PropertyWidget::setObject(QObject *object)
   connect(m_signalMapper, SIGNAL(signalEmitted(QObject*,int)), SLOT(signalEmitted(QObject*,int)));
 
   m_methodLogModel->clear();
+
+  m_metaPropertyModel->setObject(object);
+
+  setQObjectTabsVisible(true);
 }
 
-void PropertyWidget::methodActivated(const QModelIndex &index)
+void PropertyWidget::setObject(void *object, const QString &className)
+{
+  setObject(0);
+  m_metaPropertyModel->setObject(object, className);
+  setQObjectTabsVisible(false);
+}
+
+void GammaRay::PropertyWidget::methodActivated(const QModelIndex &index)
 {
   const QMetaMethod method = index.data(ObjectMethodModel::MetaMethodRole).value<QMetaMethod>();
   if (method.methodType() == QMetaMethod::Slot) {
@@ -169,6 +193,27 @@ void PropertyWidget::methodConextMenu(const QPoint &pos)
 
   if (contextMenu.exec(ui.methodView->viewport()->mapToGlobal(pos))) {
     methodActivated(index);
+  }
+}
+
+void PropertyWidget::setQObjectTabsVisible(bool visible)
+{
+  // TODO: this should actually hide instead of disable...
+  for (int i = 0; i < ui.tabWidget->count(); ++i) {
+    if (ui.tabWidget->widget(i) != ui.metaPropertyTab) {
+      ui.tabWidget->setTabEnabled(i, visible);
+    }
+  }
+  if (!visible) {
+    ui.tabWidget->setCurrentWidget(ui.metaPropertyTab);
+  }
+}
+
+void PropertyWidget::setEditorFactory(QAbstractItemView *view)
+{
+  QStyledItemDelegate *delegate = qobject_cast<QStyledItemDelegate*>(view->itemDelegate());
+  if (delegate) {
+    delegate->setItemEditorFactory(m_editorFactory.data());
   }
 }
 

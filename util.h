@@ -35,7 +35,20 @@ namespace Util
 {
   QString displayString(const QObject *object);
   QString variantToString(const QVariant &value);
+  /// Returns a value representing @p value in a itemview decoration role
+  QVariant decorationForVariant(const QVariant &value);
   QString addressToString(const void *p);
+  QString addressToUid(const void *p);
+
+  /**
+   * Translates an enum or flag value into a human readable text.
+   * @param value The numerical value. Type information from the QVariant
+   *              are used to find the corresponding QMetaEnum.
+   * @param typeName Use this if the @p value has type int
+   *                 (e.g. the case for QMetaProperty::read).
+   * @param object Additional QObject to search for QMetaEnums.
+   */
+  QString enumToString(const QVariant &value, const char *typeName = 0, QObject *object = 0);
 
   bool descendantOf(QObject *ascendant, QObject *obj);
 
@@ -49,6 +62,9 @@ namespace Util
     }
     return findParentOfType<T>(object->parent());
   }
+
+  /// Returns an icon for the given object.
+  QVariant iconForObject(QObject *obj);
 }
 
 }

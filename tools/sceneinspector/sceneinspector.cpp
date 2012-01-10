@@ -31,6 +31,7 @@
 #include <singlecolumnobjectproxymodel.h>
 #include <probeinterface.h>
 #include <kde/krecursivefilterproxymodel.h>
+#include <metaobjectrepository.h>
 
 #include <QDebug>
 #include <QGraphicsItem>
@@ -82,7 +83,12 @@ void SceneInspector::sceneItemSelected(const QModelIndex &index)
 {
   if (index.isValid()) {
     QGraphicsItem *item = index.data(SceneModel::SceneItemRole).value<QGraphicsItem*>();
-    ui->scenePropertyWidget->setObject(item->toGraphicsObject());
+    QGraphicsObject *obj = item->toGraphicsObject();
+    if (obj) {
+      ui->scenePropertyWidget->setObject(obj);
+    } else {
+      ui->scenePropertyWidget->setObject(item, findBestType(item));
+    }
     ui->graphicsSceneView->showGraphicsItem(item);
   } else {
     ui->scenePropertyWidget->setObject(0);
@@ -119,6 +125,27 @@ void SceneInspector::sceneItemSelected(QGraphicsItem *item)
     QItemSelectionModel::Rows | QItemSelectionModel::Current);
   ui->sceneTreeView->scrollTo(index);
   sceneItemSelected(index);
+}
+
+#define QGV_CHECK_TYPE(Class) \
+  if (dynamic_cast<Class*>(item) && MetaObjectRepository::instance()->hasMetaObject(#Class)) \
+    return QLatin1String(#Class)
+
+QString SceneInspector::findBestType(QGraphicsItem *item)
+{
+  // keep this in reverse topological order of the class hierarchy!
+  // QObject-based types are covered elsewhere, so we don't need those here
+  QGV_CHECK_TYPE(QGraphicsEllipseItem);
+  QGV_CHECK_TYPE(QGraphicsPathItem);
+  QGV_CHECK_TYPE(QGraphicsPolygonItem);
+  QGV_CHECK_TYPE(QGraphicsSimpleTextItem);
+  QGV_CHECK_TYPE(QGraphicsRectItem);
+  QGV_CHECK_TYPE(QAbstractGraphicsShapeItem);
+  QGV_CHECK_TYPE(QGraphicsLineItem);
+  QGV_CHECK_TYPE(QGraphicsItemGroup);
+  QGV_CHECK_TYPE(QGraphicsPixmapItem);
+
+  return QLatin1String("QGraphicsItem");
 }
 
 #include "sceneinspector.moc"

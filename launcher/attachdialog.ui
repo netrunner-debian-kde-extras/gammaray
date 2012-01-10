@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>GammaRay::AttachDialog</class>
+ <widget class="QWidget" name="GammaRay::AttachDialog">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>400</width>
+    <height>300</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Dialog</string>
+  </property>
+  <property name="windowIcon">
+   <iconset resource="../resources/gammaray.qrc">
+    <normaloff>:/gammaray/GammaRay-128x128.png</normaloff>:/gammaray/GammaRay-128x128.png</iconset>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <widget class="QStackedWidget" name="stackedWidget">
+     <property name="currentIndex">
+      <number>1</number>
+     </property>
+     <widget class="QLabel" name="loadingLabel">
+      <property name="text">
+       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;center&quot;&gt;&lt;img src=&quot;:/gammaray/GammaRay-48x48.png&quot;/&gt;&lt;/p&gt;&lt;p align=&quot;center&quot;&gt;Retrieving the list of processes which use Qt ...&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+      </property>
+     </widget>
+     <widget class="QWidget" name="listViewPage">
+      <layout class="QVBoxLayout" name="verticalLayout_2">
+       <property name="margin">
+        <number>0</number>
+       </property>
+       <item>
+        <widget class="KFilterProxySearchLine" name="filter"/>
+       </item>
+       <item>
+        <widget class="QTreeView" name="view">
+         <property name="rootIsDecorated">
+          <bool>false</bool>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <zorder>listViewPage</zorder>
+     <zorder>loadingLabel</zorder>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>KFilterProxySearchLine</class>
+   <extends>QWidget</extends>
+   <header>kfilterproxysearchline.h</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
+ <resources>
+  <include location="../resources/gammaray.qrc"/>
+ </resources>
+ <connections/>
+</ui>

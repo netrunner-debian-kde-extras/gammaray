@@ -31,12 +31,14 @@
 #include "toolmodel.h"
 #include "readorwritelocker.h"
 #include "tools/modelinspector/modeltest.h"
+#include "hooking/functionoverwriterfactory.h"
 
 #include <QtCore/QCoreApplication>
 #include <QtCore/QThread>
-#include <QtGui/QMouseEvent>
-#include <QtGui/QDialog>
+#include <QMouseEvent>
+#include <QDialog>
 #include <QtCore/QTimer>
+#include <QApplication>
 
 #include <iostream>
 #include <stdio.h>
@@ -63,7 +65,9 @@ using namespace GammaRay;
 using namespace std;
 
 Probe *Probe::s_instance = 0;
-QReadWriteLock Probe::s_lock(QReadWriteLock::Recursive);
+bool functionsOverwritten = false;
+
+#if (QT_VERSION < QT_VERSION_CHECK(5, 0, 0))
 
 namespace GammaRay
 {
@@ -90,6 +94,7 @@ static bool probeDisconnectCallback(void ** args)
 }
 
 }
+#endif // QT_VERSION
 
 // useful for debugging, dumps the object and all it's parents
 // also useable from GDB!
@@ -124,20 +129,44 @@ struct Listener
 Q_GLOBAL_STATIC(Listener, s_listener)
 Q_GLOBAL_STATIC(QVector<QObject*>, s_addedBeforeProbeInsertion)
 
-ProbeCreator::ProbeCreator(Type type)
-: m_type(type)
+// ensures proper information is returned by isValidObject by
+// locking it in objectAdded/Removed
+class ObjectLock : public QReadWriteLock
 {
+  public:
+    ObjectLock()
+      : QReadWriteLock(QReadWriteLock::Recursive)
+    {}
+};
+Q_GLOBAL_STATIC(ObjectLock, s_lock)
+
+ProbeCreator::ProbeCreator(Type type)
+  : m_type(type)
+{
+  //push object into the main thread, as windows creates a
+  //different thread where this runs in
+  moveToThread(QApplication::instance()->thread());
   // delay to foreground thread
   QMetaObject::invokeMethod(this, "createProbe", Qt::QueuedConnection);
 }
 
 void ProbeCreator::createProbe()
 {
+  QWriteLocker lock(s_lock());
   // make sure we are in the ui thread
   Q_ASSERT(QThread::currentThread() == qApp->thread());
 
   if (!qApp || Probe::isInitialized()) {
     // never create it twice
+    return;
+  }
+
+  // Exit early instead of asserting in QWidgetPrivate::init()
+  const QApplication * const qGuiApplication = qApp; // qobject_cast<const QApplication *>(qApp);
+  if (!qGuiApplication || qGuiApplication->type() == QApplication::Tty) {
+    cerr << "Unable to attach to a non-GUI application.\n"
+         << "Your application needs to use QApplication, "
+         << "otherwise GammaRay can not work." << endl;
     return;
   }
 
@@ -181,8 +210,10 @@ Probe::Probe(QObject *parent):
     new ModelTest(m_toolModel, m_toolModel);
   }
 
+#if (QT_VERSION < QT_VERSION_CHECK(5, 0, 0))
   QInternal::registerCallback(QInternal::ConnectCallback, &GammaRay::probeConnectCallback);
   QInternal::registerCallback(QInternal::DisconnectCallback, &GammaRay::probeDisconnectCallback);
+#endif
 
   m_queueTimer->setSingleShot(true);
   m_queueTimer->setInterval(0);
@@ -194,8 +225,10 @@ Probe::~Probe()
 {
   IF_DEBUG(cerr << "detaching GammaRay probe" << endl;)
 
+#if (QT_VERSION < QT_VERSION_CHECK(5, 0, 0))
   QInternal::unregisterCallback(QInternal::ConnectCallback, &GammaRay::probeConnectCallback);
   QInternal::unregisterCallback(QInternal::DisconnectCallback, &GammaRay::probeDisconnectCallback);
+#endif
 
   s_instance = 0;
 }
@@ -248,13 +281,7 @@ void Probe::delayedInit()
   window->show();
 }
 
-/**
- * Returns true if @p obj belongs to the GammaRay Probe or Window.
- *
- * These objects should not be tracked or shown to the user,
- * hence must be explictly filtered.
- */
-static bool filterObject(QObject *obj)
+bool Probe::filterObject(QObject *obj)
 {
   Probe *p = Probe::instance();
   Q_ASSERT(p);
@@ -294,17 +321,18 @@ QObject *Probe::probe() const
 
 bool Probe::isValidObject(QObject *obj) const
 {
-  ///TODO: can we somehow assert(s_lock.isLocked()) ?!
+  ///TODO: can we somehow assert(s_lock().isLocked()) ?!
   return m_validObjects.contains(obj);
 }
 
 QReadWriteLock *Probe::objectLock() const
 {
-  return &s_lock;
+  return s_lock();
 }
 
 void Probe::objectAdded(QObject *obj, bool fromCtor)
 {
+  QWriteLocker lock(s_lock());
   if (s_listener()->filterThread == obj->thread()) {
     // Ignore
     IF_DEBUG(cout
@@ -313,8 +341,6 @@ void Probe::objectAdded(QObject *obj, bool fromCtor)
              << (fromCtor ? " (from ctor)" : "") << endl;)
     return;
   } else if (isInitialized()) {
-    QWriteLocker lock(&s_lock);
-
     if (filterObject(obj)) {
       IF_DEBUG(cout
                << "objectAdded Filter: "
@@ -381,7 +407,7 @@ void Probe::objectAdded(QObject *obj, bool fromCtor)
 
 void Probe::queuedObjectsFullyConstructed()
 {
-  QWriteLocker lock(&s_lock);
+  QWriteLocker lock(s_lock());
 
   IF_DEBUG(cout << Q_FUNC_INFO << " " << m_queuedObjects.size() << endl;)
 
@@ -404,7 +430,7 @@ void Probe::queuedObjectsFullyConstructed()
 void Probe::objectFullyConstructed(QObject *obj)
 {
   // must be write locked
-  Q_ASSERT(!s_lock.tryLockForRead());
+  Q_ASSERT(!s_lock()->tryLockForRead());
 
   if (!m_validObjects.contains(obj)) {
     // deleted already
@@ -428,7 +454,6 @@ void Probe::objectFullyConstructed(QObject *obj)
   Q_ASSERT(!obj->parent() || m_validObjects.contains(obj->parent()));
 
   m_objectListModel->objectAdded(obj);
-  m_objectTreeModel->objectAdded(obj);
   m_toolModel->objectAdded(obj);
 
   emit objectCreated(obj);
@@ -436,8 +461,8 @@ void Probe::objectFullyConstructed(QObject *obj)
 
 void Probe::objectRemoved(QObject *obj)
 {
+  QWriteLocker lock(s_lock());
   if (isInitialized()) {
-    QWriteLocker lock(&s_lock);
     IF_DEBUG(cout << "object removed:" << hex << obj << " " << obj->parent() << endl;)
 
     bool success = instance()->m_validObjects.remove(obj);
@@ -449,8 +474,6 @@ void Probe::objectRemoved(QObject *obj)
     instance()->m_queuedObjects.removeOne(obj);
 
     instance()->m_objectListModel->objectRemoved(obj);
-    instance()->m_objectTreeModel->objectRemoved(obj);
-    instance()->m_connectionModel->objectRemoved(obj);
 
     instance()->connectionRemoved(obj, 0, 0, 0);
     instance()->connectionRemoved(0, 0, obj, 0);
@@ -482,7 +505,7 @@ void Probe::connectionAdded(QObject *sender, const char *signal, QObject *receiv
     return;
   }
 
-  ReadOrWriteLocker lock(&s_lock);
+  ReadOrWriteLocker lock(s_lock());
   if (filterObject(sender) || filterObject(receiver)) {
     return;
   }
@@ -499,7 +522,7 @@ void Probe::connectionRemoved(QObject *sender, const char *signal,
     return;
   }
 
-  ReadOrWriteLocker lock(&s_lock);
+  ReadOrWriteLocker lock(s_lock());
   if ((sender && filterObject(sender)) || (receiver && filterObject(receiver))) {
     return;
   }
@@ -517,7 +540,7 @@ bool Probe::eventFilter(QObject *receiver, QEvent *event)
     QChildEvent *childEvent = static_cast<QChildEvent*>(event);
     QObject *obj = childEvent->child();
 
-    QWriteLocker lock(&s_lock);
+    QWriteLocker lock(s_lock());
     const bool tracked = m_validObjects.contains(obj);
     const bool filtered = filterObject(obj);
 
@@ -529,13 +552,14 @@ bool Probe::eventFilter(QObject *receiver, QEvent *event)
     if (!filtered && childEvent->added()) {
       if (!tracked) {
         // was not tracked before, add to all models
-        objectAdded(obj);
+        // child added events are sent before qt_addObject is called,
+        // so we assumes this comes from the ctor
+        objectAdded(obj, true);
       } else if (!m_queuedObjects.contains(obj)) {
         // object is known already, just update the position in the tree
         // BUT: only when we did not queue this item before
         IF_DEBUG(cout << "update pos: " << hex << obj << endl;)
-        m_objectTreeModel->objectRemoved(obj);
-        m_objectTreeModel->objectAdded(obj);
+        emit objectReparanted(obj);
       }
     } else if (tracked) {
       objectRemoved(obj);
@@ -563,7 +587,7 @@ bool Probe::eventFilter(QObject *receiver, QEvent *event)
   // we have no preloading hooks, so recover all objects we see
   if (s_listener()->trackDestroyed && event->type() != QEvent::ChildAdded &&
       event->type() != QEvent::ChildRemoved && !filterObject(receiver)) {
-    QWriteLocker lock(&s_lock);
+    QWriteLocker lock(s_lock());
     const bool tracked = m_validObjects.contains(receiver);
     if (!tracked) {
       objectAdded(receiver);
@@ -616,29 +640,35 @@ extern "C" Q_DECL_EXPORT void qt_startup_hook()
   s_listener()->trackDestroyed = false;
 
   new ProbeCreator(ProbeCreator::CreateOnly);
-#if !defined Q_OS_WIN and !defined Q_OS_MAC
-  static void(*next_qt_startup_hook)() = (void (*)()) dlsym(RTLD_NEXT, "qt_startup_hook");
-  next_qt_startup_hook();
+#if !defined Q_OS_WIN && !defined Q_OS_MAC
+  if (!functionsOverwritten) {
+    static void(*next_qt_startup_hook)() = (void (*)()) dlsym(RTLD_NEXT, "qt_startup_hook");
+    next_qt_startup_hook();
+  }
 #endif
 }
 
 extern "C" Q_DECL_EXPORT void qt_addObject(QObject *obj)
 {
   Probe::objectAdded(obj, true);
-#if !defined Q_OS_WIN and !defined Q_OS_MAC
-  static void (*next_qt_addObject)(QObject *obj) =
-    (void (*)(QObject *obj)) dlsym(RTLD_NEXT, "qt_addObject");
-  next_qt_addObject(obj);
+#if !defined Q_OS_WIN && !defined Q_OS_MAC
+  if (!functionsOverwritten) {
+    static void (*next_qt_addObject)(QObject *obj) =
+      (void (*)(QObject *obj)) dlsym(RTLD_NEXT, "qt_addObject");
+    next_qt_addObject(obj);
+  }
 #endif
 }
 
 extern "C" Q_DECL_EXPORT void qt_removeObject(QObject *obj)
 {
   Probe::objectRemoved(obj);
-#if !defined Q_OS_WIN and !defined Q_OS_MAC
-  static void (*next_qt_removeObject)(QObject *obj) =
-    (void (*)(QObject *obj)) dlsym(RTLD_NEXT, "qt_removeObject");
-  next_qt_removeObject(obj);
+#if !defined Q_OS_WIN && !defined Q_OS_MAC
+  if (!functionsOverwritten) {
+    static void (*next_qt_removeObject)(QObject *obj) =
+      (void (*)(QObject *obj)) dlsym(RTLD_NEXT, "qt_removeObject");
+    next_qt_removeObject(obj);
+  }
 #endif
 }
 
@@ -667,130 +697,35 @@ Q_DECL_EXPORT const char *myFlagLocation(const char *method)
 }
 #endif
 
-#if defined(Q_OS_WIN) or defined(Q_OS_MAC)
-// IMPORTANT NOTE:
-// We are writing a jmp instruction at the target address.
-// If the function is not big, we have to trust that the alignment gives
-// us enough space to this jmp.  Jumps are 10 bytes long under 32 bit and
-// 13 bytes long under x64.
-// We will overwrite the existing function, which cannot be reverted.
-// It would be possible to save the content and write it back when we unattach.
-
-static inline void *page_align(void *addr)
+void overwriteQtFunctions()
 {
-  assert(addr != NULL);
-  return (void *)((size_t)addr & ~(0xFFFF));
-}
+  functionsOverwritten = true;
+  AbstractFunctionOverwriter *overwriter = FunctionOverwriterFactory::createFunctionOverwriter();
 
-void writeJmp(void *func, void *replacement)
-{
-#ifdef Q_OS_WIN
-  DWORD oldProtect = 0;
-
-  //Jump takes 10 bytes under x86 and 14 bytes under x64
-  int worstSize;
-#ifdef _M_IX86
-  worstSize = 10;
-#else ifdef _M_X64
-  worstSize = 14;
+  overwriter->overwriteFunction(QLatin1String("qt_startup_hook"), (void*)qt_startup_hook);
+  overwriter->overwriteFunction(QLatin1String("qt_addObject"), (void*)qt_addObject);
+  overwriter->overwriteFunction(QLatin1String("qt_removeObject"), (void*)qt_removeObject);
+#if defined(Q_OS_WIN)
+#ifdef ARCH_64
+  overwriter->overwriteFunction(
+    QLatin1String("?qFlagLocation@@YAPEBDPEBD@Z"), (void*)myFlagLocation);
+#else
+  overwriter->overwriteFunction(
+    QLatin1String("?qFlagLocation@@YAPBDPBD@Z"), (void*)myFlagLocation);
 #endif
-
-  VirtualProtect(func, worstSize, PAGE_EXECUTE_READWRITE, &oldProtect);
-#else ifdef Q_OS_MAC
-  quint8 *aligned = (quint8*)page_align(func);
-  const bool writable = (mprotect(aligned, 0xFFFF, PROT_READ|PROT_WRITE|PROT_EXEC) == 0);
-  assert(writable);
-#endif
-
-  quint8 *cur = (quint8 *) func;
-
-  // If there is a short jump, its a jumptable and we don't have enough
-  // space after, so follow the short jump and write the jmp there
-  if (*cur == 0xE9) {
-    size_t old_offset = *(unsigned long *)(cur + 1);
-#ifdef _M_IX86
-    void *ret = (void *)(((quint32)(((quint32) cur) + sizeof (quint32))) + old_offset + 1);
-#else ifdef _M_X64
-    void *ret = (void *)(((quint32)(((quint64) cur) + sizeof (quint32))) + old_offset + 1);
-#endif
-    writeJmp(ret, replacement);
-    return;
-  }
-
-  *cur = 0xff;
-  *(++cur) = 0x25;
-
-#ifdef _M_IX86
-  *((quint32 *) ++cur) = (quint32)(((quint32) cur) + sizeof (quint32));
-  cur += sizeof (DWORD);
-  *((quint32 *)cur) = (quint32)replacement;
-#else ifdef _M_X64
-  *((quint32 *) ++cur) = 0;
-  cur += sizeof (quint32);
-  *((quint64*)cur) = (quint64)replacement;
-#endif
-
-#ifdef Q_OS_WIN
-  VirtualProtect(func, worstSize, oldProtect, &oldProtect);
-#else ifdef Q_OS_MAC
-  const bool readOnly = (mprotect(aligned, 0xFFFF, PROT_READ|PROT_EXEC) == 0);
-  assert(readOnly);
 #endif
 }
-
-#endif
 
 #ifdef Q_OS_WIN
 extern "C" Q_DECL_EXPORT void gammaray_probe_inject();
 
-BOOL WINAPI DllMain(HINSTANCE/*hInstance*/, DWORD dwReason, LPVOID/*lpvReserved*/)
+extern "C" BOOL WINAPI DllMain(HINSTANCE/*hInstance*/, DWORD dwReason, LPVOID/*lpvReserved*/)
 {
-  // First retrieve the right module, if Qt is linked in release or debug
-  HMODULE qtCoreDllHandle = GetModuleHandle(L"QtCore4");
-  if (qtCoreDllHandle == NULL) {
-    qtCoreDllHandle = GetModuleHandle(L"QtCored4");
-  }
-
-  if (qtCoreDllHandle == NULL) {
-    cerr << "no handle for QtCore found!" << endl;
-    return FALSE;
-  }
-
-  // Look up the address of qt_startup_hook
-  FARPROC qtstartuphookaddr = GetProcAddress(qtCoreDllHandle, "qt_startup_hook");
-  FARPROC qtaddobjectaddr = GetProcAddress(qtCoreDllHandle, "qt_addObject");
-  FARPROC qtremobjectaddr = GetProcAddress(qtCoreDllHandle, "qt_removeObject");
-#ifdef _M_X64
-  FARPROC qFlagLocationaddr = GetProcAddress(qtCoreDllHandle, "?qFlagLocation@@YAPEBDPEBD@Z");
-#else
-  FARPROC qFlagLocationaddr = GetProcAddress(qtCoreDllHandle, "?qFlagLocation@@YAPBDPBD@Z");
-#endif
-
-  if (qtstartuphookaddr == NULL) {
-    cerr << "no address for qt_startup_hook found!" << endl;
-    return FALSE;
-  }
-  if (qtaddobjectaddr == NULL) {
-    cerr << "no address for qt_addObject found!" << endl;
-    return FALSE;
-  }
-  if (qtremobjectaddr == NULL) {
-    cerr << "no address for qt_removeObject found!" << endl;
-    return FALSE;
-  }
-  if (qFlagLocationaddr == NULL) {
-    cerr << "no address for qFlagLocation found!" << endl;
-    return FALSE;
-  }
-
   switch(dwReason) {
   case DLL_PROCESS_ATTACH:
   {
-    // write ourself into the hook chain
-    writeJmp(qtstartuphookaddr, (void *)qt_startup_hook);
-    writeJmp(qtaddobjectaddr, (void *)qt_addObject);
-    writeJmp(qtremobjectaddr, (void *)qt_removeObject);
-    writeJmp(qFlagLocationaddr, (void *)myFlagLocation);
+    overwriteQtFunctions();
+
     gammaray_probe_inject();
     break;
   }
@@ -823,12 +758,7 @@ class HitMeBabyOneMoreTime
   public:
     HitMeBabyOneMoreTime()
     {
-      void *qt_startup_hook_addr = dlsym(RTLD_NEXT, "qt_startup_hook");
-      void *qt_add_object_addr = dlsym(RTLD_NEXT, "qt_addObject");
-      void *qt_remove_object_addr = dlsym(RTLD_NEXT, "qt_removeObject");
-      writeJmp(qt_startup_hook_addr, (void *)qt_startup_hook);
-      writeJmp(qt_add_object_addr, (void *)qt_addObject);
-      writeJmp(qt_remove_object_addr, (void *)qt_removeObject);
+      overwriteQtFunctions();
     }
 
 };
