@@ -13,21 +13,18 @@ License: GPL-2+ or LGPL-2.1
 
 Files: 3rdparty/kde/*
 Copyright: 2007, David Faure <faure@kde.org>
+           2010, Klarälvdalens Datakonsult AB, a KDAB Group company
            2007-2008, Omat Holding B.V. <info@omat.nl>
            2009, Stephen Kelly <steveire@gmail.com>
 License: LGPL-2+
 
 Files: 3rdparty/qt/*
-       attach/processlist.h
-       attach/processlist_win.cpp
-       attach/processlist_unix.cpp
+       launcher/processlist.h
+       launcher/processlist_win.cpp
+       launcher/processlist_unix.cpp
        qmldebugcontrol/*
 Copyright: 2011, Nokia Corporation and/or its subsidiary(-ies)
 License: LGPL-2.1
-
-Files: qmldebugcontrol/canvas/qdeclarativetiledcanvas.cpp
-Copyright: 2010, Nokia Corporation and/or its subsidiary(-ies)
-License: BSD-3-clause
 
 Files: tools/messagehandler/StackWalker.cpp
        tools/messagehandler/StackWalker.h
