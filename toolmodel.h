@@ -66,9 +66,6 @@ class ToolModel : public QAbstractListModel
      */
     void objectAdded(const QMetaObject *mo);
 
-    /** List all possible tool plugin files. */
-    QStringList plugins() const;
-
   private:
     QVector<ToolFactory*> m_tools;
     QHash<ToolFactory*, QWidget*> m_toolWidgets;

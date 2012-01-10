@@ -17,11 +17,15 @@ if(NOT Prog_NAME)
   set(Prog_NAME "GammaRay")
 endif()
 
+set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/ ${CMAKE_MODULE_PATH})
+
 set(GAMMARAY_VERSION_MAJOR "1")
-set(GAMMARAY_VERSION_MINOR "0")
-set(GAMMARAY_VERSION_PATCH "1")
+set(GAMMARAY_VERSION_MINOR "1")
+set(GAMMARAY_VERSION_PATCH "0")
 set(GAMMARAY_VERSION "${GAMMARAY_VERSION_MAJOR}.${GAMMARAY_VERSION_MINOR}.${GAMMARAY_VERSION_PATCH}")
 set(GAMMARAY_VERSION_STRING "${GAMMARAY_VERSION}")
+
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
 
 enable_testing()
 
@@ -44,9 +48,29 @@ message(STATUS "Building ${Prog_NAME} ${GAMMARAY_VERSION_STRING} in ${CMAKE_BUIL
 add_definitions(-DPROGRAM_NAME=\"${Prog_NAME}\")
 
 include(CheckCXXCompilerFlag)
+include(CheckLibraryExists)
+include(GammaRayMacros)
 
-set(QT_MIN_VERSION "4.7.0")
-find_package(Qt4 REQUIRED)
+find_package(Qt5Core QUIET)
+
+if(Qt5Core_FOUND)
+
+  find_package(Qt5Gui REQUIRED)
+  find_package(Qt5Designer REQUIRED)
+  find_package(Qt5Script REQUIRED)
+  find_package(Qt5Network REQUIRED)
+  find_package(Qt5ScriptTools REQUIRED)
+  find_package(Qt5Widgets REQUIRED)
+  find_package(Qt5Svg REQUIRED)
+  find_package(Qt5PrintSupport REQUIRED)
+  find_package(Qt5Test REQUIRED)
+  find_package(Qt5Xml REQUIRED)
+  include(CMakeQt4To5Porting.cmake) # TODO: Port away from this.
+
+else()
+  set(QT_MIN_VERSION "4.7.0")
+  find_package(Qt4 REQUIRED)
+endif()
 
 if(CMAKE_BUILD_TYPE MATCHES "^[Rr]elease$")
   add_definitions(-DQT_NO_DEBUG_OUTPUT)
@@ -57,6 +81,7 @@ include_directories(
   ${CMAKE_BINARY_DIR}
   ${CMAKE_SOURCE_DIR}
   ${CMAKE_SOURCE_DIR}/3rdparty
+  ${CMAKE_SOURCE_DIR}/3rdparty/kde
 )
 
 set(LIB_SUFFIX "" CACHE STRING "Define suffix of directory name (32/64)")
@@ -69,6 +94,19 @@ set(
   LIBRARY DESTINATION ${LIB_INSTALL_DIR}
   ARCHIVE DESTINATION ${LIB_INSTALL_DIR} COMPONENT Devel
 )
+
+# TODO: Make this work on Windows, and test this on Mac
+check_library_exists(rt clock_gettime "" HAVE_CLOCK_GETTIME)
+if(HAVE_CLOCK_GETTIME)
+  set(BUILD_TIMER_PLUGIN TRUE)
+  message(STATUS "clock_gettime in librt found, building timer plugin.")
+elseif(WIN32)
+  set(BUILD_TIMER_PLUGIN TRUE)
+  message(STATUS "windows, building timer plugin.")
+else()
+  set(BUILD_TIMER_PLUGIN FALSE)
+  message(STATUS "clock_gettime in librt not found, disabling timer plugin.")
+endif()
 
 if(WIN32)
   add_definitions(-DUNICODE -D_UNICODE)
@@ -121,51 +159,43 @@ if(CMAKE_COMPILER_IS_GNUCXX)
   endif()
 endif()
 
-add_subdirectory(injector)
-
-set(gammaray_runner_srcs
-  injector/abstractinjector.cpp
-  injector/injectorfactory.cpp
-  injector/preloadinjector.cpp
-  injector/styleinjector.cpp
-  injector/windllinjector.cpp
-  injector/interactiveprocess.cpp
-  probefinder.cpp
-  main.cpp
-  promolabel.cpp
-  splashscreen.cpp
-
-  attach/attachdialog.cpp
-  attach/processmodel.cpp
-  attach/processfiltermodel.cpp
-
-  3rdparty/kde/kidentityproxymodel.cpp
-  3rdparty/kde/krecursivefilterproxymodel.cpp
-  3rdparty/kde/kfilterproxysearchline.cpp
-)
-if(NOT WIN32)
-  set(gammaray_runner_srcs
-    ${gammaray_runner_srcs}
-    injector/gdbinjector.cpp
-    attach/processlist_unix.cpp
-  )
-else()
-  set(gammaray_runner_srcs
-    ${gammaray_runner_srcs}
-    attach/processlist_win.cpp
-  )
+if(MINGW)
+  # mingw will error out on the crazy casts in probe.cpp without this
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fpermissive")
 endif()
 
-qt4_wrap_ui(gammaray_runner_srcs attach/attachdialog.ui)
-qt4_add_resources(gammaray_runner_srcs resources/gammaray.qrc)
+# linker flags
+if(CMAKE_SYSTEM_NAME MATCHES Linux OR CMAKE_SYSTEM_NAME STREQUAL GNU)
+  if(CMAKE_COMPILER_IS_GNUCXX)
+    set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--fatal-warnings -Wl,--no-undefined -lc ${CMAKE_SHARED_LINKER_FLAGS}")
+    set(CMAKE_MODULE_LINKER_FLAGS "-Wl,--fatal-warnings -Wl,--no-undefined -lc ${CMAKE_MODULE_LINKER_FLAGS}")
+  endif()
+endif()
 
-add_executable(gammaray ${gammaray_runner_srcs})
-target_link_libraries(gammaray ${QT_QTCORE_LIBRARY} ${QT_QTGUI_LIBRARY})
+add_subdirectory(injector)
+add_subdirectory(launcher)
+
+find_package(Graphviz)
+find_package(VTK)
 
 set(gammaray_srcs
   mainwindow.cpp
+  metaobject.cpp
+  metaobjectrepository.cpp
+  metaproperty.cpp
+  metapropertymodel.cpp
+  pluginmanager.cpp
   probe.cpp
+
   propertywidget.cpp
+  propertyeditor/propertycoloreditor.cpp
+  propertyeditor/propertydoublepaireditor.cpp
+  propertyeditor/propertyeditorfactory.cpp
+  propertyeditor/propertyextendededitor.cpp
+  propertyeditor/propertyfonteditor.cpp
+  propertyeditor/propertyintpaireditor.cpp
+
+  proxydetacher.cpp
   objectlistmodel.cpp
   objectpropertymodel.cpp
   objectdynamicpropertymodel.cpp
@@ -177,8 +207,6 @@ set(gammaray_srcs
   connectionmodel.cpp
   connectionfilterproxymodel.cpp
   tools/sceneinspector/scenemodel.cpp
-  tools/statemachineinspector/statemodel.cpp
-  tools/statemachineinspector/transitionmodel.cpp
   util.cpp
   tools/widgetinspector/widgetpreviewwidget.cpp
   methodinvocationdialog.cpp
@@ -192,6 +220,9 @@ set(gammaray_srcs
   tools/sceneinspector/graphicssceneview.cpp
   tools/metatypebrowser/metatypesmodel.cpp
   tools/fontbrowser/fontmodel.cpp
+  tools/localeinspector/localemodel.cpp
+  tools/localeinspector/localedataaccessor.cpp
+  tools/localeinspector/localeaccessormodel.cpp
   tools/codecbrowser/codecmodel.cpp
   tools/textdocumentinspector/textdocumentmodel.cpp
   tools/textdocumentinspector/textdocumentformatmodel.cpp
@@ -199,12 +230,14 @@ set(gammaray_srcs
   tools/messagehandler/messagehandler.cpp
   tools/messagehandler/messagemodel.cpp
   toolmodel.cpp
-  promolabel.cpp
+  proxydetacher.cpp
+  proxytoolfactory.cpp
   sidepane.cpp
 
   tools/codecbrowser/codecbrowser.cpp
   tools/connectioninspector/connectioninspector.cpp
   tools/fontbrowser/fontbrowser.cpp
+  tools/localeinspector/localeinspector.cpp
   tools/metatypebrowser/metatypebrowser.cpp
   tools/modelinspector/modelinspector.cpp
   tools/modelinspector/modelinspectorwidget.cpp
@@ -212,79 +245,101 @@ set(gammaray_srcs
   tools/resourcebrowser/resourcebrowser.cpp
   tools/resourcebrowser/resourcefiltermodel.cpp
   tools/sceneinspector/sceneinspector.cpp
-  tools/scriptenginedebugger/scriptenginedebugger.cpp
   tools/selectionmodelinspector/selectionmodelinspector.cpp
-  tools/statemachineinspector/statemachineinspector.cpp
   tools/textdocumentinspector/textdocumentinspector.cpp
-  tools/webinspector/webinspector.cpp
   tools/widgetinspector/widgetinspector.cpp
   tools/widgetinspector/overlaywidget.cpp
+  tools/widgetinspector/widgettreemodel.cpp
 
   3rdparty/kde/kidentityproxymodel.cpp
   3rdparty/kde/krecursivefilterproxymodel.cpp
   3rdparty/kde/kfilterproxysearchline.cpp
   3rdparty/qt/resourcemodel.cpp
+
+  hooking/abstractfunctionoverwriter.cpp
+  hooking/functionoverwriterfactory.cpp
+  hooking/winfunctionoverwriter.cpp
+  hooking/unixfunctionoverwriter.cpp
 )
+
+if(BUILD_TIMER_PLUGIN)
+  set(gammaray_srcs
+    ${gammaray_srcs}
+    tools/timertop/timertop.cpp
+    tools/timertop/timermodel.cpp
+    tools/timertop/timerinfo.cpp
+    tools/timertop/functioncalltimer.cpp
+  )
+endif()
 
 if(NOT WIN32)
   set(gammaray_srcs ${gammaray_srcs} tools/messagehandler/backtrace_unix.cpp)
+elseif(MINGW)
+  set(gammaray_srcs ${gammaray_srcs} tools/messagehandler/backtrace_dummy.cpp)
 else()
   set(gammaray_srcs ${gammaray_srcs}
                     tools/messagehandler/backtrace_win.cpp
                     tools/messagehandler/StackWalker.cpp)
 endif()
 
-qt4_automoc(${gammaray_srcs} ${gammaray_runner_srcs})
+qt4_automoc(${gammaray_srcs})
 qt4_wrap_ui(gammaray_srcs
   mainwindow.ui
   propertywidget.ui
   methodinvocationdialog.ui
+  propertyeditor/propertydoublepaireditor.ui
+  propertyeditor/propertyextendededitor.ui
+  propertyeditor/propertyintpaireditor.ui
   tools/sceneinspector/graphicssceneview.ui
-
   tools/codecbrowser/codecbrowser.ui
   tools/connectioninspector/connectioninspector.ui
   tools/fontbrowser/fontbrowser.ui
+  tools/localeinspector/localeinspector.ui
   tools/messagehandler/messagehandler.ui
   tools/metatypebrowser/metatypebrowser.ui
   tools/modelinspector/modelinspectorwidget.ui
   tools/objectinspector/objectinspector.ui
   tools/resourcebrowser/resourcebrowser.ui
   tools/sceneinspector/sceneinspector.ui
-  tools/scriptenginedebugger/scriptenginedebugger.ui
   tools/selectionmodelinspector/selectionmodelinspector.ui
-  tools/statemachineinspector/statemachineinspector.ui
   tools/textdocumentinspector/textdocumentinspector.ui
-  tools/webinspector/webinspector.ui
   tools/widgetinspector/widgetinspector.ui
 )
+
+if(BUILD_TIMER_PLUGIN)
+  qt4_wrap_ui(gammaray_srcs
+    tools/timertop/timertop.ui
+  )
+endif()
+
 qt4_add_resources(gammaray_srcs resources/gammaray.qrc)
-add_library(gammaray_probe SHARED ${gammaray_srcs})
+add_library(gammaray_probe
+  SHARED ${gammaray_srcs}
+)
+if(BUILD_TIMER_PLUGIN AND NOT WIN32)
+  target_link_libraries(gammaray_probe rt)
+endif()
 target_link_libraries(gammaray_probe
-  ${QT_QTCORE_LIBRARY}
-  ${QT_QTGUI_LIBRARY}
-  ${QT_QTSCRIPT_LIBRARY}
-  ${QT_QTSCRIPTTOOLS_LIBRARY}
-  ${QT_QTWEBKIT_LIBRARY}
+  ${QT_QTCORE_LIBRARIES}
+  ${QT_QTGUI_LIBRARIES}
 )
 if(NOT WIN32)
   target_link_libraries(gammaray_probe dl)
 endif()
 set_target_properties(gammaray_probe PROPERTIES PREFIX "")
 
-install(TARGETS gammaray gammaray_probe ${INSTALL_TARGETS_DEFAULT_ARGS})
+install(TARGETS gammaray_probe ${INSTALL_TARGETS_DEFAULT_ARGS})
 
 if(UNIX AND NOT APPLE)
   set(XDG_APPS_INSTALL_DIR share/applications)
   install(FILES GammaRay.desktop DESTINATION ${XDG_APPS_INSTALL_DIR})
 
-  install(FILES resources/GammaRay-16x16.png DESTINATION share/icons/hicolor/16x16/apps)
-  install(FILES resources/GammaRay-32x32.png DESTINATION share/icons/hicolor/32x32/apps)
-  install(FILES resources/GammaRay-48x48.png DESTINATION share/icons/hicolor/48x48/apps)
-  install(FILES resources/GammaRay-128x128.png DESTINATION share/icons/hicolor/128x128/apps)
-  install(FILES resources/GammaRay-256x256.png DESTINATION share/icons/hicolor/256x256/apps)
-  install(FILES resources/GammaRay-512x512.png DESTINATION share/icons/hicolor/512x512/apps)
-
-  install(FILES resources/kdablogo160.png resources/kdabproducts.png resources/splashscreen.png DESTINATION share/icons/hicolor/apps)
+  install(FILES resources/GammaRay-16x16.png DESTINATION share/icons/hicolor/16x16/apps RENAME GammaRay.png)
+  install(FILES resources/GammaRay-32x32.png DESTINATION share/icons/hicolor/32x32/apps RENAME GammaRay.png)
+  install(FILES resources/GammaRay-48x48.png DESTINATION share/icons/hicolor/48x48/apps RENAME GammaRay.png)
+  install(FILES resources/GammaRay-128x128.png DESTINATION share/icons/hicolor/128x128/apps RENAME GammaRay.png)
+  install(FILES resources/GammaRay-256x256.png DESTINATION share/icons/hicolor/256x256/apps RENAME GammaRay.png)
+  install(FILES resources/GammaRay-512x512.png DESTINATION share/icons/hicolor/512x512/apps RENAME GammaRay.png)
 endif()
 
 set(LICENSE_FILE "License.txt")
@@ -293,8 +348,6 @@ if(NOT APPLE)
   install(FILES "${LICENSE_FILE}" "${README_FILE}" DESTINATION ${DOC_INSTALL_DIR})
 endif()
 
-add_subdirectory(qmldebugcontrol)
-
 find_program(CPPCHECK_EXECUTABLE cppcheck)
 if(CPPCHECK_EXECUTABLE)
   set(_cppcheck_flags "-I${CMAKE_CURRENT_BINARY_DIR}")
@@ -302,8 +355,16 @@ if(CPPCHECK_EXECUTABLE)
   foreach(_current ${_inc_dirs})
     set(_cppcheck_flags ${_cppcheck_flags} "-I${_current}")
   endforeach()
+  get_directory_property(_defs COMPILE_DEFINITIONS)
+  foreach(_current ${_defs})
+    set(_cppcheck_flags ${_cppcheck_flags} "-D${_current}")
+  endforeach()
+
   add_custom_target(cppcheck
-    COMMAND ${CPPCHECK_EXECUTABLE} --enable=all -j 4 --quiet ${_cppcheck_flags} ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMAND ${CPPCHECK_EXECUTABLE} --enable=all -j 4 --suppress=*:${QT_INCLUDE_DIR}* ${_cppcheck_flags}
+      -i${CMAKE_CURRENT_SOURCE_DIR}/3rdparty
+      -i${CMAKE_CURRENT_SOURCE_DIR}/tests
+      ${CMAKE_CURRENT_SOURCE_DIR}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     COMMENT "Running the cppcheck static code checker"
   )
@@ -323,3 +384,4 @@ endif()
 include(ExternalProject)
 
 add_subdirectory(tests)
+add_subdirectory(tools)

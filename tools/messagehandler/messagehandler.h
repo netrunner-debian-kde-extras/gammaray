@@ -20,12 +20,12 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#ifndef MESSAGEHANDLER_H
-#define MESSAGEHANDLER_H
+#ifndef GAMMARAY_MESSAGEHANDLER_H
+#define GAMMARAY_MESSAGEHANDLER_H
 
 #include <toolfactory.h>
 
-#include <QtGui/QWidget>
+#include <QWidget>
 
 class QSortFilterProxyModel;
 

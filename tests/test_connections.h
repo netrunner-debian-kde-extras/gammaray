@@ -21,8 +21,8 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef TEST_CONNECTIONS_H
-#define TEST_CONNECTIONS_H
+#ifndef TEST_GAMMARAY_CONNECTIONS_H
+#define TEST_GAMMARAY_CONNECTIONS_H
 
 #include <QtCore/QObject>
 #include <QtCore/QThread>
@@ -94,10 +94,17 @@ class TestThread : public QThread
 class TestMain : public QObject
 {
   Q_OBJECT
+  public:
+    TestMain(int argc, char **m_argv);
+  public slots:
+    void startTests();
   private slots:
     void run_data();
     void run();
     void threading();
+  private:
+    int m_argc;
+    char **m_argv;
 };
 
 class TestWaiter : public QObject

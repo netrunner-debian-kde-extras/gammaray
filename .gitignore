@@ -1,5 +1,13 @@
+# general
 *.kdev4
 *~
 *.rej
 *.orig
 .*
+CMakeLists.txt.user
+
+# from git merge
+*.BACKUP.*
+*.BASE.*
+*.LOCAL.*
+*.REMOTE.*

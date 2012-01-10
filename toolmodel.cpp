@@ -28,19 +28,21 @@
 #include "tools/codecbrowser/codecbrowser.h"
 #include "tools/connectioninspector/connectioninspector.h"
 #include "tools/fontbrowser/fontbrowser.h"
+#include "tools/localeinspector/localeinspector.h"
 #include "tools/metatypebrowser/metatypebrowser.h"
 #include "tools/modelinspector/modelinspector.h"
 #include "tools/objectinspector/objectinspector.h"
 #include "tools/resourcebrowser/resourcebrowser.h"
 #include "tools/sceneinspector/sceneinspector.h"
-#include "tools/scriptenginedebugger/scriptenginedebugger.h"
 #include "tools/selectionmodelinspector/selectionmodelinspector.h"
-#include "tools/statemachineinspector/statemachineinspector.h"
 #include "tools/textdocumentinspector/textdocumentinspector.h"
-#include "tools/webinspector/webinspector.h"
 #include "tools/widgetinspector/widgetinspector.h"
 #include "tools/messagehandler/messagehandler.h"
+#ifdef BUILD_TIMER_PLUGIN
+#include "tools/timertop/timertop.h"
+#endif
 
+#include "pluginmanager.h"
 #include "probe.h"
 #include "readorwritelocker.h"
 
@@ -48,7 +50,6 @@
 #include <QDebug>
 #include <QDir>
 #include <QLibrary>
-#include <QPluginLoader>
 #include <QThread>
 
 using namespace GammaRay;
@@ -60,31 +61,21 @@ ToolModel::ToolModel(QObject *parent): QAbstractListModel(parent)
   m_tools.push_back(new WidgetInspectorFactory(this));
   m_tools.push_back(new ModelInspector(this));
   m_tools.push_back(new SceneInspectorFactory(this));
-  m_tools.push_back(new ScriptEngineDebuggerFactory(this));
-  m_tools.push_back(new WebInspectorFactory(this));
   m_tools.push_back(new ConnectionInspectorFactory(this));
   m_tools.push_back(new ResourceBrowserFactory(this));
-  m_tools.push_back(new StateMachineInspectorFactory(this));
   m_tools.push_back(new MetaTypeBrowserFactory(this));
   m_tools.push_back(new SelectionModelInspectorFactory(this));
   m_tools.push_back(new FontBrowserFactory(this));
   m_tools.push_back(new CodecBrowserFactory(this));
   m_tools.push_back(new TextDocumentInspectorFactory(this));
   m_tools.push_back(new MessageHandlerFactory(this));
+  m_tools.push_back(new LocaleInspectorFactory(this));
+#ifdef BUILD_TIMER_PLUGIN
+  m_tools.push_back(new TimerTopFactory(this));
+#endif
 
-  // tool plugins
-  foreach (const QString &pluginFile, plugins()) {
-    QPluginLoader *loader = new QPluginLoader(pluginFile, this);
-    if (loader->load()) {
-      ToolFactory *factory = qobject_cast<ToolFactory*>(loader->instance());
-      if (factory) {
-        m_tools.push_back(factory);
-        continue;
-      }
-    } else {
-      qWarning() << "could not load plugin:" << loader->errorString();
-    }
-    delete loader;
+  Q_FOREACH (ToolFactory *factory, PluginManager::instance()->plugins()) {
+    m_tools.push_back(factory);
   }
 
   // everything but the object inspector is inactive initially
@@ -184,26 +175,6 @@ void ToolModel::objectAdded(const QMetaObject *mo)
   if (mo->superClass()) {
     objectAdded(mo->superClass());
   }
-}
-
-QStringList ToolModel::plugins() const
-{
-  QStringList r;
-
-  if (!QCoreApplication::libraryPaths().contains(QLatin1String(GAMMARAY_PLUGIN_INSTALL_DIR))) {
-    QCoreApplication::addLibraryPath(QLatin1String(GAMMARAY_PLUGIN_INSTALL_DIR));
-  }
-
-  foreach (const QString &pluginDir, QCoreApplication::libraryPaths()) {
-    QDir dir(pluginDir + QLatin1String("/gammaray/"));
-    foreach (const QString &plugin, dir.entryList(QDir::Files)) {
-      const QString pluginFile = dir.absoluteFilePath(plugin);
-      if (QLibrary::isLibrary(pluginFile)) {
-        r.push_back(pluginFile);
-      }
-    }
-  }
-  return r;
 }
 
 #include "toolmodel.moc"
