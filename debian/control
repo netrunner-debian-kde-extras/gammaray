@@ -15,6 +15,7 @@ Package: gammaray
 Architecture: any
 Depends: ${shlibs:Depends},
          ${misc:Depends}
+Recommends: gdb
 Description: Tool for examining the internals of Qt application
  GammaRay is a tool for examining the internals of a Qt application and
  to some extent also manipulate it. GammaRay uses injection methods to
