@@ -1,0 +1,21 @@
+From: Jakub Adam <jakub.adam@ktknet.cz>
+Date: Sun, 6 May 2012 01:18:37 +0200
+Subject: debian-multiarch
+
+---
+ CMakeLists.txt |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index bc69cd0..1d26012 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -85,7 +85,7 @@ include_directories(
+ )
+ 
+ set(LIB_SUFFIX "" CACHE STRING "Define suffix of directory name (32/64)")
+-set(LIB_INSTALL_DIR "lib${LIB_SUFFIX}")
++set(LIB_INSTALL_DIR "lib${LIB_SUFFIX}/${CMAKE_LIBRARY_ARCHITECTURE}")
+ set(PLUGIN_INSTALL_DIR "${LIB_INSTALL_DIR}/qt4/plugins")
+ set(MODULE_INSTALL_DIR "${LIB_INSTALL_DIR}/gammaray")
+ 
