@@ -1,2 +1,3 @@
 probe-lib-location.patch
 debian-multiarch.patch
+gcc-4.7-build-fix.patch
