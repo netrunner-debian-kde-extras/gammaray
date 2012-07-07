@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2011 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Milian Wolff <milian.wolff@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -53,19 +53,23 @@ class ProcessModel : public QAbstractTableModel
       UserColumn,
       COLUMN_COUNT
     };
+
     virtual int columnCount(const QModelIndex &parent = QModelIndex()) const;
     virtual int rowCount(const QModelIndex &parent = QModelIndex()) const;
+
     enum CustomRoles {
       PIDRole = Qt::UserRole,
       NameRole,
       StateRole,
       UserRole
     };
+
     virtual QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const;
 
     virtual QVariant headerData(int section, Qt::Orientation orientation,
                                 int role = Qt::DisplayRole) const;
-private:
+
+  private:
     ProcDataList m_data;
 };
 

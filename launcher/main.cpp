@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2011 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -68,9 +68,15 @@ int main(int argc, char **argv)
   QApplication::setOrganizationDomain("kdab.com");
   QApplication::setApplicationName("GammaRay");
 
+  QStringList args;
+  for (int i = 1; i < argc; ++i) {
+    args.push_back(QString::fromLocal8Bit(argv[i]));
+  }
   QApplication app(argc, argv);
-  QStringList args = app.arguments();
-  args.takeFirst(); // that's us
+
+  QStringList builtInArgs = QStringList() << QLatin1String("-style")
+                                          << QLatin1String("-stylesheet")
+                                          << QLatin1String("-graphicssystem");
 
   QString injectorType;
   int pid = -1;
@@ -102,6 +108,12 @@ int main(int argc, char **argv)
     }
     if (arg == QLatin1String("-modeltest")) {
       qputenv("GAMMARAY_MODELTEST", "1");
+    }
+    // built-in arguments of QApp, could be meant for us if we are showing the launcher window
+    foreach (const QString &builtInArg, builtInArgs) {
+      if (arg == builtInArg && !args.isEmpty()) {
+        args.takeFirst();
+      }
     }
   }
 

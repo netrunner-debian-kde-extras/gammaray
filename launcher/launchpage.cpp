@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2011 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2011-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -25,10 +25,10 @@
 #include "ui_launchpage.h"
 
 #include <QCompleter>
+#include <QFileDialog>
 #include <QFileSystemModel>
-#include <qfiledialog.h>
-#include <qstringlistmodel.h>
 #include <QSettings>
+#include <QStringListModel>
 
 using namespace GammaRay;
 
@@ -66,25 +66,40 @@ void LaunchPage::writeSettings()
 {
   QSettings settings;
   settings.setValue(QLatin1String("Launcher/Program"), ui->progEdit->text());
-  settings.setValue(QLatin1String("Launcher/Arguments"), m_argsModel->stringList());
+  settings.setValue(QLatin1String("Launcher/Arguments"), notEmptyString(m_argsModel->stringList()));
+}
+
+QStringList LaunchPage::notEmptyString(const QStringList &list) const
+{
+  QStringList notEmptyStringList;
+  const int numberOfArguments = list.count();
+  for (int i = 0; i < numberOfArguments; ++i) {
+    if(!list.at(i).trimmed().isEmpty()) {
+      notEmptyStringList << list.at(i);
+    }
+  }
+  return notEmptyStringList;
 }
 
 QStringList LaunchPage::launchArguments() const
 {
   QStringList l;
   l.push_back(ui->progEdit->text());
-  l.append(m_argsModel->stringList());
+  l.append(notEmptyString(m_argsModel->stringList()));
   return l;
 }
 
 void LaunchPage::showFileDialog()
 {
-  // TODO: add *.exe filter on Windows
   const QString exeFilePath =
     QFileDialog::getOpenFileName(
       this,
       tr("Executable to Launch"),
-      ui->progEdit->text());
+      ui->progEdit->text()
+#ifdef Q_OS_WIN
+      ,tr("Executable (*.exe)")
+#endif
+    );
 
   if (exeFilePath.isEmpty()) {
     return;

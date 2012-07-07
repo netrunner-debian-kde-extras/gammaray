@@ -6,8 +6,12 @@
 #  Set this if your compiler uses an unsupported C++ name mangling scheme
 #  Default=off
 #
-# To build the man page from POD, run 'make man' after CMake.
+# To build the man page from POD, run 'make man' after CMake (assumes perl is available)
 # To install the resulting man page, run 'make install'
+# Not available on Windows.
+#
+# To build the apidox, run 'make docs' after CMake (assumes doxygen is available)
+# Not available on Windows.
 #
 
 project(GammaRay)
@@ -20,10 +24,12 @@ endif()
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/ ${CMAKE_MODULE_PATH})
 
 set(GAMMARAY_VERSION_MAJOR "1")
-set(GAMMARAY_VERSION_MINOR "1")
+set(GAMMARAY_VERSION_MINOR "2")
 set(GAMMARAY_VERSION_PATCH "0")
 set(GAMMARAY_VERSION "${GAMMARAY_VERSION_MAJOR}.${GAMMARAY_VERSION_MINOR}.${GAMMARAY_VERSION_PATCH}")
 set(GAMMARAY_VERSION_STRING "${GAMMARAY_VERSION}")
+
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
 
@@ -32,9 +38,11 @@ enable_testing()
 if(EXISTS "${CMAKE_SOURCE_DIR}/.git")
   find_package(Git)
   if(GIT_FOUND)
-    execute_process(COMMAND ${GIT_EXECUTABLE} rev-parse --short HEAD
-                    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-                    OUTPUT_VARIABLE _git_revision)
+    execute_process(
+      COMMAND ${GIT_EXECUTABLE} rev-parse --short HEAD
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+      OUTPUT_VARIABLE _git_revision
+    )
     string(REGEX REPLACE "\n" "" _git_revision "${_git_revision}")
     set(GAMMARAY_VERSION_STRING "${GAMMARAY_VERSION_STRING} (revision: ${_git_revision})")
   endif()
@@ -46,43 +54,35 @@ endif()
 
 message(STATUS "Building ${Prog_NAME} ${GAMMARAY_VERSION_STRING} in ${CMAKE_BUILD_TYPE} mode")
 add_definitions(-DPROGRAM_NAME=\"${Prog_NAME}\")
+add_definitions(-DQT_USE_FAST_CONCATENATION -DQT_USE_FAST_OPERATOR_PLUS -DQT_STRICT_ITERATORS)
 
 include(CheckCXXCompilerFlag)
 include(CheckLibraryExists)
 include(GammaRayMacros)
+include(MacroLogFeature)
 
-find_package(Qt5Core QUIET)
+set(QT_MIN_VERSION "4.7.0")
+find_package(Qt5Transitional REQUIRED
+  Core
+  Gui
+  Script
+  ScriptTools
+  Svg
+  Test
+)
 
+# TODO: Remove me once fixed in ECM module
 if(Qt5Core_FOUND)
-
-  find_package(Qt5Gui REQUIRED)
-  find_package(Qt5Designer REQUIRED)
-  find_package(Qt5Script REQUIRED)
-  find_package(Qt5Network REQUIRED)
-  find_package(Qt5ScriptTools REQUIRED)
-  find_package(Qt5Widgets REQUIRED)
-  find_package(Qt5Svg REQUIRED)
-  find_package(Qt5PrintSupport REQUIRED)
-  find_package(Qt5Test REQUIRED)
-  find_package(Qt5Xml REQUIRED)
-  include(CMakeQt4To5Porting.cmake) # TODO: Port away from this.
-
-else()
-  set(QT_MIN_VERSION "4.7.0")
-  find_package(Qt4 REQUIRED)
+  # Avoid errors and build in PIC mode:
+  # qt5/qtbase/include/QtCore/qglobal.h:1765:4: error:
+  #   #error "You must build your code with position independent code if Qt was
+  #   built with -reduce-relocations. " "Compile your code with -fPIC or -fPIE."
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
 endif()
 
 if(CMAKE_BUILD_TYPE MATCHES "^[Rr]elease$")
   add_definitions(-DQT_NO_DEBUG_OUTPUT)
 endif()
-
-include_directories(
-  ${QT_INCLUDES}
-  ${CMAKE_BINARY_DIR}
-  ${CMAKE_SOURCE_DIR}
-  ${CMAKE_SOURCE_DIR}/3rdparty
-  ${CMAKE_SOURCE_DIR}/3rdparty/kde
-)
 
 set(LIB_SUFFIX "" CACHE STRING "Define suffix of directory name (32/64)")
 set(LIB_INSTALL_DIR "lib${LIB_SUFFIX}")
@@ -95,17 +95,53 @@ set(
   ARCHIVE DESTINATION ${LIB_INSTALL_DIR} COMPONENT Devel
 )
 
-# TODO: Make this work on Windows, and test this on Mac
-check_library_exists(rt clock_gettime "" HAVE_CLOCK_GETTIME)
-if(HAVE_CLOCK_GETTIME)
-  set(BUILD_TIMER_PLUGIN TRUE)
-  message(STATUS "clock_gettime in librt found, building timer plugin.")
-elseif(WIN32)
-  set(BUILD_TIMER_PLUGIN TRUE)
-  message(STATUS "windows, building timer plugin.")
+macro_log_feature(
+  QT_QTWEBKIT_FOUND
+  "WebKit in Qt"
+  "A Qt-based web browser engine"
+  "included with Qt"
+  FALSE
+  ""
+  "Required for the webinspector tool"
+)
+
+find_path(
+  QT_PRIVATE_INCLUDE_DIR private/qobject_p.h
+  PATHS ${QT_INCLUDES}
+)
+if(QT_PRIVATE_INCLUDE_DIR)
+  # not enough, some of them include harfbuzz headers, so we need to find those as well
+  # for now we assume a regular Qt4 source build layout, but that probably should be generalized
+  find_path(
+    HARFBUZZ_INCLUDE_DIR harfbuzz.h
+    PATH ${QT_PRIVATE_INCLUDE_DIR}/../../src/3rdparty/harfbuzz/src
+  )
+endif()
+
+if(QT_PRIVATE_INCLUDE_DIR AND HARFBUZZ_INCLUDE_DIR)
+  set(HAVE_PRIVATE_QT_HEADERS TRUE)
+  include_directories(${HARFBUZZ_INCLUDE_DIR})
 else()
-  set(BUILD_TIMER_PLUGIN FALSE)
-  message(STATUS "clock_gettime in librt not found, disabling timer plugin.")
+  set(HAVE_PRIVATE_QT_HEADERS FALSE)
+  # needs to go before Qt includes, in case we have non-working headers with the same name there
+  include_directories(BEFORE ${CMAKE_SOURCE_DIR}/3rdparty/qt)
+endif()
+macro_log_feature(
+  HAVE_PRIVATE_QT_HEADERS
+  "Qt internals"
+  "Private Qt headers, necessary for painter debugging/profiling."
+  "http://developer.qt.nokia.com/"
+  FALSE
+  ${QT_MIN_VERSION}
+  "You must have a build version of Qt available. Make sure the qmake found first in your execute comes from this build version."
+)
+
+if(WIN32 OR APPLE)
+  set(BUILD_TIMER_PLUGIN TRUE)
+else()
+  check_library_exists(rt clock_gettime "" HAVE_CLOCK_GETTIME)
+  macro_log_feature(HAVE_CLOCK_GETTIME "librt" "High resolution clock for the timer profiler plugin." "part of glibc" FALSE)
+  set(BUILD_TIMER_PLUGIN ${HAVE_CLOCK_GETTIME})
 endif()
 
 if(WIN32)
@@ -150,7 +186,7 @@ configure_file(
 if(CMAKE_COMPILER_IS_GNUCXX)
   check_cxx_compiler_flag(-Wunused-but-set-variable HAVE_GCC_UNUSED_BUT_SET)
   check_cxx_compiler_flag(-Wlogical-op HAVE_GCC_LOGICAL_OP)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated -Wextra -Woverloaded-virtual -Winit-self -Wmissing-include-dirs -Wunused -Wno-div-by-zero -Wundef -Wpointer-arith -Wcast-qual -Wcast-align -Wmissing-noreturn -Werror=return-type")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated -Wextra -Woverloaded-virtual -Winit-self -Wmissing-include-dirs -Wunused -Wno-div-by-zero -Wundef -Wpointer-arith -Wcast-qual -Wcast-align -Wmissing-noreturn -Werror=return-type -fvisibility=hidden")
   if(HAVE_GCC_UNUSED_BUT_SET)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wunused-but-set-variable")
   endif()
@@ -172,174 +208,61 @@ if(CMAKE_SYSTEM_NAME MATCHES Linux OR CMAKE_SYSTEM_NAME STREQUAL GNU)
   endif()
 endif()
 
-add_subdirectory(injector)
+add_subdirectory(core)
 add_subdirectory(launcher)
 
-find_package(Graphviz)
-find_package(VTK)
-
-set(gammaray_srcs
-  mainwindow.cpp
-  metaobject.cpp
-  metaobjectrepository.cpp
-  metaproperty.cpp
-  metapropertymodel.cpp
-  pluginmanager.cpp
-  probe.cpp
-
-  propertywidget.cpp
-  propertyeditor/propertycoloreditor.cpp
-  propertyeditor/propertydoublepaireditor.cpp
-  propertyeditor/propertyeditorfactory.cpp
-  propertyeditor/propertyextendededitor.cpp
-  propertyeditor/propertyfonteditor.cpp
-  propertyeditor/propertyintpaireditor.cpp
-
-  proxydetacher.cpp
-  objectlistmodel.cpp
-  objectpropertymodel.cpp
-  objectdynamicpropertymodel.cpp
-  objectstaticpropertymodel.cpp
-  objectclassinfomodel.cpp
-  objectmethodmodel.cpp
-  objectenummodel.cpp
-  objecttreemodel.cpp
-  connectionmodel.cpp
-  connectionfilterproxymodel.cpp
-  tools/sceneinspector/scenemodel.cpp
-  util.cpp
-  tools/widgetinspector/widgetpreviewwidget.cpp
-  methodinvocationdialog.cpp
-  methodargumentmodel.cpp
-  multisignalmapper.cpp
-  singlecolumnobjectproxymodel.cpp
-  tools/modelinspector/modeltester.cpp
-  tools/modelinspector/modelmodel.cpp
-  tools/modelinspector/modelcellmodel.cpp
-  tools/sceneinspector/graphicsview.cpp
-  tools/sceneinspector/graphicssceneview.cpp
-  tools/metatypebrowser/metatypesmodel.cpp
-  tools/fontbrowser/fontmodel.cpp
-  tools/localeinspector/localemodel.cpp
-  tools/localeinspector/localedataaccessor.cpp
-  tools/localeinspector/localeaccessormodel.cpp
-  tools/codecbrowser/codecmodel.cpp
-  tools/textdocumentinspector/textdocumentmodel.cpp
-  tools/textdocumentinspector/textdocumentformatmodel.cpp
-  tools/textdocumentinspector/textdocumentcontentview.cpp
-  tools/messagehandler/messagehandler.cpp
-  tools/messagehandler/messagemodel.cpp
-  toolmodel.cpp
-  proxydetacher.cpp
-  proxytoolfactory.cpp
-  sidepane.cpp
-
-  tools/codecbrowser/codecbrowser.cpp
-  tools/connectioninspector/connectioninspector.cpp
-  tools/fontbrowser/fontbrowser.cpp
-  tools/localeinspector/localeinspector.cpp
-  tools/metatypebrowser/metatypebrowser.cpp
-  tools/modelinspector/modelinspector.cpp
-  tools/modelinspector/modelinspectorwidget.cpp
-  tools/objectinspector/objectinspector.cpp
-  tools/resourcebrowser/resourcebrowser.cpp
-  tools/resourcebrowser/resourcefiltermodel.cpp
-  tools/sceneinspector/sceneinspector.cpp
-  tools/selectionmodelinspector/selectionmodelinspector.cpp
-  tools/textdocumentinspector/textdocumentinspector.cpp
-  tools/widgetinspector/widgetinspector.cpp
-  tools/widgetinspector/overlaywidget.cpp
-  tools/widgetinspector/widgettreemodel.cpp
-
-  3rdparty/kde/kidentityproxymodel.cpp
-  3rdparty/kde/krecursivefilterproxymodel.cpp
-  3rdparty/kde/kfilterproxysearchline.cpp
-  3rdparty/qt/resourcemodel.cpp
-
-  hooking/abstractfunctionoverwriter.cpp
-  hooking/functionoverwriterfactory.cpp
-  hooking/winfunctionoverwriter.cpp
-  hooking/unixfunctionoverwriter.cpp
-)
-
-if(BUILD_TIMER_PLUGIN)
-  set(gammaray_srcs
-    ${gammaray_srcs}
-    tools/timertop/timertop.cpp
-    tools/timertop/timermodel.cpp
-    tools/timertop/timerinfo.cpp
-    tools/timertop/functioncalltimer.cpp
-  )
-endif()
-
-if(NOT WIN32)
-  set(gammaray_srcs ${gammaray_srcs} tools/messagehandler/backtrace_unix.cpp)
-elseif(MINGW)
-  set(gammaray_srcs ${gammaray_srcs} tools/messagehandler/backtrace_dummy.cpp)
-else()
-  set(gammaray_srcs ${gammaray_srcs}
-                    tools/messagehandler/backtrace_win.cpp
-                    tools/messagehandler/StackWalker.cpp)
-endif()
-
-qt4_automoc(${gammaray_srcs})
-qt4_wrap_ui(gammaray_srcs
-  mainwindow.ui
-  propertywidget.ui
-  methodinvocationdialog.ui
-  propertyeditor/propertydoublepaireditor.ui
-  propertyeditor/propertyextendededitor.ui
-  propertyeditor/propertyintpaireditor.ui
-  tools/sceneinspector/graphicssceneview.ui
-  tools/codecbrowser/codecbrowser.ui
-  tools/connectioninspector/connectioninspector.ui
-  tools/fontbrowser/fontbrowser.ui
-  tools/localeinspector/localeinspector.ui
-  tools/messagehandler/messagehandler.ui
-  tools/metatypebrowser/metatypebrowser.ui
-  tools/modelinspector/modelinspectorwidget.ui
-  tools/objectinspector/objectinspector.ui
-  tools/resourcebrowser/resourcebrowser.ui
-  tools/sceneinspector/sceneinspector.ui
-  tools/selectionmodelinspector/selectionmodelinspector.ui
-  tools/textdocumentinspector/textdocumentinspector.ui
-  tools/widgetinspector/widgetinspector.ui
-)
-
-if(BUILD_TIMER_PLUGIN)
-  qt4_wrap_ui(gammaray_srcs
-    tools/timertop/timertop.ui
-  )
-endif()
-
 qt4_add_resources(gammaray_srcs resources/gammaray.qrc)
-add_library(gammaray_probe
-  SHARED ${gammaray_srcs}
-)
-if(BUILD_TIMER_PLUGIN AND NOT WIN32)
-  target_link_libraries(gammaray_probe rt)
-endif()
-target_link_libraries(gammaray_probe
-  ${QT_QTCORE_LIBRARIES}
-  ${QT_QTGUI_LIBRARIES}
-)
-if(NOT WIN32)
-  target_link_libraries(gammaray_probe dl)
-endif()
-set_target_properties(gammaray_probe PROPERTIES PREFIX "")
 
-install(TARGETS gammaray_probe ${INSTALL_TARGETS_DEFAULT_ARGS})
+find_package(Graphviz)
+macro_log_feature(
+  GRAPHVIZ_FOUND
+  "Graphviz"
+  "Graph layouting library for the state machine visualizer."
+  "http://www.graphviz.org/"
+  FALSE
+)
+
+#VTK discovery works a lot better if you give CMake a hint using the VTK_DIR variable
+find_path(VTK_DIR VTKConfig.cmake
+  /usr/lib64/vtk /usr/lib/vtk /usr/local/lib64/vtk /usr/local/lib/vtk
+)
+find_package(VTK)
+macro_log_feature(
+  VTK_FOUND
+  "VTK"
+  "Graph visualizing library for the object visualization plugin."
+  "http://www.vtk.org"
+  FALSE
+)
 
 if(UNIX AND NOT APPLE)
   set(XDG_APPS_INSTALL_DIR share/applications)
   install(FILES GammaRay.desktop DESTINATION ${XDG_APPS_INSTALL_DIR})
 
-  install(FILES resources/GammaRay-16x16.png DESTINATION share/icons/hicolor/16x16/apps RENAME GammaRay.png)
-  install(FILES resources/GammaRay-32x32.png DESTINATION share/icons/hicolor/32x32/apps RENAME GammaRay.png)
-  install(FILES resources/GammaRay-48x48.png DESTINATION share/icons/hicolor/48x48/apps RENAME GammaRay.png)
-  install(FILES resources/GammaRay-128x128.png DESTINATION share/icons/hicolor/128x128/apps RENAME GammaRay.png)
-  install(FILES resources/GammaRay-256x256.png DESTINATION share/icons/hicolor/256x256/apps RENAME GammaRay.png)
-  install(FILES resources/GammaRay-512x512.png DESTINATION share/icons/hicolor/512x512/apps RENAME GammaRay.png)
+  install(
+    FILES resources/GammaRay-16x16.png
+    DESTINATION share/icons/hicolor/16x16/apps RENAME GammaRay.png
+  )
+  install(
+    FILES resources/GammaRay-32x32.png
+    DESTINATION share/icons/hicolor/32x32/apps RENAME GammaRay.png
+  )
+  install(
+    FILES resources/GammaRay-48x48.png
+    DESTINATION share/icons/hicolor/48x48/apps RENAME GammaRay.png
+  )
+  install(
+    FILES resources/GammaRay-128x128.png
+    DESTINATION share/icons/hicolor/128x128/apps RENAME GammaRay.png
+  )
+  install(
+    FILES resources/GammaRay-256x256.png
+    DESTINATION share/icons/hicolor/256x256/apps RENAME GammaRay.png
+  )
+  install(
+    FILES resources/GammaRay-512x512.png
+    DESTINATION share/icons/hicolor/512x512/apps RENAME GammaRay.png
+  )
 endif()
 
 set(LICENSE_FILE "License.txt")
@@ -364,24 +287,50 @@ if(CPPCHECK_EXECUTABLE)
     COMMAND ${CPPCHECK_EXECUTABLE} --enable=all -j 4 --suppress=*:${QT_INCLUDE_DIR}* ${_cppcheck_flags}
       -i${CMAKE_CURRENT_SOURCE_DIR}/3rdparty
       -i${CMAKE_CURRENT_SOURCE_DIR}/tests
-      ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     COMMENT "Running the cppcheck static code checker"
   )
 endif()
 
 if(UNIX)
-  add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/gammaray.1
-                     COMMAND pod2man -c "KDAB Products" -r "\"${GAMMARAY_VERSION}\"" -s 1 ${CMAKE_SOURCE_DIR}/gammaray.pod ${CMAKE_BINARY_DIR}/gammaray.1
-                     DEPENDS ${CMAKE_SOURCE_DIR}/gammaray.pod
-                     )
-
+  #man page generation using pod2man
+  add_custom_command(
+    OUTPUT ${CMAKE_BINARY_DIR}/gammaray.1
+    COMMAND pod2man -c "KDAB Products" -r "\"${GAMMARAY_VERSION}\"" -s 1 ${CMAKE_SOURCE_DIR}/gammaray.pod ${CMAKE_BINARY_DIR}/gammaray.1
+    DEPENDS ${CMAKE_SOURCE_DIR}/gammaray.pod
+  )
   add_custom_target(man ALL DEPENDS ${CMAKE_BINARY_DIR}/gammaray.1)
 
-  install(FILES ${CMAKE_BINARY_DIR}/gammaray.1 DESTINATION ${CMAKE_INSTALL_PREFIX}/man/man1)
+  install(FILES ${CMAKE_BINARY_DIR}/gammaray.1 DESTINATION ${CMAKE_INSTALL_PREFIX}/share/man/man1)
+
+  file(GLOB API_LIST include/*.h include/*.dox images/*.html)
+
+  #apidox generation using doxygen
+  add_custom_command(
+    OUTPUT ${CMAKE_BINARY_DIR}/apidocs/html/index.html
+    COMMAND echo \"PROJECT_NUMBER = ${GAMMARAY_VERSION}\" > ${CMAKE_BINARY_DIR}/versfoo
+    COMMAND echo \"INPUT = ${CMAKE_SOURCE_DIR}/include\" > ${CMAKE_BINARY_DIR}/inputfoo
+    COMMAND echo \"IMAGE_PATH = ${CMAKE_SOURCE_DIR}/images\" > ${CMAKE_BINARY_DIR}/imgfoo
+    COMMAND echo \"HTML_FOOTER = ${CMAKE_SOURCE_DIR}/images/footer.html\" > ${CMAKE_BINARY_DIR}/footfoo
+    COMMAND cat ${CMAKE_SOURCE_DIR}/Doxyfile
+                ${CMAKE_BINARY_DIR}/versfoo
+                ${CMAKE_BINARY_DIR}/inputfoo
+                ${CMAKE_BINARY_DIR}/imgfoo
+                ${CMAKE_BINARY_DIR}/footfoo | doxygen -
+    DEPENDS ${API_LIST} ${CMAKE_SOURCE_DIR}/Doxyfile
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+  )
+  add_custom_target(docs
+    DEPENDS ${CMAKE_BINARY_DIR}/apidocs/html/index.html
+  )
+
 endif()
 
 include(ExternalProject)
 
+add_subdirectory(include)
 add_subdirectory(tests)
-add_subdirectory(tools)
+add_subdirectory(plugins)
+
+macro_display_feature_log()

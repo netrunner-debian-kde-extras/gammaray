@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2011 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Andreas Holzammer <andreas.holzammer@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -27,10 +27,11 @@
 
 #include <dlfcn.h>
 #include <inttypes.h>
+#include <cassert>
+
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/errno.h>
-#include <assert.h>
 
 static inline void *
 page_align(void *addr)
