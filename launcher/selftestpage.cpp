@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2011 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2011-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -22,12 +22,13 @@
 */
 
 #include "selftestpage.h"
-#include "ui_selftestpage.h"
 #include "probefinder.h"
+#include "ui_selftestpage.h"
 
+#include "injector/injectorfactory.h"
+
+#include <QFileInfo>
 #include <QStandardItemModel>
-#include <qfileinfo.h>
-#include <injector/injectorfactory.h>
 
 using namespace GammaRay;
 
@@ -102,6 +103,7 @@ void SelfTestPage::testInjectors()
 void SelfTestPage::error(const QString &msg)
 {
   QStandardItem *item = new QStandardItem;
+  item->setEditable(false);
   item->setText(msg);
   item->setIcon(style()->standardIcon(QStyle::SP_MessageBoxCritical));
   m_resultModel->appendRow(item);
@@ -110,6 +112,7 @@ void SelfTestPage::error(const QString &msg)
 void SelfTestPage::information(const QString &msg)
 {
   QStandardItem *item = new QStandardItem;
+  item->setEditable(false);
   item->setText(msg);
   item->setIcon(style()->standardIcon(QStyle::SP_MessageBoxInformation));
   m_resultModel->appendRow(item);

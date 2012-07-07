@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2011 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2011-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -24,7 +24,7 @@
 #ifndef GAMMARAY_LAUNCHPAGE_H
 #define GAMMARAY_LAUNCHPAGE_H
 
-#include <qwidget.h>
+#include <QWidget>
 
 class QStringListModel;
 
@@ -56,6 +56,7 @@ class LaunchPage : public QWidget
     void updateArgumentButtons();
 
   private:
+    QStringList notEmptyString(const QStringList &list) const;
     Ui::LaunchPage *ui;
     QStringListModel *m_argsModel;
 };

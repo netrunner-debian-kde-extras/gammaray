@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2011 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Milian Wolff <milian.wolff@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -21,11 +21,11 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef TEST_GAMMARAY_CONNECTIONS_H
-#define TEST_GAMMARAY_CONNECTIONS_H
+#ifndef GAMMARAY_TEST_CONNECTIONS_H
+#define GAMMARAY_TEST_CONNECTIONS_H
 
-#include <QtCore/QObject>
-#include <QtCore/QThread>
+#include <QObject>
+#include <QThread>
 
 class QTimer;
 class QEventLoop;
