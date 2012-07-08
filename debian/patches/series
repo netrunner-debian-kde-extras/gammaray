@@ -1,2 +1,3 @@
 widget-export-actions-location.patch
 debian-multiarch.patch
+harfbuzz-search-path.patch

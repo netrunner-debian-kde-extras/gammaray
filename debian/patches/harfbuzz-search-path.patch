@@ -1,0 +1,23 @@
+From: Jakub Adam <jakub.adam@ktknet.cz>
+Date: Sun, 8 Jul 2012 14:47:26 +0200
+Subject: harfbuzz-search-path
+
+---
+ CMakeLists.txt |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 126dfb3..70208fa 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -114,8 +114,8 @@ if(QT_PRIVATE_INCLUDE_DIR)
+   # not enough, some of them include harfbuzz headers, so we need to find those as well
+   # for now we assume a regular Qt4 source build layout, but that probably should be generalized
+   find_path(
+-    HARFBUZZ_INCLUDE_DIR harfbuzz.h
+-    PATH ${QT_PRIVATE_INCLUDE_DIR}/../../src/3rdparty/harfbuzz/src
++    HARFBUZZ_INCLUDE_DIR harfbuzz-shaper.h
++    PATH ${QT_PRIVATE_INCLUDE_DIR}/../../src/corelib/tools
+   )
+ endif()
+ 
