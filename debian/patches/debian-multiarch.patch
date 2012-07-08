@@ -7,11 +7,11 @@ Subject: debian-multiarch
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index bc69cd0..1d26012 100644
+index 971ecbf..126dfb3 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -85,7 +85,7 @@ include_directories(
- )
+@@ -85,7 +85,7 @@ if(CMAKE_BUILD_TYPE MATCHES "^[Rr]elease$")
+ endif()
  
  set(LIB_SUFFIX "" CACHE STRING "Define suffix of directory name (32/64)")
 -set(LIB_INSTALL_DIR "lib${LIB_SUFFIX}")
