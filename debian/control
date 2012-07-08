@@ -26,6 +26,22 @@ Description: Tool for examining the internals of Qt application
  the complex internal structures you find in some Qt frameworks, such as
  QGraphicsView, model/view, QTextDocument, state machines and more.
 
+Package: gammaray-dev
+Architecture: any
+Section: libdevel
+Depends: gammaray (= ${binary:Version}),
+         ${misc:Depends}
+Description: GammaRay plugin development files
+ GammaRay is a tool for examining the internals of a Qt application and
+ to some extent also manipulate it. GammaRay uses injection methods to
+ hook into an application at runtime and provide access to a wide variety
+ of interesting information. It provides easy ways of navigating through
+ the complex internal structures you find in some Qt frameworks, such as
+ QGraphicsView, model/view, QTextDocument, state machines and more.
+ .
+ This package contains header files used for building 3rd party GammaRay
+ plugins.
+
 Package: gammaray-dbg
 Architecture: any
 Section: debug
