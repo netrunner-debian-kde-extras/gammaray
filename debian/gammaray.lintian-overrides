@@ -1,0 +1,1 @@
+gammaray: hardening-no-fortify-functions usr/lib/*/libgammaray_probe.so.*
