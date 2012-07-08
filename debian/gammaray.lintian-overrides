@@ -1,1 +1,2 @@
 gammaray: hardening-no-fortify-functions usr/lib/*/libgammaray_probe.so.*
+gammaray: package-name-doesnt-match-sonames
