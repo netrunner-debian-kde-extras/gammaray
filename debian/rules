@@ -6,7 +6,7 @@
 	dh $@ --parallel
 
 override_dh_auto_test:
-	# Do not perform test suite as it requires X11 running
+	xvfb-run dh_auto_test
 
 override_dh_auto_install:
 	dh_auto_install

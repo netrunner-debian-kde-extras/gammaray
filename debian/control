@@ -7,7 +7,10 @@ Build-Depends: debhelper (>= 9~),
                libqt4-dev,
                libqt4-private-dev,
                libqtwebkit-dev,
-               graphviz-dev
+               graphviz-dev,
+               gdb,
+               xauth,
+               xvfb
 Standards-Version: 3.9.3
 Vcs-Git: git://anonscm.debian.org/collab-maint/gammaray.git
 Vcs-Browser: http://anonscm.debian.org/gitweb/?p=collab-maint/gammaray.git
