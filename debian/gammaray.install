@@ -1,5 +1,5 @@
 usr/bin
-usr/lib/*/gammaray
-usr/lib/*/libgammaray_probe.so.*
-usr/lib/*/qt4
+usr/lib/gammaray
+usr/lib/libgammaray_probe.so.*
+usr/lib/qt4
 usr/share
