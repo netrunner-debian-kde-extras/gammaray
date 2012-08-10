@@ -1,6 +1,6 @@
 #!/usr/bin/make -f
 
-.PHONY: override_dh_strip
+.PHONY: override_dh_auto_test override_dh_auto_install override_dh_installdocs override_dh_strip
 
 %:
 	dh $@ --parallel
