@@ -1,7 +1,8 @@
 Source: gammaray
 Priority: optional
 Section: devel
-Maintainer: Jakub Adam <jakub.adam@ktknet.cz>
+Maintainer: Debian Qt/KDE Maintainers <debian-qt-kde@lists.debian.org>
+Uploaders: Jakub Adam <jakub.adam@ktknet.cz>
 Build-Depends: debhelper (>= 9~),
                cmake,
                libqt4-dev,
