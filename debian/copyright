@@ -6,11 +6,6 @@ Copyright: 2006, Bradley T. Hughes
            2010-2011, Klarälvdalens Datakonsult AB, a KDAB Group company
 License: GPL-2+
 
-Files: qmljsdebugger_global.h
-Copyright: 2010-2011, Klarälvdalens Datakonsult AB, a KDAB Group company
-           2011, Nokia Corporation
-License: GPL-2+ or LGPL-2.1
-
 Files: 3rdparty/kde/*
 Copyright: 2007, David Faure <faure@kde.org>
            2010, Klarälvdalens Datakonsult AB, a KDAB Group company
@@ -22,21 +17,44 @@ Files: 3rdparty/qt/*
        launcher/processlist.h
        launcher/processlist_win.cpp
        launcher/processlist_unix.cpp
-       qmldebugcontrol/*
 Copyright: 2011, Nokia Corporation and/or its subsidiary(-ies)
 License: LGPL-2.1
 
-Files: tools/messagehandler/StackWalker.cpp
-       tools/messagehandler/StackWalker.h
+Files: cmake/FindQt5Transitional.cmake
+       cmake/GammaRayMacros.cmake
+Copyright: TODO unknown
+License: TODO unknown
+
+Files: cmake/ECMQt4To5Porting.cmake
+Copyright: 2005-2011, Kitware, Inc.
+License: BSD-3-clause
+
+Files: cmake/FindGraphviz.cmake
+Copyright: 2009, Adrien Bustany <madcat@mymadcat.com>
+License: GPL-3+
+
+Files: cmake/MacroLogFeature.cmake
+Copyright: 2006, Alexander Neundorf <neundorf@kde.org>
+           2006, Allen Winter <winter@kde.org>
+           2009, Sebastian Trueg <trueg@kde.org>
+License: BSD-3-clause
+
+Files: core/palettemodel.cpp
+Copyright: 2010, Ariya Hidayat <ariya.hidayat@gmail.com>
+           2012, Klarälvdalens Datakonsult AB, a KDAB Group company <info@kdab.com>
+License: GPL-2+
+
+Files: core/tools/messagehandler/StackWalker.cpp
+       core/tools/messagehandler/StackWalker.h
 Copyright: 2005-2011, Jochen Kalmbach
 License: BSD-2-clause
 
-Files: tools/modelinspector/modeltest.cpp
-       tools/modelinspector/modeltest.h
+Files: core/tools/modelinspector/modeltest.cpp
+       core/tools/modelinspector/modeltest.h
 Copyright: 2007 Trolltech ASA
 License: GPL-2
 
-Files: tools/messagehandler/backtrace_unix.cpp
+Files: core/tools/messagehandler/backtrace_unix.cpp
 Copyright: 2002 Holger Freyther (freyther@kde.org)
            2010-2011, Klarälvdalens Datakonsult AB, a KDAB Group company
            1997, Matthias Kalle Dalheimer (kalle@kde.org)
@@ -53,6 +71,12 @@ License: GPL-2+
  For full text of GPL-2 see /usr/share/common-licenses/GPL-2.
  For the latest version of the GPL see /usr/share/common-licenses/GPL.
 
+License: GPL-3+
+ You may use the software under the terms of GNU General Public License v3 or,
+ at your option, any later version.
+ .
+ For full text of GPL-3 see /usr/share/common-licenses/GPL-3.
+ For the latest version of the GPL see /usr/share/common-licenses/GPL.
 
 License: LGPL-2
  For full text of GNU Library General Public License v2 see
@@ -89,3 +113,29 @@ License: BSD-2-clause
  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+License: BSD-3-clause
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions
+ are met:
+ .
+  * Redistributions of source code must retain the above copyright
+    notice, this list of conditions and the following disclaimer.
+  * Redistributions in binary form must reproduce the above copyright
+    notice, this list of conditions and the following disclaimer in the
+    documentation and/or other materials provided with the distribution.
+  * Neither the name of Kitware, Inc. nor the names of its
+    contributors may be used to endorse or promote products derived
+    from this software without specific prior written permission.
+ .
+ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
