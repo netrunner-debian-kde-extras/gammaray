@@ -1,9 +1,17 @@
 #!/usr/bin/make -f
 
-.PHONY: override_dh_auto_test override_dh_auto_install override_dh_installdocs override_dh_strip
+.PHONY: override_dh_auto_configure override_dh_auto_test override_dh_auto_install override_dh_installdocs override_dh_strip override_dh_clean
 
 %:
 	dh $@ --parallel
+
+override_dh_auto_configure:
+	# Move away bundled Qt private headers so that system versions are used
+	if [ -d 3rdparty/qt/private ]; then \
+		mv 3rdparty/qt/private 3rdparty/qt/private.dont.use; \
+	fi
+
+	dh_auto_configure
 
 override_dh_auto_test:
 	xvfb-run dh_auto_test
@@ -17,3 +25,11 @@ override_dh_installdocs:
 
 override_dh_strip:
 	dh_strip --dbg-package=gammaray-dbg
+
+override_dh_clean:
+	dh_clean
+
+	# Put back bundled Qt private headers to restore sources into original state
+	if [ -d 3rdparty/qt/private.dont.use ]; then \
+		mv 3rdparty/qt/private.dont.use 3rdparty/qt/private; \
+	fi
