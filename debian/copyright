@@ -21,9 +21,12 @@ Copyright: 2011, Nokia Corporation and/or its subsidiary(-ies)
 License: LGPL-2.1
 
 Files: cmake/FindQt5Transitional.cmake
-       cmake/GammaRayMacros.cmake
-Copyright: TODO unknown
-License: TODO unknown
+Copyright: 2012, Klarälvdalens Datakonsult AB, a KDAB Group company <info@kdab.com>
+License: BSD-3-clause
+
+Files: cmake/GammaRayMacros.cmake
+Copyright: 2011, Volker Krause <volker.krause@kdab.com>
+License: BSD-3-clause
 
 Files: cmake/ECMQt4To5Porting.cmake
 Copyright: 2005-2011, Kitware, Inc.
