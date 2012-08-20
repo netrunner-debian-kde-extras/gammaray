@@ -25,7 +25,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/ ${CMAKE_MODULE_PATH})
 
 set(GAMMARAY_VERSION_MAJOR "1")
 set(GAMMARAY_VERSION_MINOR "2")
-set(GAMMARAY_VERSION_PATCH "0")
+set(GAMMARAY_VERSION_PATCH "1")
 set(GAMMARAY_VERSION "${GAMMARAY_VERSION_MAJOR}.${GAMMARAY_VERSION_MINOR}.${GAMMARAY_VERSION_PATCH}")
 set(GAMMARAY_VERSION_STRING "${GAMMARAY_VERSION}")
 
@@ -65,8 +65,6 @@ set(QT_MIN_VERSION "4.7.0")
 find_package(Qt5Transitional REQUIRED
   Core
   Gui
-  Script
-  ScriptTools
   Svg
   Test
 )
@@ -78,6 +76,10 @@ if(Qt5Core_FOUND)
   #   #error "You must build your code with position independent code if Qt was
   #   built with -reduce-relocations. " "Compile your code with -fPIC or -fPIE."
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+
+  # more hacks: find qpa/... includes
+  # also see https://codereview.qt-project.org/#change,30483
+  include_directories(${Qt5Gui_PRIVATE_INCLUDE_DIRS})
 endif()
 
 if(CMAKE_BUILD_TYPE MATCHES "^[Rr]elease$")
@@ -93,6 +95,16 @@ set(
   RUNTIME DESTINATION bin
   LIBRARY DESTINATION ${LIB_INSTALL_DIR}
   ARCHIVE DESTINATION ${LIB_INSTALL_DIR} COMPONENT Devel
+)
+
+macro_log_feature(
+  QT_QTSCRIPTTOOLS_FOUND
+  "Script engine debugger in Qt"
+  "A debugger for QtScript"
+  "included with Qt"
+  FALSE
+  ""
+  "Required for the script engine debugger tool"
 )
 
 macro_log_feature(
@@ -211,16 +223,20 @@ endif()
 add_subdirectory(core)
 add_subdirectory(launcher)
 
-qt4_add_resources(gammaray_srcs resources/gammaray.qrc)
-
+set(GRAPHVIZ_MIN_VERSION "2.20")
 find_package(Graphviz)
 macro_log_feature(
   GRAPHVIZ_FOUND
   "Graphviz"
-  "Graph layouting library for the state machine visualizer."
+  "Graph visualization software"
   "http://www.graphviz.org/"
   FALSE
+  ${GRAPHVIZ_MIN_VERSION}
+  "Needed for the state machine visualizer plugin"
 )
+if(GRAPHVIZ_FOUND)
+  add_definitions(-DGRAPHVIZ_MAJOR_VERSION=${GRAPHVIZ_MAJOR_VERSION} -DGRAPHVIZ_MINOR_VERSION=${GRAPHVIZ_MINOR_VERSION})
+endif()
 
 #VTK discovery works a lot better if you give CMake a hint using the VTK_DIR variable
 find_path(VTK_DIR VTKConfig.cmake
@@ -230,9 +246,11 @@ find_package(VTK)
 macro_log_feature(
   VTK_FOUND
   "VTK"
-  "Graph visualizing library for the object visualization plugin."
+  "Visualization Toolkit"
   "http://www.vtk.org"
   FALSE
+  ""
+  "Needed for the object visualization plugin"
 )
 
 if(UNIX AND NOT APPLE)

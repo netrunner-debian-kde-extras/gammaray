@@ -216,6 +216,7 @@ QString GammaRay::Util::variantToString(const QVariant &value)
     return QObject::tr("<%1 elements>").arg(path.elementCount());
   }
 
+#if (QT_VERSION < QT_VERSION_CHECK(5, 0, 0))
   if (value.type() == (QVariant::Type)qMetaTypeId<QWidget*>()) {
     return displayString(value.value<QWidget*>());
   }
@@ -238,6 +239,12 @@ QString GammaRay::Util::variantToString(const QVariant &value)
   if (value.userType() == qMetaTypeId<const QStyle*>()) {
     return displayString(value.value<const QStyle*>());
   }
+#else
+  // HACK workaround for a Qt bug which makes canConvert<QObject*>() crash on a variant holding a null pointer
+  if (value.value<QObject*>() && value.canConvert<QObject*>()) {
+    return displayString(value.value<QObject*>());
+  }
+#endif
 
   // enums
   const QString enumStr = enumToString(value);
