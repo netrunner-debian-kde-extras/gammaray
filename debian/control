@@ -3,7 +3,7 @@ Priority: optional
 Section: devel
 Maintainer: Debian KDE Extras Team <pkg-kde-extras@lists.alioth.debian.org>
 Uploaders: Jakub Adam <jakub.adam@ktknet.cz>
-Build-Depends: debhelper (>= 9~),
+Build-Depends: debhelper (>= 9),
                cmake,
                libqt4-dev,
                libqt4-private-dev,
@@ -51,9 +51,8 @@ Package: gammaray-dbg
 Architecture: any
 Section: debug
 Priority: extra
-Depends:
-    gammaray (= ${binary:Version}),
-    ${misc:Depends}
+Depends: gammaray (= ${binary:Version}),
+         ${misc:Depends}
 Description: debugging symbols for gammaray
  GammaRay is a tool for examining the internals of a Qt application and
  to some extent also manipulate it. GammaRay uses injection methods to
