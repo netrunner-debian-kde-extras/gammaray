@@ -1,5 +1,5 @@
-gammaray (1.2.1-1) UNRELEASED; urgency=low
+gammaray (1.2.1-1) unstable; urgency=low
 
   * Initial release. (Closes: #654667)
 
- -- Jakub Adam <jakub.adam@ktknet.cz>  Tue, 10 Jan 2012 12:36:37 +0100
+ -- Jakub Adam <jakub.adam@ktknet.cz>  Tue, 21 Aug 2012 10:48:10 +0200
