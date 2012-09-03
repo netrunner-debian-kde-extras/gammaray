@@ -1,3 +1,10 @@
+gammaray (1.2.1-2) UNRELEASED; urgency=low
+
+  * Build-depend on libgraphviz-dev instead of dummy transitional
+    graphviz-dev.
+
+ -- Jakub Adam <jakub.adam@ktknet.cz>  Mon, 03 Sep 2012 08:53:49 +0200
+
 gammaray (1.2.1-1) unstable; urgency=low
 
   * Initial release. (Closes: #654667)
