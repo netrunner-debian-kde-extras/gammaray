@@ -1,0 +1,21 @@
+From: Jakub Adam <jakub.adam@ktknet.cz>
+Date: Tue, 4 Sep 2012 21:25:27 +0200
+Subject: gnu-hurd-build-fix
+
+---
+ plugins/timertop/functioncalltimer.cpp |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/plugins/timertop/functioncalltimer.cpp b/plugins/timertop/functioncalltimer.cpp
+index 34be761..3940f64 100644
+--- a/plugins/timertop/functioncalltimer.cpp
++++ b/plugins/timertop/functioncalltimer.cpp
+@@ -26,7 +26,7 @@
+ #include <Windows.h>
+ #endif
+ 
+-#ifdef __MACH__
++#if defined(Q_OS_MAC) && defined(__MACH__)
+ #include <mach/clock.h>
+ #include <mach/mach.h>
+ #endif
