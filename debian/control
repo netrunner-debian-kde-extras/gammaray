@@ -18,7 +18,7 @@ Vcs-Browser: http://anonscm.debian.org/gitweb/?p=pkg-kde/kde-extras/gammaray.git
 Homepage: http://www.kdab.com/gammaray
 
 Package: gammaray
-Architecture: any-i386 any-amd64
+Architecture: any
 Pre-Depends: ${misc:Pre-Depends}
 Depends: ${shlibs:Depends},
          ${misc:Depends}
@@ -32,7 +32,7 @@ Description: Tool for examining the internals of Qt application
  QGraphicsView, model/view, QTextDocument, state machines and more.
 
 Package: gammaray-dev
-Architecture: any-i386 any-amd64
+Architecture: any
 Section: libdevel
 Depends: gammaray (= ${binary:Version}),
          ${misc:Depends}
@@ -48,7 +48,7 @@ Description: GammaRay plugin development files
  plugins.
 
 Package: gammaray-dbg
-Architecture: any-i386 any-amd64
+Architecture: any
 Section: debug
 Priority: extra
 Depends: gammaray (= ${binary:Version}),
