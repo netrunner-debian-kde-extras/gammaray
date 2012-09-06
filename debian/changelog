@@ -1,4 +1,4 @@
-gammaray (1.2.1-2) UNRELEASED; urgency=low
+gammaray (1.2.1-2) unstable; urgency=low
 
   * Build-depend on libgraphviz-dev instead of dummy transitional
     graphviz-dev.
@@ -7,7 +7,7 @@ gammaray (1.2.1-2) UNRELEASED; urgency=low
     Windows and Mac, disabling it fixes building GammaRay on other archs
     than i386 and amd64.
 
- -- Jakub Adam <jakub.adam@ktknet.cz>  Mon, 03 Sep 2012 08:53:49 +0200
+ -- Jakub Adam <jakub.adam@ktknet.cz>  Thu, 06 Sep 2012 15:45:25 +0200
 
 gammaray (1.2.1-1) unstable; urgency=low
 
