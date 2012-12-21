@@ -16,6 +16,8 @@
 
 # Redistribution and use is allowed according to the terms of the GPLv3+ license.
 
+include(CheckIncludeFiles)
+
 if(NOT GRAPHVIZ_MIN_VERSION)
   set(GRAPHVIZ_MIN_VERSION "2.00")
 endif()
@@ -42,13 +44,17 @@ find_library(GRAPHVIZ_CGRAPH_LIBRARY NAMES cgraph PATH_SUFFIXES ${GRAPHVIZ_LIB_P
 find_library(GRAPHVIZ_GRAPH_LIBRARY NAMES graph PATH_SUFFIXES ${GRAPHVIZ_LIB_PATH_SUFFIX})
 find_library(GRAPHVIZ_PATHPLAN_LIBRARY NAMES pathplan PATH_SUFFIXES ${GRAPHVIZ_LIB_PATH_SUFFIX})
 
-if(GRAPHVIZ_INCLUDE_DIR AND GRAPHVIZ_CDT_LIBRARY AND GRAPHVIZ_GVC_LIBRARY AND GRAPHVIZ_CGRAPH_LIBRARY AND GRAPHVIZ_GRAPH_LIBRARY AND GRAPHVIZ_PATHPLAN_LIBRARY)
+check_include_files(graphviz/graphviz_version.h HAVE_GRAPHVIZ_VERSION_H)
+
+if(GRAPHVIZ_INCLUDE_DIR AND GRAPHVIZ_CDT_LIBRARY AND GRAPHVIZ_GVC_LIBRARY
+    AND GRAPHVIZ_CGRAPH_LIBRARY AND GRAPHVIZ_GRAPH_LIBRARY AND GRAPHVIZ_PATHPLAN_LIBRARY
+    AND HAVE_GRAPHVIZ_VERSION_H)
   set(GRAPHVIZ_FOUND TRUE)
 else()
   set(GRAPHVIZ_FOUND FALSE)
 endif()
 
-#ok now compute the version and make sure its greater then the min required
+# Ok, now compute the version and make sure its greater then the min required
 if(GRAPHVIZ_FOUND)
   set(FIND_GRAPHVIZ_VERSION_SOURCE
     "#include <graphviz/graphviz_version.h>\n#include <stdio.h>\n int main()\n {\n printf(\"%s\",PACKAGE_VERSION);return 1;\n }\n")
@@ -84,7 +90,7 @@ if(GRAPHVIZ_FOUND)
     endif()
   endif()
 
-  #compute the major and minor version numbers
+  # Compute the major and minor version numbers
   if(NOT CMAKE_CROSSCOMPILING)
     string(REPLACE "." ";" VL ${GRAPHVIZ_VERSION})
     list(GET VL 0 GRAPHVIZ_MAJOR_VERSION)
