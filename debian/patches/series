@@ -2,5 +2,3 @@ widget-export-actions-location.patch
 harfbuzz-search-path.patch
 find-widget-export-actions-when-attaching.patch
 gammaray-probe-versioned-soname.patch
-gnu-hurd-build-fix.patch
-dont-build-functionoverwriter.patch
