@@ -3,6 +3,7 @@ gammaray (1.2.2-1) UNRELEASED; urgency=low
   * New upstream release.
   * Removed d/patches/dont-build-functionoverwriter.patch and
     debian/patches/gnu-hurd-build-fix.patch (applied upstream).
+  * Refreshed d/patches/gammaray-probe-versioned-soname.patch.
 
  -- Jakub Adam <jakub.adam@ktknet.cz>  Fri, 21 Dec 2012 22:39:46 +0100
 
