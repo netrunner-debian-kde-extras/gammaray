@@ -32,6 +32,19 @@ Description: Tool for examining the internals of Qt application
  the complex internal structures you find in some Qt frameworks, such as
  QGraphicsView, model/view, QTextDocument, state machines and more.
 
+Package: gammaray-plugin-objectvisualizer
+Architecture: any
+Depends: gammaray (= ${binary:Version}),
+         ${shlibs:Depends},
+         ${misc:Depends}
+Description: QObject hierarchy visualization plugin for GammaRay
+ This plugin can visualize parent-child relationships of QObjects in a
+ form of planar or 3D acyclic graph. Multiple graph layout algorihtms
+ are available.
+ .
+ Also, for use with 3D glasses, various types of stereoscopic rendering
+ are supported.
+
 Package: gammaray-dev
 Architecture: any
 Section: libdevel

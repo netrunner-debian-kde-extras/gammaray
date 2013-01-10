@@ -1,5 +1,9 @@
 usr/bin
 usr/lib/gammaray
 usr/lib/libgammaray_probe.so.*
-usr/lib/qt4
+usr/lib/qt4/plugins/gammaray/gammaray_actioninspector*
+usr/lib/qt4/plugins/gammaray/gammaray_scriptenginedebugger*
+usr/lib/qt4/plugins/gammaray/gammaray_statemachineviewer*
+usr/lib/qt4/plugins/gammaray/gammaray_timertop*
+usr/lib/qt4/plugins/gammaray/gammaray_webinspector*
 usr/share
