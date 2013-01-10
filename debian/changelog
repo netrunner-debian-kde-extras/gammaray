@@ -1,3 +1,9 @@
+gammaray (1.2.2-2) UNRELEASED; urgency=low
+
+  * Add dependency on VTK 5.10 and enable object visualizer plugin.
+
+ -- Jakub Adam <jakub.adam@ktknet.cz>  Thu, 10 Jan 2013 19:20:50 +0100
+
 gammaray (1.2.2-1) unstable; urgency=low
 
   * New upstream release.
