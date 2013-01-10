@@ -1,6 +1,8 @@
 gammaray (1.2.2-2) UNRELEASED; urgency=low
 
   * Add dependency on VTK 5.10 and enable object visualizer plugin.
+  * Don't set RPATH in binaries; prevents binary-or-shlib-defines-rpath
+    lintian error.
 
  -- Jakub Adam <jakub.adam@ktknet.cz>  Thu, 10 Jan 2013 19:20:50 +0100
 
