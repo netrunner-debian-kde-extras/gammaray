@@ -6,4 +6,5 @@ usr/lib/qt4/plugins/gammaray/gammaray_scriptenginedebugger*
 usr/lib/qt4/plugins/gammaray/gammaray_statemachineviewer*
 usr/lib/qt4/plugins/gammaray/gammaray_timertop*
 usr/lib/qt4/plugins/gammaray/gammaray_webinspector*
+usr/lib/qt4/plugins/styles
 usr/share
