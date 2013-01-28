@@ -15,32 +15,32 @@ postinst-must-call-ldconfig
  3 files changed, 3 insertions(+), 2 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 74548df..971ecbf 100644
+index 4254e18..e448b56 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -87,6 +87,7 @@ endif()
- set(LIB_SUFFIX "" CACHE STRING "Define suffix of directory name (32/64)")
- set(LIB_INSTALL_DIR "lib${LIB_SUFFIX}")
- set(PLUGIN_INSTALL_DIR "${LIB_INSTALL_DIR}/qt4/plugins")
+@@ -126,6 +126,7 @@ if(Qt5Core_FOUND)
+ else()
+   set(PLUGIN_INSTALL_DIR "${LIB_INSTALL_DIR}/qt4/plugins")
+ endif()
 +set(MODULE_INSTALL_DIR "${LIB_INSTALL_DIR}/gammaray")
  
  set(
    INSTALL_TARGETS_DEFAULT_ARGS
 diff --git a/core/tools/widgetinspector/CMakeLists.txt b/core/tools/widgetinspector/CMakeLists.txt
-index eefa624..e851f8d 100644
+index 94d8798..0a22d8b 100644
 --- a/core/tools/widgetinspector/CMakeLists.txt
 +++ b/core/tools/widgetinspector/CMakeLists.txt
-@@ -10,4 +10,4 @@ target_link_libraries(gammaray_widget_export_actions
+@@ -12,4 +12,4 @@ target_link_libraries(gammaray_widget_export_actions
    ${QT_QTDESIGNER_LIBRARIES}
  )
  
 -install(TARGETS gammaray_widget_export_actions ${INSTALL_TARGETS_DEFAULT_ARGS})
 +install(TARGETS gammaray_widget_export_actions DESTINATION ${MODULE_INSTALL_DIR})
 diff --git a/core/tools/widgetinspector/widgetinspector.cpp b/core/tools/widgetinspector/widgetinspector.cpp
-index dcd9e1a..1fafc92 100644
+index 6d9bded..9af5048 100644
 --- a/core/tools/widgetinspector/widgetinspector.cpp
 +++ b/core/tools/widgetinspector/widgetinspector.cpp
-@@ -246,7 +246,7 @@ void WidgetInspector::callExternalExportAction(const char *name,
+@@ -279,7 +279,7 @@ void WidgetInspector::callExternalExportAction(const char *name,
  {
    if (!m_externalExportActions.isLoaded()) {
      const QString probePath =

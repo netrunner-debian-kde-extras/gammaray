@@ -10,11 +10,11 @@ Subject: gammaray-probe-versioned-soname
  4 files changed, 4 insertions(+), 2 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index f2055bb..4bbee30 100644
+index fe396a0..01dc3ac 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -28,6 +28,7 @@ set(GAMMARAY_VERSION_MINOR "2")
- set(GAMMARAY_VERSION_PATCH "2")
+@@ -28,6 +28,7 @@ set(GAMMARAY_VERSION_MINOR "3")
+ set(GAMMARAY_VERSION_PATCH "0")
  set(GAMMARAY_VERSION "${GAMMARAY_VERSION_MAJOR}.${GAMMARAY_VERSION_MINOR}.${GAMMARAY_VERSION_PATCH}")
  set(GAMMARAY_VERSION_STRING "${GAMMARAY_VERSION}")
 +set(GAMMARAY_PROBE_SOVERSION "${GAMMARAY_VERSION_STRING}")
@@ -22,7 +22,7 @@ index f2055bb..4bbee30 100644
  set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
  
 diff --git a/config-gammaray.h.cmake b/config-gammaray.h.cmake
-index 0236a7c..2bda83c 100644
+index 11c8cc3..b79c05d 100644
 --- a/config-gammaray.h.cmake
 +++ b/config-gammaray.h.cmake
 @@ -1,5 +1,6 @@
@@ -33,10 +33,10 @@ index 0236a7c..2bda83c 100644
  #define GAMMARAY_BUILD_DIR "${CMAKE_BINARY_DIR}"
  
 diff --git a/core/CMakeLists.txt b/core/CMakeLists.txt
-index b49d795..10d81e3 100644
+index b0d6cf2..4978a5b 100644
 --- a/core/CMakeLists.txt
 +++ b/core/CMakeLists.txt
-@@ -172,6 +172,6 @@ target_link_libraries(gammaray_probe
+@@ -193,6 +193,6 @@ endif()
  if(NOT WIN32)
    target_link_libraries(gammaray_probe dl)
  endif()
@@ -45,7 +45,7 @@ index b49d795..10d81e3 100644
  
  install(TARGETS gammaray_probe ${INSTALL_TARGETS_DEFAULT_ARGS})
 diff --git a/launcher/probefinder.cpp b/launcher/probefinder.cpp
-index 6ab643b..d011a60 100644
+index 7590e47..a6a8b44 100644
 --- a/launcher/probefinder.cpp
 +++ b/launcher/probefinder.cpp
 @@ -50,7 +50,7 @@ QString findProbe(const QString &baseName)
