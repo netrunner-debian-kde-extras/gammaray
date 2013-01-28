@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -224,12 +224,6 @@ QString GammaRay::Util::variantToString(const QVariant &value)
   if (value.userType() == qMetaTypeId<QGraphicsEffect*>()) {
     return addressToString(value.value<QGraphicsEffect*>());
   }
-  if (value.userType() == qMetaTypeId<QGraphicsItem*>()) {
-    return addressToString(value.value<QGraphicsItem*>());
-  }
-  if (value.userType() == qMetaTypeId<QGraphicsItemGroup*>()) {
-    return addressToString(value.value<QGraphicsItemGroup*>());
-  }
   if (value.userType() == qMetaTypeId<QGraphicsObject*>()) {
     return displayString(value.value<QGraphicsObject*>());
   }
@@ -240,11 +234,17 @@ QString GammaRay::Util::variantToString(const QVariant &value)
     return displayString(value.value<const QStyle*>());
   }
 #else
-  // HACK workaround for a Qt bug which makes canConvert<QObject*>() crash on a variant holding a null pointer
-  if (value.value<QObject*>() && value.canConvert<QObject*>()) {
+  if (value.canConvert<QObject*>()) {
     return displayString(value.value<QObject*>());
   }
 #endif
+
+  if (value.userType() == qMetaTypeId<QGraphicsItem*>()) {
+    return addressToString(value.value<QGraphicsItem*>());
+  }
+  if (value.userType() == qMetaTypeId<QGraphicsItemGroup*>()) {
+    return addressToString(value.value<QGraphicsItemGroup*>());
+  }
 
   // enums
   const QString enumStr = enumToString(value);

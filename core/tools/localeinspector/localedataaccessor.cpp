@@ -2,7 +2,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2011-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2011-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Stephen Kelly <stephen.kelly@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -25,35 +25,35 @@
 
 using namespace GammaRay;
 
-Q_GLOBAL_STATIC(LocaleDataAccessorRegistry, instance)
-
-LocaleDataAccessorRegistry::LocaleDataAccessorRegistry()
+LocaleDataAccessorRegistry::LocaleDataAccessorRegistry(QObject *parent)
+  : QObject(parent)
 {
+  init();
 }
 
-LocaleDataAccessorRegistry *LocaleDataAccessorRegistry::instance()
+LocaleDataAccessorRegistry::~LocaleDataAccessorRegistry()
 {
-  return ::instance();
+  qDeleteAll(m_accessors);
 }
 
 QVector< LocaleDataAccessor * > LocaleDataAccessorRegistry::accessors()
 {
-  return ::instance()->m_accessors;
+  return m_accessors;
 }
 
 QVector< LocaleDataAccessor * > LocaleDataAccessorRegistry::enabledAccessors()
 {
-  return ::instance()->m_enabledAccessors;
+  return m_enabledAccessors;
 }
 
 void LocaleDataAccessorRegistry::registerAccessor(LocaleDataAccessor *accessor)
 {
-  ::instance()->m_accessors.push_back(accessor);
+  m_accessors.push_back(accessor);
 }
 
 void LocaleDataAccessorRegistry::setAccessorEnabled(LocaleDataAccessor *accessor, bool enabled)
 {
-  QVector< LocaleDataAccessor * > &accessors = ::instance()->m_enabledAccessors;
+  QVector< LocaleDataAccessor * > &accessors = m_enabledAccessors;
   if (enabled && !accessors.contains(accessor)) {
     accessors.push_back(accessor);
   } else {
@@ -62,8 +62,11 @@ void LocaleDataAccessorRegistry::setAccessorEnabled(LocaleDataAccessor *accessor
       accessors.remove(idx);
     }
   }
-  emit ::instance()->accessorsChanged();
+  emit accessorsChanged();
 }
+
+void LocaleDataAccessorRegistry::init()
+{
 
 LOCALE_SIMPLE_DEFAULT_ACCESSOR(Name,
   return locale.name();
@@ -167,6 +170,36 @@ LOCALE_SIMPLE_DEFAULT_ACCESSOR(WeekDays,
   }
   return QLocale().createSeparatedList(resultList);
 )
+
+LOCALE_SIMPLE_ACCESSOR(BCP47,
+  return locale.bcp47Name();
+)
 #endif
+
+LOCALE_SIMPLE_ACCESSOR(DecimalPoint,
+  return locale.decimalPoint();
+)
+
+LOCALE_SIMPLE_ACCESSOR(GroupSeparator,
+  return locale.groupSeparator();
+)
+
+LOCALE_SIMPLE_ACCESSOR(Exponential,
+  return locale.exponential();
+)
+
+LOCALE_SIMPLE_ACCESSOR(Percent,
+  return locale.percent();
+)
+
+LOCALE_SIMPLE_ACCESSOR(PositiveSign,
+  return locale.positiveSign();
+)
+
+LOCALE_SIMPLE_ACCESSOR(NegativeSign,
+  return locale.negativeSign();
+)
+
+}
 
 #include "localedataaccessor.moc"

@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2012-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Kevin Funk <kevin.funk@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -38,7 +38,9 @@ class ErrorModel : public QAbstractTableModel
 {
   public:
     explicit ErrorModel(PluginLoadErrors &errors, QObject *parent = 0)
-      : QAbstractTableModel(parent), m_errors(errors) {}
+      : QAbstractTableModel(parent), m_errors(errors)
+    {
+    }
 
     virtual int columnCount(const QModelIndex &parent = QModelIndex()) const
     {
@@ -97,7 +99,9 @@ class ToolModel : public QAbstractTableModel
 {
   public:
     explicit ToolModel(const QVector<ToolFactory*>& tools, QObject* parent = 0)
-      : QAbstractTableModel(parent), m_tools(tools) {}
+      : QAbstractTableModel(parent), m_tools(tools)
+    {
+    }
 
     virtual int columnCount(const QModelIndex &parent = QModelIndex()) const
     {
@@ -196,10 +200,6 @@ AboutPluginsDialog::AboutPluginsDialog(QWidget *parent, Qt::WindowFlags f)
   }
 
   setWindowTitle(tr("GammaRay: Plugin Info"));
-}
-
-void AboutPluginsDialog::init()
-{
 }
 
 #include "aboutpluginsdialog.moc"

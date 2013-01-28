@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Thomas McGuire <thomas.mcguire@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -62,7 +62,7 @@ static void signal_begin_callback(QObject *caller, int method_index, void **argv
 {
   Q_UNUSED(argv);
   QTimer * const timer = timer_from_callback(caller, method_index);
-  if (timer) {
+  if (timer && TimerModel::isInitialized()) {
     TimerModel::instance()->preSignalActivate(timer);
   }
 }
@@ -70,7 +70,7 @@ static void signal_begin_callback(QObject *caller, int method_index, void **argv
 static void signal_end_callback(QObject *caller, int method_index)
 {
   QTimer * const timer = timer_from_callback(caller, method_index);
-  if (timer) {
+  if (timer && TimerModel::isInitialized()) {
     TimerModel::instance()->postSignalActivate(timer);
   }
 }
@@ -80,6 +80,16 @@ TimerModel::TimerModel(QObject *parent)
     m_sourceModel(0),
     m_probe(0)
 {
+}
+
+TimerModel::~TimerModel()
+{
+  s_timerModel = 0;
+}
+
+bool TimerModel::isInitialized()
+{
+  return s_timerModel != 0;
 }
 
 TimerModel *TimerModel::instance()

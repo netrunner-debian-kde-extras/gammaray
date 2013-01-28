@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -25,8 +25,10 @@
 #include "probe.h"
 #include "readorwritelocker.h"
 
+#include "include/metatypedeclarations.h"
 #include "include/util.h"
 
+#include <QColor>
 #include <QDebug>
 #include <QMetaMethod>
 #include <QMetaObject>
@@ -252,7 +254,7 @@ QVariant ConnectionModel::data(const QModelIndex &index, int role) const
     return QVariant::fromValue(con.receiver);
   } else if (role == Qt::ForegroundRole) {
     if (!con.valid) {
-      return Qt::red;
+      return QVariant::fromValue<QColor>(Qt::red);
     }
   } else if (role == ConnectionValidRole) {
     return con.valid;

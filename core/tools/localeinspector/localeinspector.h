@@ -2,7 +2,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2011-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2011-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Stephen Kelly <stephen.kelly@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -40,8 +40,8 @@ class LocaleInspector : public QWidget
   public:
     explicit LocaleInspector(ProbeInterface *probe, QWidget *parent = 0);
 
-//   private slots:
-//     void updateFonts(const QItemSelection &selected, const QItemSelection &deselected);
+  private slots:
+    void initSplitterPosition();
 
   private:
     QScopedPointer< ::Ui::LocaleInspector> ui;

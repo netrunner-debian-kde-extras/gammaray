@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -34,7 +34,12 @@
 
 #include "kde/krecursivefilterproxymodel.h"
 
+#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
 #include <private/qguiplatformplugin_p.h> //krazy:exclude=camelcase
+#else
+#include <qpa/qplatformtheme.h>           //krazy:exclude=camelcase
+#include <private/qguiapplication_p.h>    //krazy:exclude=camelcase
+#endif
 
 #include <QComboBox>
 #include <QCoreApplication>
@@ -46,6 +51,8 @@
 #include <QStyleFactory>
 #include <QTextCodec>
 #include <QTreeView>
+#include <QTextBrowser>
+#include <QDialogButtonBox>
 
 using namespace GammaRay;
 
@@ -60,16 +67,25 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent)
   // so set the platform default one.
   // unfortunately, that's not recursive by default, unless we have a style sheet set
   setStyleSheet(QLatin1String("I_DONT_EXIST {}"));
+
+  QStyle *defaultStyle = 0;
 #if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
   QGuiPlatformPlugin defaultGuiPlatform;
-  if (QStyle *defaultStyle = QStyleFactory::create(defaultGuiPlatform.styleName())) {
+  defaultStyle = QStyleFactory::create(defaultGuiPlatform.styleName());
+#else
+  foreach (const QString &styleName, QGuiApplicationPrivate::platform_theme->defaultThemeHint(QPlatformTheme::StyleNames).toStringList()) {
+    if (defaultStyle = QStyleFactory::create(styleName)) {
+      break;
+    }
+  }
+#endif
+  if (defaultStyle) {
     // do not set parent of default style
     // this will cause the style being deleted too early through ~QObject()
     // other objects (e.g. the script engine debugger) still might have a
     // reference on the style during destruction
     setStyle(defaultStyle);
   }
-#endif
 
   ui.setupUi(this);
 
@@ -124,30 +140,50 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent)
 
 void MainWindow::about()
 {
-  QMessageBox mb(this);
-  mb.setWindowTitle(tr("About %1").arg(progName));
-  mb.setText(tr("<b>%1 %2</b><p>%3").arg(progName).arg(progVersion).arg(progDesc));
-  mb.setInformativeText(
+  QDialog dialog(this);
+  dialog.setWindowTitle(tr("About %1").arg(progName));
+  QVBoxLayout *lay = new QVBoxLayout;
+  dialog.setLayout(lay);
+  QLabel *title = new QLabel;
+  QFont titleFont = dialog.font();
+  titleFont.setBold(true);
+  title->setFont(titleFont);
+  title->setText(tr("<b>%1 %2</b><p>%3").arg(progName).arg(progVersion).arg(progDesc));
+
+  lay->addWidget(title);
+
+  QLabel *informativeText = new QLabel;
+  informativeText->setTextInteractionFlags(Qt::TextBrowserInteraction);
+  informativeText->setOpenExternalLinks(true);
+  informativeText->setWordWrap(true);
+  informativeText->setText(
     trUtf8("<qt>"
-       "<p>Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, "
-       "a KDAB Group company, <a href='mailto:info@kdab.com'>info@kdab.com</a></p>"
-       "<p><u>Authors:</u><br>"
-       "Allen Winter &lt;allen.winter@kdab.com&gt;<br>"
-       "Andreas Holzammer &lt;andreas.holzammer@kdab.com&gt;<br>"
-       "David Faure &lt;david.faure@kdab.com&gt;<br>"
-       "Kevin Funk &lt;kevin.funk@kdab.com&gt;<br>"
-       "Milian Wolff &lt;milian.wolff@kdab.com&gt;<br>"
-       "Patrick Spendrin &lt;patrick.spendrin@kdab.com&gt;<br>"
-       "Stephen Kelly &lt;stephen.kelly@kdab.com&gt;<br>"
-       "Till Adam &lt;till@kdab.com&gt;<br>"
-       "Thomas McGuire &lt;thomas.mcguire@kdab.com&gt;<br>"
-       "Tobias Koenig &lt;tobias.koenig@kdab.com&gt;<br>"
-       "Volker Krause &lt;volker.krause@kdab.com&gt;</p>"
-       "<p>StackWalker code Copyright (c) 2005-2009, Jochen Kalmbach, All rights reserved</p>"
-       "</qt>"));
-  mb.setIconPixmap(QPixmap(":gammaray/GammaRay-128x128.png"));
-  mb.addButton(QMessageBox::Close);
-  mb.exec();
+           "<p>Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, "
+           "a KDAB Group company, <a href=\"mailto:info@kdab.com\">info@kdab.com</a></p>"
+           "<p><u>Authors:</u><br>"
+           "Allen Winter &lt;allen.winter@kdab.com&gt;<br>"
+           "Andreas Holzammer &lt;andreas.holzammer@kdab.com&gt;<br>"
+           "David Faure &lt;david.faure@kdab.com&gt;<br>"
+           "Kevin Funk &lt;kevin.funk@kdab.com&gt;<br>"
+           "Laurent Montel &lt;laurent.montel@kdab.com&gt;<br>"
+           "Milian Wolff &lt;milian.wolff@kdab.com&gt;<br>"
+           "Patrick Spendrin &lt;patrick.spendrin@kdab.com&gt;<br>"
+           "Stephen Kelly &lt;stephen.kelly@kdab.com&gt;<br>"
+           "Till Adam &lt;till@kdab.com&gt;<br>"
+           "Thomas McGuire &lt;thomas.mcguire@kdab.com&gt;<br>"
+           "Tobias Koenig &lt;tobias.koenig@kdab.com&gt;<br>"
+           "Volker Krause &lt;volker.krause@kdab.com&gt;<br></p>"
+           "<p>StackWalker code Copyright (c) 2005-2009, Jochen Kalmbach, All rights reserved</p>"
+           "</qt>"));
+  lay->addWidget(informativeText);
+  QDialogButtonBox *buttonBox = new QDialogButtonBox;
+  buttonBox->addButton(QDialogButtonBox::Close);
+  connect(buttonBox, SIGNAL(rejected()), &dialog, SLOT(close()));
+  lay->addWidget(buttonBox);
+
+  dialog.setWindowIcon(QPixmap(":gammaray/GammaRay-128x128.png"));
+
+  dialog.exec();
 }
 
 void MainWindow::aboutPlugins()
@@ -159,10 +195,23 @@ void MainWindow::aboutPlugins()
 
 void MainWindow::aboutKDAB()
 {
-  QMessageBox mb(this);
-  mb.setWindowTitle(tr("About KDAB"));
-  mb.setText(trUtf8("Klarälvdalens Datakonsult AB (KDAB)"));
-  mb.setInformativeText(
+  QDialog dialog(this);
+  dialog.setWindowTitle(tr("About KDAB"));
+  QVBoxLayout *lay = new QVBoxLayout;
+  dialog.setLayout(lay);
+  QLabel *title = new QLabel;
+  QFont titleFont = dialog.font();
+  titleFont.setBold(true);
+  title->setFont(titleFont);
+  title->setText(trUtf8("Klarälvdalens Datakonsult AB (KDAB)"));
+
+  lay->addWidget(title);
+
+  QLabel *informativeText = new QLabel;
+  informativeText->setTextInteractionFlags(Qt::TextBrowserInteraction);
+  informativeText->setOpenExternalLinks(true);
+  informativeText->setWordWrap(true);
+  informativeText->setText(
     tr("<qt><p>%1 is supported and maintained by KDAB</p>"
        "KDAB, the Qt experts, provide consulting and mentoring for developing "
        "Qt applications from scratch and in porting from all popular and legacy "
@@ -172,9 +221,16 @@ void MainWindow::aboutKDAB()
        "to meet the people who write code like this. "
        "We also offer Qt training courses."
        "</p></qt>").arg(progName));
-  mb.setIconPixmap(QPixmap(":gammaray/kdablogo160.png"));
-  mb.addButton(QMessageBox::Close);
-  mb.exec();
+
+  lay->addWidget(informativeText);
+  QDialogButtonBox *buttonBox = new QDialogButtonBox;
+  buttonBox->addButton(QDialogButtonBox::Close);
+  connect(buttonBox, SIGNAL(rejected()), &dialog, SLOT(close()));
+  lay->addWidget(buttonBox);
+
+  dialog.setWindowIcon(QPixmap(":gammaray/kdablogo160.png"));
+
+  dialog.exec();
 }
 
 void MainWindow::selectInitialTool()

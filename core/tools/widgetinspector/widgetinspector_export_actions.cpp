@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2011-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2011-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -26,15 +26,24 @@
  * dlopen hack to avoid dependencies on QtSvg and QtDesigner in the main probe.
  */
 
+#include "config-gammaray.h"
 #include "uiextractor.h"
 
-#include <QPainter>
+#ifdef HAVE_QT_SVG
 #include <QSvgGenerator>
+#endif
+
+#ifdef HAVE_QT_PRINTSUPPORT
+#include <QPrinter>
+#endif
+
+#include <QPainter>
 #include <QWidget>
 #include <QFile>
 
 extern "C" {
 
+#ifdef HAVE_QT_SVG
 Q_DECL_EXPORT void gammaray_save_widget_to_svg(QWidget *widget, const QString &fileName)
 {
   QSvgGenerator svg;
@@ -45,7 +54,9 @@ Q_DECL_EXPORT void gammaray_save_widget_to_svg(QWidget *widget, const QString &f
   widget->render(&painter);
   painter.end();
 }
+#endif
 
+#ifdef HAVE_QT_DESIGNER
 Q_DECL_EXPORT void gammaray_save_widget_to_ui(QWidget *widget, const QString &fileName)
 {
   QFile file(fileName);
@@ -54,5 +65,19 @@ Q_DECL_EXPORT void gammaray_save_widget_to_ui(QWidget *widget, const QString &fi
     formBuilder.save(&file, widget);
   }
 }
+#endif
+
+#ifdef HAVE_QT_PRINTSUPPORT
+Q_DECL_EXPORT void gammaray_save_widget_to_pdf(QWidget *widget, const QString &fileName)
+{
+  QPrinter printer(QPrinter::ScreenResolution);
+  printer.setOutputFileName(fileName);
+  printer.setOutputFormat(QPrinter::PdfFormat);
+  printer.setPageMargins(0, 0, 0, 0, QPrinter::DevicePixel);
+  printer.setPaperSize(widget->size(), QPrinter::DevicePixel);
+
+  widget->render(&printer);
+}
+#endif
 
 }

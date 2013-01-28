@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
   Author: Stephen Kelly <stephen.kelly@kdab.com>
 
@@ -27,6 +27,7 @@
 #include "mainwindow.h"
 #include "objectlistmodel.h"
 #include "objecttreemodel.h"
+#include "metaobjecttreemodel.h"
 #include "connectionmodel.h"
 #include "toolmodel.h"
 #include "readorwritelocker.h"
@@ -119,9 +120,9 @@ void dumpObject(QObject *obj)
 struct Listener
 {
   Listener()
-    : filterThread(0),
-      trackDestroyed(true)
-  {}
+    : filterThread(0), trackDestroyed(true)
+  {
+  }
 
   QThread *filterThread;
   bool trackDestroyed;
@@ -137,7 +138,8 @@ class ObjectLock : public QReadWriteLock
   public:
     ObjectLock()
       : QReadWriteLock(QReadWriteLock::Recursive)
-    {}
+    {
+    }
 };
 Q_GLOBAL_STATIC(ObjectLock, s_lock)
 
@@ -163,8 +165,12 @@ void ProbeCreator::createProbe()
   }
 
   // Exit early instead of asserting in QWidgetPrivate::init()
-  const QApplication * const qGuiApplication = qApp; // qobject_cast<const QApplication *>(qApp);
-  if (!qGuiApplication || qGuiApplication->type() == QApplication::Tty) {
+  const QApplication * const qGuiApplication = qobject_cast<const QApplication *>(qApp);
+  if (!qGuiApplication
+#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
+      || qGuiApplication->type() == QApplication::Tty
+#endif
+  ) {
     cerr << "Unable to attach to a non-GUI application.\n"
          << "Your application needs to use QApplication, "
          << "otherwise GammaRay can not work." << endl;
@@ -196,6 +202,7 @@ Probe::Probe(QObject *parent):
   QObject(parent),
   m_objectListModel(new ObjectListModel(this)),
   m_objectTreeModel(new ObjectTreeModel(this)),
+  m_metaObjectTreeModel(new MetaObjectTreeModel(this)),
   m_connectionModel(new ConnectionModel(this)),
   m_toolModel(new ToolModel(this)),
   m_window(0),
@@ -301,6 +308,11 @@ QAbstractItemModel *Probe::objectListModel() const
 QAbstractItemModel *Probe::objectTreeModel() const
 {
   return m_objectTreeModel;
+}
+
+QAbstractItemModel *Probe::metaObjectModel() const
+{
+  return m_metaObjectTreeModel;
 }
 
 QAbstractItemModel *Probe::connectionModel() const
@@ -456,10 +468,12 @@ void Probe::objectFullyConstructed(QObject *obj)
   // alternative way of detecting reparenting...
   // Without linking to the QtQuick library of course, for extra fun.
   if (obj->inherits("QQuickItem")) {
-    bool foo = connect(obj, SIGNAL(parentChanged(QQuickItem*)), this, SLOT(objectParentChanged()));
+    connect(obj, SIGNAL(parentChanged(QQuickItem*)), this, SLOT(objectParentChanged()));
   }
 
   m_objectListModel->objectAdded(obj);
+  m_metaObjectTreeModel->objectAdded(obj);
+
   m_toolModel->objectAdded(obj);
 
   emit objectCreated(obj);

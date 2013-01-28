@@ -24,8 +24,8 @@ endif()
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/ ${CMAKE_MODULE_PATH})
 
 set(GAMMARAY_VERSION_MAJOR "1")
-set(GAMMARAY_VERSION_MINOR "2")
-set(GAMMARAY_VERSION_PATCH "2")
+set(GAMMARAY_VERSION_MINOR "3")
+set(GAMMARAY_VERSION_PATCH "0")
 set(GAMMARAY_VERSION "${GAMMARAY_VERSION_MAJOR}.${GAMMARAY_VERSION_MINOR}.${GAMMARAY_VERSION_PATCH}")
 set(GAMMARAY_VERSION_STRING "${GAMMARAY_VERSION}")
 
@@ -62,24 +62,57 @@ include(GammaRayMacros)
 include(MacroLogFeature)
 
 set(QT_MIN_VERSION "4.7.0")
-find_package(Qt5Transitional REQUIRED
-  Core
-  Gui
-  Svg
-  Test
-)
+
+# try Qt5 first, and prefer that if found
+find_package(Qt5Core QUIET)
+if(Qt5Core_FOUND)
+  find_package(Qt5Gui REQUIRED)
+  find_package(Qt5Widgets REQUIRED)
+  find_package(Qt5Concurrent REQUIRED)
+  find_package(Qt5Test REQUIRED)
+
+  find_package(Qt5PrintSupport QUIET)
+  find_package(Qt5Svg QUIET)
+  find_package(Qt5Script QUIET)
+  find_package(Qt5ScriptTools QUIET)
+  find_package(Qt5WebKitWidgets 5.0.1 QUIET) # 5.0.0 has a code generation bug in uic that fails to generate proper code for webkitwidget classes
+  find_package(Qt5Designer QUIET)
+
+  include("cmake/ECMQt4To5Porting.cmake")
+  include_directories(${QT_INCLUDES}) # TODO: Port away from this.
+
+  set(HAVE_QT_SVG ${Qt5Svg_FOUND})
+  set(HAVE_QT_DESIGNER ${Qt5Designer_FOUND})
+  set(HAVE_QT_PRINTSUPPORT ${Qt5PrintSupport_FOUND})
+
+  set(QT_QTWEBKIT_FOUND ${Qt5WebKitWidgets_FOUND}) # backward compat with Qt4 webkit code
+
+  if(Qt5_POSITION_INDEPENDENT_CODE)
+    if(CMAKE_VERSION VERSION_LESS 2.8.9) # TODO remove once we increase the cmake requirement
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+    else()
+      set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+    endif()
+  endif()
+
+# Qt4
+else()
+  find_package(Qt4 ${QT_MIN_VERSION} REQUIRED QtCore QtGui)
+
+  include_directories(${QT_INCLUDES})
+  set(HAVE_QT_SVG true)
+  set(HAVE_QT_DESIGNER true)
+  set(HAVE_QT_PRINTSUPPORT true)
+endif()
 
 # TODO: Remove me once fixed in ECM module
 if(Qt5Core_FOUND)
-  # Avoid errors and build in PIC mode:
-  # qt5/qtbase/include/QtCore/qglobal.h:1765:4: error:
-  #   #error "You must build your code with position independent code if Qt was
-  #   built with -reduce-relocations. " "Compile your code with -fPIC or -fPIE."
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
-
   # more hacks: find qpa/... includes
   # also see https://codereview.qt-project.org/#change,30483
   include_directories(${Qt5Gui_PRIVATE_INCLUDE_DIRS})
+
+  # TODO warnings rather than build errors for the deprecated methods would be nice...
+  add_definitions(-DQT_DISABLE_DEPRECATED_BEFORE=0)
 endif()
 
 if(CMAKE_BUILD_TYPE MATCHES "^[Rr]elease$")
@@ -88,7 +121,11 @@ endif()
 
 set(LIB_SUFFIX "" CACHE STRING "Define suffix of directory name (32/64)")
 set(LIB_INSTALL_DIR "lib${LIB_SUFFIX}")
-set(PLUGIN_INSTALL_DIR "${LIB_INSTALL_DIR}/qt4/plugins")
+if(Qt5Core_FOUND)
+  set(PLUGIN_INSTALL_DIR "${LIB_INSTALL_DIR}/qt5/plugins")
+else()
+  set(PLUGIN_INSTALL_DIR "${LIB_INSTALL_DIR}/qt4/plugins")
+endif()
 
 set(
   INSTALL_TARGETS_DEFAULT_ARGS
@@ -117,6 +154,37 @@ macro_log_feature(
   "Required for the webinspector tool"
 )
 
+macro_log_feature(
+  HAVE_QT_SVG
+  "Qt SVG"
+  "Qt SVG renderer and generator"
+  "http://qt-project.org/"
+  FALSE
+  ""
+  "Required for widget SVG export"
+)
+
+macro_log_feature(
+  HAVE_QT_DESIGNER
+  "Qt Designer Library"
+  "Qt graphical widget editor"
+  "http://qt-project.org/"
+  FALSE
+  ""
+  "Required for widget .ui file export"
+)
+
+macro_log_feature(
+  HAVE_QT_PRINTSUPPORT
+  "Qt Print Support"
+  "Qt PDF generation"
+  "http://qt-project.org/"
+  FALSE
+  ""
+  "Required for widget PDF export"
+)
+
+if(NOT Qt5Core_FOUND)
 find_path(
   QT_PRIVATE_INCLUDE_DIR private/qobject_p.h
   PATHS ${QT_INCLUDES}
@@ -138,6 +206,13 @@ else()
   # needs to go before Qt includes, in case we have non-working headers with the same name there
   include_directories(BEFORE ${CMAKE_SOURCE_DIR}/3rdparty/qt)
 endif()
+else() # Qt 5
+  find_path(QT_PRIVATE_INCLUDE_DIR private/qobject_p.h PATHS ${Qt5Core_PRIVATE_INCLUDE_DIRS})
+  if(QT_PRIVATE_INCLUDE_DIR)
+    set(HAVE_PRIVATE_QT_HEADERS true)
+  endif()
+endif()
+
 macro_log_feature(
   HAVE_PRIVATE_QT_HEADERS
   "Qt internals"

@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -26,6 +26,8 @@
 
 #include "metatypesmodel.h"
 
+#include <QSortFilterProxyModel>
+
 using namespace GammaRay;
 
 MetaTypeBrowser::MetaTypeBrowser(ProbeInterface *probe, QWidget *parent)
@@ -36,8 +38,12 @@ MetaTypeBrowser::MetaTypeBrowser(ProbeInterface *probe, QWidget *parent)
   ui->setupUi(this);
 
   MetaTypesModel *mtm = new MetaTypesModel(this);
-  ui->metaTypeView->setModel(mtm);
+  QSortFilterProxyModel *proxy = new QSortFilterProxyModel(this);
+  proxy->setSourceModel(mtm);
+  ui->metaTypeView->setModel(proxy);
   ui->metaTypeView->header()->setResizeMode(0, QHeaderView::ResizeToContents);
+  ui->metaTypeSearchLine->setProxy(proxy);
+  ui->metaTypeView->header()->setSortIndicator(1, Qt::AscendingOrder); // sort by type id
 }
 
 #include "metatypebrowser.moc"

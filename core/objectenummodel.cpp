@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -45,7 +45,7 @@ int ObjectEnumModel::rowCount(const QModelIndex &parent) const
   if (parent.parent().isValid()) {
     return 0;
   }
-  const QMetaEnum e = m_object.data()->metaObject()->enumerator(parent.row());
+  const QMetaEnum e = m_metaObject->enumerator(parent.row());
   return e.keyCount();
 }
 
@@ -62,7 +62,7 @@ QVariant ObjectEnumModel::data(const QModelIndex &index, int role) const
   }
 
   if (role == Qt::DisplayRole) {
-    const QMetaEnum e = m_object.data()->metaObject()->enumerator(index.parent().row());
+    const QMetaEnum e = m_metaObject->enumerator(index.parent().row());
     if (index.column() == 0) {
       return e.key(index.row());
     }

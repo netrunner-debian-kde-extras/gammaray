@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -38,7 +38,6 @@ namespace Ui {
 class WebInspector : public QWidget
 {
   Q_OBJECT
-  Q_PLUGIN_METADATA(IID "com.kdab.gammaray.WebInspector")
   public:
     explicit WebInspector(GammaRay::ProbeInterface *probe, QWidget *parent = 0);
 
@@ -54,10 +53,17 @@ class WebInspectorFactory
 {
   Q_OBJECT
   Q_INTERFACES(GammaRay::ToolFactory)
+  Q_PLUGIN_METADATA(IID "com.kdab.gammaray.WebInspector")
 
   public:
-    explicit WebInspectorFactory(QObject *parent = 0) : QObject(parent) {}
-    inline QString name() const { return tr("Web Pages"); }
+    explicit WebInspectorFactory(QObject *parent = 0) : QObject(parent)
+    {
+    }
+
+    inline QString name() const
+    {
+      return tr("Web Pages");
+    }
 };
 
 }

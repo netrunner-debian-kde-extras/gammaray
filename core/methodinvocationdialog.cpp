@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -23,12 +23,13 @@
 
 #include "methodinvocationdialog.h"
 #include "methodargumentmodel.h"
+
+#include "include/metatypedeclarations.h"
+
 #include <QMessageBox>
 #include <QPushButton>
 
 using namespace GammaRay;
-
-Q_DECLARE_METATYPE(Qt::ConnectionType)
 
 MethodInvocationDialog::MethodInvocationDialog(QWidget *parent)
   : QDialog(parent),

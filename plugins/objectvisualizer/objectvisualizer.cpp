@@ -2,7 +2,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Kevin Funk <kevin.funk@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -97,9 +97,11 @@ void GraphViewer::delayedInit()
   // select the qApp object (if any) in the object treeView
   const QAbstractItemModel *viewModel = mObjectTreeView->model();
   const QModelIndexList matches = viewModel->match(viewModel->index(0, 0),
-                                                   ObjectModel::ObjectRole,
-                                                   QVariant::fromValue<QObject*>(qApp));
+      ObjectModel::ObjectRole, QVariant::fromValue<QObject*>(qApp), 1,
+      Qt::MatchFlags(Qt::MatchExactly|Qt::MatchRecursive));
+
   if (!matches.isEmpty()) {
+    Q_ASSERT(matches.first().data(ObjectModel::ObjectRole).value<QObject*>() == qApp);
     mObjectTreeView->setCurrentIndex(matches.first());
   }
 }

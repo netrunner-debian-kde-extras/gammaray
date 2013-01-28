@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -52,7 +52,9 @@ class ObjectModelBase : public Base
      * Constructor.
      * @param parent is the parent object for this instance.
      */
-    explicit ObjectModelBase<Base>(QObject *parent) : Base(parent) {}
+    explicit ObjectModelBase<Base>(QObject *parent) : Base(parent)
+    {
+    }
 
     /**
      * Returns the number of columns in the specified model (currently this is
@@ -90,8 +92,9 @@ class ObjectModelBase : public Base
         return QVariant::fromValue(object);
       } else if (role == Qt::ToolTipRole) {
           return
-            QString("Object name: %1\nParent: %2 (Address: %3)\nNumber of children: %4").
+            QObject::tr("Object name: %1\nType: %2\nParent: %3 (Address: %4)\nNumber of children: %5").
               arg(object->objectName().isEmpty() ? "<Not set>" : object->objectName()).
+              arg(object->metaObject()->className()).
               arg(object->parent() ? object->parent()->metaObject()->className() : "<No parent>").
               arg(Util::addressToString(object->parent())).
               arg(object->children().size());

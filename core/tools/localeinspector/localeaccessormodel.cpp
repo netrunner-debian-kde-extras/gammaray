@@ -2,7 +2,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2011-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2011-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Stephen Kelly <stephen.kelly@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -28,8 +28,8 @@
 
 using namespace GammaRay;
 
-LocaleAccessorModel::LocaleAccessorModel(QObject *parent)
-  : QAbstractTableModel(parent)
+LocaleAccessorModel::LocaleAccessorModel(LocaleDataAccessorRegistry *registry, QObject *parent)
+  : QAbstractTableModel(parent), m_registry(registry)
 {
 }
 
@@ -38,7 +38,7 @@ int LocaleAccessorModel::columnCount(const QModelIndex &parent) const
   if (parent.isValid()) {
     return 0;
   }
-  int area = LocaleDataAccessorRegistry::accessors().size();
+  int area = m_registry->accessors().size();
   return qSqrt(area);
 }
 
@@ -47,7 +47,7 @@ int LocaleAccessorModel::rowCount(const QModelIndex &parent) const
   if (parent.isValid()) {
     return 0;
   }
-  int area = LocaleDataAccessorRegistry::accessors().size();
+  int area = m_registry->accessors().size();
   return qCeil((float)area / (int)qSqrt(area));
 }
 
@@ -58,7 +58,7 @@ Qt::ItemFlags LocaleAccessorModel::flags(const QModelIndex &index) const
 
 QVariant LocaleAccessorModel::data(const QModelIndex &index, int role) const
 {
-  QVector<LocaleDataAccessor*> acc = LocaleDataAccessorRegistry::accessors();
+  QVector<LocaleDataAccessor*> acc = m_registry->accessors();
   int offset = (index.row() * columnCount()) + index.column();
   if (offset >= acc.size()) {
     return QVariant();
@@ -70,7 +70,7 @@ QVariant LocaleAccessorModel::data(const QModelIndex &index, int role) const
     return accessor->accessorName();
   case Qt::CheckStateRole:
     return
-      LocaleDataAccessorRegistry::enabledAccessors().contains(accessor) ?
+      m_registry->enabledAccessors().contains(accessor) ?
         Qt::Checked :
         Qt::Unchecked;
   case AccessorRole:
@@ -87,8 +87,9 @@ bool LocaleAccessorModel::setData(const QModelIndex &index, const QVariant &valu
   }
   bool enabled = value.toInt() == Qt::Checked;
   LocaleDataAccessor *accessor = index.data(AccessorRole).value<LocaleDataAccessor*>();
-  LocaleDataAccessorRegistry::setAccessorEnabled(accessor, enabled);
-  return false;
+  m_registry->setAccessorEnabled(accessor, enabled);
+  emit dataChanged(index, index);
+  return true;
 }
 
 #include "localeaccessormodel.moc"

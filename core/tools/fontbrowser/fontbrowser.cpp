@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Stephen Kelly <stephen.kelly@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -56,6 +56,7 @@ FontBrowser::FontBrowser(ProbeInterface *probe, QWidget *parent)
       }
 
       styleItem->setText(1, sizes.trimmed());
+      styleItem->setToolTip(1, sizes.trimmed());
     }
   }
   ui->fontTree->header()->setResizeMode(0, QHeaderView::ResizeToContents);
@@ -76,6 +77,9 @@ FontBrowser::FontBrowser(ProbeInterface *probe, QWidget *parent)
           m_selectedFontModel, SLOT(toggleUnderlineFont(bool)));
   connect(ui->pointSize, SIGNAL(valueChanged(int)),
           m_selectedFontModel, SLOT(setPointSize(int)));
+
+  // init
+  m_selectedFontModel->updateText(ui->fontText->text());
 }
 
 void FontBrowser::updateFonts(const QItemSelection &selected, const QItemSelection &deselected)

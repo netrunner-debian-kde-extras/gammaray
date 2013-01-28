@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2011-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2011-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -50,7 +50,7 @@ QWidget *PropertyEditorFactory::createEditor(QVariant::Type type, QWidget *paren
     return 0;
   }
 
-  // the read-only view is still in the background usually, so transpareny is not a good choice here
+  // the read-only view is still in the background usually, so transparency is not a good choice here
   w->setAutoFillBackground(true);
   return w;
 }

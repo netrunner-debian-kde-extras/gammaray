@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -55,9 +55,14 @@ void WebInspector::webPageSelected(int index)
   if (page) {
     page->settings()->setAttribute(QWebSettings::DeveloperExtrasEnabled, true);
     ui->webInspector->setPage(page);
+    // webinspector needs a show event to actually show anything, just setting the page is not enough...
+    ui->webInspector->hide();
+    ui->webInspector->show();
   }
 }
 
+#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
 Q_EXPORT_PLUGIN(WebInspectorFactory)
+#endif
 
 #include "webinspector.moc"

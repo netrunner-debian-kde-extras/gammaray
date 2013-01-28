@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2011-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2011-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -23,6 +23,7 @@
 
 #include "uiextractor.h"
 
+#ifdef HAVE_QT_DESIGNER
 #include <QDebug>
 #include <QLocale>
 #include <QMetaObject>
@@ -65,3 +66,5 @@ bool UiExtractor::checkProperty(QObject *obj, const QString &prop) const
 
   return false;
 }
+
+#endif

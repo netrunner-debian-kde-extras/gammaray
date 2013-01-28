@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Kevin Funk <kevin.funk@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -39,9 +39,14 @@ class PluginLoadError
 {
   public:
     PluginLoadError(QString _pluginFile, QString _errorString)
-      : pluginFile(_pluginFile), errorString(_errorString) {}
+      : pluginFile(_pluginFile), errorString(_errorString)
+    {
+    }
 
-    QString pluginName() const { return QFileInfo(pluginFile).baseName(); }
+    QString pluginName() const
+    {
+      return QFileInfo(pluginFile).baseName();
+    }
 
   public:
     QString pluginFile;
@@ -51,14 +56,20 @@ class PluginLoadError
 class PluginManager
 {
   public:
-    static PluginManager *instance();
+    /** Slightly ugly, but we need a valid QObject parent that is a decendent of the probe,
+     *  for creating [Proxy]ToolFactory instances, otherwise they show up in the object tree.
+     */
+    static PluginManager *instance(QObject *parent = 0);
 
     QVector<ToolFactory*> plugins();
 
-    QList<PluginLoadError> errors() { return m_errors; }
+    QList<PluginLoadError> errors()
+    {
+      return m_errors;
+    }
 
   protected:
-    PluginManager();
+    PluginManager(QObject *parent = 0);
 
   private:
     QStringList pluginPaths() const;
@@ -67,6 +78,7 @@ class PluginManager
     static PluginManager *s_instance;
     QVector<ToolFactory*> m_plugins;
     QList<PluginLoadError> m_errors;
+    QObject *m_parent;
 };
 
 }

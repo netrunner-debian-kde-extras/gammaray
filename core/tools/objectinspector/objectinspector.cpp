@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -57,6 +57,21 @@ ObjectInspector::ObjectInspector(ProbeInterface *probe, QWidget *parent)
   }
 
   connect(probe->probe(), SIGNAL(widgetSelected(QWidget*,QPoint)), SLOT(widgetSelected(QWidget*)));
+
+  selectDefaultItem();
+}
+
+void ObjectInspector::selectDefaultItem()
+{
+  // select the qApp object (if any) in the object treeView
+  const QAbstractItemModel *viewModel = ui->objectTreeView->model();
+  const QModelIndexList matches = viewModel->match(viewModel->index(0, 0),
+      ObjectModel::ObjectRole, QVariant::fromValue<QObject*>(qApp), 1,
+      Qt::MatchFlags(Qt::MatchExactly|Qt::MatchRecursive));
+
+  if (!matches.isEmpty()) {
+    ui->objectTreeView->setCurrentIndex(matches.first());
+  }
 }
 
 void ObjectInspector::objectSelected(const QModelIndex &index)

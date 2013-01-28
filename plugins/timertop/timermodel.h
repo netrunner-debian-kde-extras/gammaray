@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Thomas McGuire <thomas.mcguire@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -39,7 +39,11 @@ class TimerModel : public QAbstractTableModel
 {
   Q_OBJECT
   public:
-    TimerModel(QObject *parent = 0);
+    virtual ~TimerModel();
+
+    /// @return True in case instance() would return a valid pointer, else false
+    static bool isInitialized();
+
     static TimerModel *instance();
 
     // For the spy callbacks
@@ -87,6 +91,7 @@ class TimerModel : public QAbstractTableModel
     void slotEndReset();
 
   private:
+    explicit TimerModel(QObject *parent = 0);
 
     // Finds only QTimers based on the timer ID, not free timers.
     TimerInfoPtr findOrCreateQTimerTimerInfo(int timerId);

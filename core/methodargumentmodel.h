@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -34,7 +34,7 @@ class SafeArgument
 {
   public:
     SafeArgument();
-    SafeArgument(const QVariant &v);
+    explicit SafeArgument(const QVariant &v);
     ~SafeArgument();
     operator QGenericArgument () const;
 
@@ -48,7 +48,7 @@ class MethodArgumentModel : public QAbstractTableModel
 {
   Q_OBJECT
   public:
-    MethodArgumentModel(QObject *parent = 0);
+    explicit MethodArgumentModel(QObject *parent = 0);
     void setMethod(const QMetaMethod &method);
     QVector<SafeArgument> arguments() const;
 

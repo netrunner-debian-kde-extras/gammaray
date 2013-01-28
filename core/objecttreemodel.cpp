@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -49,10 +49,11 @@ ObjectTreeModel::ObjectTreeModel(Probe *probe)
           this, SLOT(objectReparanted(QObject*)));
 }
 
-static QObject* parentObject(QObject *obj)
+static QObject *parentObject(QObject *obj)
 {
-  if (obj->parent())
+  if (obj->parent()) {
     return obj->parent();
+  }
 
   // QQuickItem does very ugly things with its parent, so we have to try harder to get hold of it...
   if (obj->inherits("QQuickItem")) {

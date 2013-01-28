@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -40,6 +40,11 @@
 #include "tools/widgetinspector/widgetinspector.h"
 #include "tools/messagehandler/messagehandler.h"
 #include "tools/styleinspector/styleinspector.h"
+#include "tools/metaobjectbrowser/metaobjectbrowser.h"
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+#include "tools/standardpaths/standardpaths.h"
+#include "tools/mimetypes/mimetypes.h"
+#endif
 
 #include "pluginmanager.h"
 #include "probe.h"
@@ -60,8 +65,11 @@ ToolModel::ToolModel(QObject *parent): QAbstractListModel(parent)
   m_tools.push_back(new WidgetInspectorFactory(this));
   m_tools.push_back(new ModelInspector(this));
   m_tools.push_back(new SceneInspectorFactory(this));
+#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
   m_tools.push_back(new ConnectionInspectorFactory(this));
+#endif
   m_tools.push_back(new ResourceBrowserFactory(this));
+  m_tools.push_back(new MetaObjectBrowserFactory(this));
   m_tools.push_back(new MetaTypeBrowserFactory(this));
   m_tools.push_back(new SelectionModelInspectorFactory(this));
   m_tools.push_back(new FontBrowserFactory(this));
@@ -70,8 +78,12 @@ ToolModel::ToolModel(QObject *parent): QAbstractListModel(parent)
   m_tools.push_back(new MessageHandlerFactory(this));
   m_tools.push_back(new LocaleInspectorFactory(this));
   m_tools.push_back(new StyleInspectorFactory(this));
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+  m_tools.push_back(new StandardPathsFactory(this));
+  m_tools.push_back(new MimeTypesFactory(this));
+#endif
 
-  Q_FOREACH (ToolFactory *factory, PluginManager::instance()->plugins()) {
+  Q_FOREACH (ToolFactory *factory, PluginManager::instance(this)->plugins()) {
     m_tools.push_back(factory);
   }
 
