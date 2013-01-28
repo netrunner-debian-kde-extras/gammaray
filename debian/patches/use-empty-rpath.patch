@@ -3,11 +3,12 @@ Date: Thu, 10 Jan 2013 20:16:29 +0100
 Subject: use-empty-rpath
 
 ---
- CMakeLists.txt |    2 --
- 1 file changed, 2 deletions(-)
+ CMakeLists.txt                     |    2 --
+ plugins/kjobtracker/CMakeLists.txt |    3 +++
+ 2 files changed, 3 insertions(+), 2 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 4bbee30..1e62b19 100644
+index 01dc3ac..f5df540 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -30,8 +30,6 @@ set(GAMMARAY_VERSION "${GAMMARAY_VERSION_MAJOR}.${GAMMARAY_VERSION_MINOR}.${GAMM
@@ -19,3 +20,17 @@ index 4bbee30..1e62b19 100644
  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
  
  enable_testing()
+diff --git a/plugins/kjobtracker/CMakeLists.txt b/plugins/kjobtracker/CMakeLists.txt
+index f2ade54..b32d1c6 100644
+--- a/plugins/kjobtracker/CMakeLists.txt
++++ b/plugins/kjobtracker/CMakeLists.txt
+@@ -39,6 +39,9 @@ qt4_wrap_ui(gammaray_kjob_plugin_srcs
+   kjobtracker.ui
+ )
+ 
++# Override value set in FindKDE4Internal.cmake
++unset(CMAKE_INSTALL_RPATH)
++
+ gammaray_add_plugin(gammaray_kjobtracker_plugin
+   gammaray_kjobtracker.desktop
+   ${gammaray_kjob_plugin_srcs}
