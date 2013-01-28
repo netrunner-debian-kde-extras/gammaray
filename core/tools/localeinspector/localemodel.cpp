@@ -2,7 +2,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2011-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2011-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Stephen Kelly <stephen.kelly@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -27,11 +27,11 @@
 
 using namespace GammaRay;
 
-LocaleModel::LocaleModel(QObject *parent)
-  : QAbstractTableModel(parent)
+LocaleModel::LocaleModel(LocaleDataAccessorRegistry *registry, QObject *parent)
+  : QAbstractTableModel(parent), m_registry(registry)
 {
   init();
-  connect(LocaleDataAccessorRegistry::instance(), SIGNAL(accessorsChanged()), SLOT(reinit()));
+  connect(registry, SIGNAL(accessorsChanged()), SLOT(reinit()));
 }
 
 int LocaleModel::columnCount(const QModelIndex &parent) const
@@ -68,7 +68,7 @@ QVariant LocaleModel::headerData(int section, Qt::Orientation orientation, int r
 
 void LocaleModel::init()
 {
-  m_localeData = LocaleDataAccessorRegistry::enabledAccessors();
+  m_localeData = m_registry->enabledAccessors();
 
 #if QT_VERSION >= QT_VERSION_CHECK(4, 8, 0)
   m_locales =

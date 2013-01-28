@@ -2,7 +2,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Kevin Funk <kevin.funk@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -48,7 +48,7 @@ class GVGraph
      * \brief Construct a Graphviz graph object
      * \param name The name of the graph, must be unique in the application
      */
-    GVGraph(const QString &name);
+    explicit GVGraph(const QString &name);
     ~GVGraph();
 
     GraphId addGraph(const QString &name);

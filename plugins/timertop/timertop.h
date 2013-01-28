@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Thomas McGuire <thomas.mcguire@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -54,9 +54,16 @@ class TimerTopFactory : public QObject,
   Q_OBJECT
   Q_INTERFACES(GammaRay::ToolFactory)
   Q_PLUGIN_METADATA(IID "com.kdab.gammaray.TimerTop")
+
   public:
-    explicit TimerTopFactory(QObject *parent = 0) : QObject(parent) {}
-    inline QString name() const { return tr("Timers"); }
+    explicit TimerTopFactory(QObject *parent = 0) : QObject(parent)
+    {
+    }
+
+    inline QString name() const
+    {
+      return tr("Timers");
+    }
 
     /* reimp */
     QStringList supportedTypes() const;

@@ -2,7 +2,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Kevin Funk <kevin.funk@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -59,7 +59,9 @@ class GraphViewerFactory : public QObject, public StandardToolFactory<QObject, G
   Q_INTERFACES(GammaRay::ToolFactory)
 
   public:
-    explicit GraphViewerFactory(QObject *parent = 0) : QObject(parent) {}
+    explicit GraphViewerFactory(QObject *parent = 0) : QObject(parent)
+    {
+    }
 
     virtual inline QString name() const
     {

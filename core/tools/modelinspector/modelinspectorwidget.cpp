@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -30,6 +30,7 @@
 
 #include "include/objectmodel.h"
 #include "include/probeinterface.h"
+#include "include/util.h"
 
 #include <kde/krecursivefilterproxymodel.h>
 
@@ -75,6 +76,12 @@ void ModelInspectorWidget::modelSelected(const QModelIndex &index)
 void ModelInspectorWidget::modelCellSelected(const QModelIndex &index)
 {
   m_cellModel->setModelIndex(index);
+
+  ui->indexLabel->setText(index.isValid() ?
+    tr("Row: %1 Column: %2").arg(index.row()).arg(index.column()) :
+    tr("Invalid"));
+  ui->internalIdLabel->setText(QString::number(index.internalId()));
+  ui->internalPtrLabel->setText(Util::addressToString(index.internalPointer()));
 }
 
 void ModelInspectorWidget::widgetSelected(QWidget *widget)

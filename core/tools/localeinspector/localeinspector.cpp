@@ -2,7 +2,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Stephen Kelly <stephen.kelly@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -24,8 +24,9 @@
 
 #include "localemodel.h"
 #include "localeaccessormodel.h"
+#include "localedataaccessor.h"
 
-#include <QTableView>
+#include <QSortFilterProxyModel>
 
 using namespace GammaRay;
 
@@ -35,17 +36,32 @@ LocaleInspector::LocaleInspector(ProbeInterface *probe, QWidget *parent)
 {
   Q_UNUSED(probe);
 
-  LocaleModel *model = new LocaleModel(this);
-  LocaleAccessorModel *accessorModel = new LocaleAccessorModel(this);
+  LocaleDataAccessorRegistry *registry = new LocaleDataAccessorRegistry(this);
+
+  LocaleModel *model = new LocaleModel(registry, this);
+  LocaleAccessorModel *accessorModel = new LocaleAccessorModel(registry, this);
+
+  QSortFilterProxyModel *proxy = new QSortFilterProxyModel(this);
+  proxy->setSourceModel(model);
 
   ui->setupUi(this);
 
-  ui->localeTable->setModel(model);
+  ui->localeTable->setModel(proxy);
   ui->accessorTable->setModel(accessorModel);
+  ui->localeSearchLine->setProxy(proxy);
 
   ui->accessorTable->resizeColumnsToContents();
   ui->localeTable->resizeColumnsToContents();
   connect(model, SIGNAL(modelReset()), ui->localeTable, SLOT(resizeColumnsToContents()));
+
+  QMetaObject::invokeMethod(this, "initSplitterPosition", Qt::QueuedConnection);
+}
+
+void LocaleInspector::initSplitterPosition()
+{
+  const int accessorHeight = ui->accessorTable->model()->rowCount() * (ui->accessorTable->rowHeight(0) + 1) // + grid line
+                           + 2 * ui->accessorTable->frameWidth();
+  ui->splitter->setSizes(QList<int>() << accessorHeight << height() - accessorHeight);
 }
 
 #include "localeinspector.moc"

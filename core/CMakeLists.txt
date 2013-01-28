@@ -10,14 +10,16 @@ include_directories(
 )
 
 set(gammaray_srcs
-  ../3rdparty/kde/krecursivefilterproxymodel.cpp
-  ../3rdparty/kde/kfilterproxysearchline.cpp
-  ../3rdparty/qt/resourcemodel.cpp
+  ${CMAKE_SOURCE_DIR}/3rdparty/kde/krecursivefilterproxymodel.cpp
+  ${CMAKE_SOURCE_DIR}/3rdparty/kde/kfilterproxysearchline.cpp
+  ${CMAKE_SOURCE_DIR}/3rdparty/qt/resourcemodel.cpp
+  ${CMAKE_SOURCE_DIR}/3rdparty/other/modelutils.cpp
 
   util.cpp
   aboutpluginsdialog.cpp
   mainwindow.cpp
   metaobject.cpp
+  metaobjecttreemodel.cpp
   metaobjectrepository.cpp
   metaproperty.cpp
   metapropertymodel.cpp
@@ -74,6 +76,7 @@ set(gammaray_srcs
   tools/connectioninspector/connectioninspector.cpp
   tools/fontbrowser/fontbrowser.cpp
   tools/localeinspector/localeinspector.cpp
+  tools/metaobjectbrowser/metaobjectbrowser.cpp
   tools/metatypebrowser/metatypebrowser.cpp
   tools/modelinspector/modelinspector.cpp
   tools/modelinspector/modelinspectorwidget.cpp
@@ -99,6 +102,20 @@ set(gammaray_srcs
   tools/styleinspector/complexcontrolmodel.cpp
   tools/styleinspector/dynamicproxystyle.cpp
 )
+
+if(Qt5Core_FOUND)
+  set(gammaray_srcs
+    ${gammaray_srcs}
+    tools/mimetypes/mimetypes.cpp
+    tools/standardpaths/standardpaths.cpp
+    tools/standardpaths/standardpathsmodel.cpp
+  )
+
+  qt4_wrap_ui(gammaray_srcs
+    tools/mimetypes/mimetypes.ui
+    tools/standardpaths/standardpaths.ui
+  )
+endif()
 
 if(WIN32 OR APPLE)
   set(gammaray_srcs
@@ -162,13 +179,17 @@ qt4_wrap_ui(gammaray_srcs
 qt4_add_resources(gammaray_srcs ${CMAKE_SOURCE_DIR}/resources/gammaray.qrc)
 
 add_definitions(-DMAKE_GAMMARAY_LIB)
-add_library(gammaray_probe
-  SHARED ${gammaray_srcs}
-)
-target_link_libraries(gammaray_probe
-  ${QT_QTCORE_LIBRARIES}
-  ${QT_QTGUI_LIBRARIES}
-)
+add_library(gammaray_probe SHARED ${gammaray_srcs})
+
+if(Qt5Core_FOUND)
+  target_link_libraries(gammaray_probe Qt5::Widgets)
+else()
+  target_link_libraries(gammaray_probe
+    ${QT_QTCORE_LIBRARIES}
+    ${QT_QTGUI_LIBRARIES}
+  )
+endif()
+
 if(NOT WIN32)
   target_link_libraries(gammaray_probe dl)
 endif()

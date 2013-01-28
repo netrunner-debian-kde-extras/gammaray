@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2011-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2011-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -92,13 +92,16 @@ QStringList ProxyToolFactory::supportedTypes() const
 void ProxyToolFactory::init(ProbeInterface *probe)
 {
   QPluginLoader loader(m_pluginPath, this);
-  m_factory = qobject_cast<ToolFactory*>(loader.instance());
+  QObject *obj = loader.instance();
+  obj->setParent(this);
+  m_factory = qobject_cast<ToolFactory*>(obj);
   if (!m_factory) {
     std::cerr << "error loading plugin " << qPrintable(m_pluginPath)
               << ": " << qPrintable(loader.errorString()) << std::endl;
     return;
   }
   Q_ASSERT(m_factory);
+
   m_factory->init(probe);
 }
 

@@ -2,7 +2,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Kevin Funk <kevin.funk@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -60,15 +60,18 @@ int main(int argc, char *argv[])
 
   Q_FOREACH (const GVNodePair &pair, graph->gvNodes()) {
     const GVNode node = pair.second;
-    new GVNodeItem(node, 0, scene);
+    QGraphicsItem *item = new GVNodeItem(node, 0);
+    scene->addItem(item);
   }
   Q_FOREACH (const GVEdgePair &pair, graph->gvEdges()) {
     const GVEdge edge = pair.second;
-    new GVEdgeItem(edge, 0, scene);
+    QGraphicsItem *item = new GVEdgeItem(edge, 0);
+    scene->addItem(item);
   }
   Q_FOREACH (const GVSubGraphPair &pair, graph->gvSubGraphs()) {
     const GVSubGraph graph = pair.second;
-    new GVGraphItem(graph, 0, scene);
+    QGraphicsItem *item = new GVGraphItem(graph, 0);
+    scene->addItem(item);
   }
   delete graph;
   graph = 0;

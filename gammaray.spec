@@ -1,6 +1,6 @@
 Name:           gammaray
-Version:        1.2.2
-Release:        1.2
+Version:        1.3.0
+Release:        0
 Summary:        A tool to poke around in a Qt-application
 Source:         %{name}-%{version}.tar.gz
 Url:            git@github.com:KDAB/GammaRay.git
@@ -8,25 +8,15 @@ Group:          Development/Tools/Debuggers
 License:        GPL v2, or any later version
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 
-#VTK devel is only available on some newer openSUSE and Fedora distros
 %if %{defined suse_version}
-%if %{suse_version} <= 1210
 BuildRequires:  libqt4-devel libQtWebKit-devel cmake graphviz-devel update-desktop-files
-%else
-BuildRequires:  libqt4-devel libQtWebKit-devel cmake graphviz-devel update-desktop-files vtk-devel
-%endif
 Requires:       graphviz
 %endif
 
 %if %{defined fedora}
-%if %{fedora} < 17
 BuildRequires:  gcc-c++ libqt4-devel qtwebkit-devel cmake desktop-file-utils graphviz-devel
-%else
-BuildRequires:  gcc-c++ libqt4-devel qtwebkit-devel cmake desktop-file-utils graphviz-devel vtk-devel
-%endif
 Requires:       graphviz
 %endif
-
 
 %description
 GammaRay is a tool for examining the internals of a Qt application
@@ -81,14 +71,8 @@ cmake . -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release
 %{_prefix}/include/gammaray
 
 %changelog
-* Fri Dec 21 2012 Allen Winter <allen.winter@kdab.com> 1.2.2
-- Update to 1.2.2 release
-* Thu Aug 16 2012 Allen Winter <allen.winter@kdab.com> 1.2.1
-- Update to 1.2.1 release
-* Tue Jul 05 2012 Allen Winter <allen.winter@kdab.com> 1.2.0
-- Update to 1.2.0 release
-* Tue Jul 03 2012 Allen Winter <allen.winter@kdab.com> 1.1.99
-- Update to beta2 release
+* Sun Jan 27 2013 Allen Winter <allen.winter@kdab.com> 1.3.0
+  Update to lastest release
 * Tue Jun 27 2012 Allen Winter <allen.winter@kdab.com> 1.1.98
 - Rename version to use all integers
 * Tue Jun 26 2012 Allen Winter <allen.winter@kdab.com> 1.2beta

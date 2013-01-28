@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -54,7 +54,7 @@ bool StyleInjector::launch(const QStringList &programAndArgs,
   if (!qtPluginPath.isEmpty()) {
     qtPluginPath.append(":");
   }
-  qtPluginPath.append(GAMMARAY_LIB_INSTALL_DIR "/qt4/plugins");
+  qtPluginPath.append(GAMMARAY_PLUGIN_INSTALL_DIR);
   env.insert("QT_PLUGIN_PATH", qtPluginPath);
 
   InteractiveProcess proc;
@@ -96,7 +96,7 @@ bool StyleInjector::launch(const QStringList &programAndArgs,
 bool StyleInjector::selfTest()
 {
   // TODO: be a bit more clever in finding the plugin location (also when actually using it above)
-  QCoreApplication::addLibraryPath(QLatin1String(GAMMARAY_LIB_INSTALL_DIR "/qt4/plugins"));
+  QCoreApplication::addLibraryPath(QLatin1String(GAMMARAY_PLUGIN_INSTALL_DIR));
   if (!QStyleFactory::keys().contains(QLatin1String("gammaray-injector"))) {
     mErrorString = QObject::tr("Injector style plugin is not found in the Qt style "
                                "plug-in search path or cannot be loaded");

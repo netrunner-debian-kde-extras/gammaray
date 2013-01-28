@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Stephen Kelly <stephen.kelly@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -25,21 +25,17 @@
 #define GAMMARAY_METATYPEBROWSER_METATYPESMODEL_H
 
 #include <QAbstractTableModel>
+#include <QVector>
 
-class MetaTypesModel : public QAbstractItemModel
+class MetaTypesModel : public QAbstractTableModel
 {
   Q_OBJECT
   public:
-    MetaTypesModel(QObject *parent = 0);
+    explicit MetaTypesModel(QObject *parent = 0);
 
     virtual QVariant headerData(int section,
                                 Qt::Orientation orientation,
                                 int role = Qt::DisplayRole) const;
-
-    virtual QModelIndex index(int row, int column,
-                              const QModelIndex &parent = QModelIndex()) const;
-
-    virtual QModelIndex parent(const QModelIndex &child) const;
 
     virtual QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const;
 
@@ -47,7 +43,9 @@ class MetaTypesModel : public QAbstractItemModel
     virtual int columnCount(const QModelIndex &parent = QModelIndex()) const;
 
   private:
-    int m_lastMetaType;
+    void scanMetaTypes();
+
+    QVector<int> m_metaTypes;
 };
 
 #endif

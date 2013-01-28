@@ -2,7 +2,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Kevin Funk <kevin.funk@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -32,8 +32,7 @@ namespace GammaRay {
 class GVNodeItem : public QGraphicsItemGroup
 {
   public:
-    explicit GVNodeItem(const GVNode &node, QGraphicsItem *parent = 0,
-                        QGraphicsScene *scene = 0);
+    explicit GVNodeItem(const GVNode &node, QGraphicsItem *parent = 0);
 
     enum {
       Type = UserType + 1
@@ -62,8 +61,7 @@ class GVNodeItem : public QGraphicsItemGroup
 class GVEdgeItem : public QGraphicsItemGroup
 {
   public:
-    explicit GVEdgeItem(const GVEdge &edge, QGraphicsItem *parent = 0,
-                        QGraphicsScene *scene = 0);
+    explicit GVEdgeItem(const GVEdge &edge, QGraphicsItem *parent = 0);
 
     enum {
       Type = UserType + 2
@@ -90,8 +88,7 @@ class GVEdgeItem : public QGraphicsItemGroup
 class GVGraphItem : public QGraphicsPathItem
 {
   public:
-    explicit GVGraphItem(const GVSubGraph &edge, QGraphicsItem *parent = 0,
-                         QGraphicsScene *scene = 0);
+    explicit GVGraphItem(const GVSubGraph &edge, QGraphicsItem *parent = 0);
 
     enum {
       Type = UserType + 3

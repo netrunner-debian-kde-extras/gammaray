@@ -2,7 +2,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Kevin Funk <kevin.funk@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -34,8 +34,13 @@ class GVElement
   public:
     friend class GVGraph;
 
-    GVElement(const QString &name) : m_name(name) {}
-    GVElement() {}
+    explicit GVElement(const QString &name) : m_name(name)
+    {
+    }
+
+    GVElement()
+    {
+    }
 
     QString name() const
     {
@@ -52,8 +57,13 @@ class GVSubGraph : public GVElement
   friend class GVGraph;
 
   public:
-    GVSubGraph(const QString &name) : GVElement(name) {}
-    GVSubGraph() {}
+    explicit GVSubGraph(const QString &name) : GVElement(name)
+    {
+    }
+
+    GVSubGraph()
+    {
+    }
 
     QPainterPath path() const
     {
@@ -77,8 +87,13 @@ class GVNode : public GVElement
       RoundedRect
     };
 
-    GVNode(const QString &name) : GVElement(name), m_height(0), m_width(0), m_shape(Ellipse) {}
-    GVNode() : m_height(0), m_width(0), m_shape(Ellipse) {}
+    GVNode(const QString &name) : GVElement(name), m_height(0), m_width(0), m_shape(Ellipse)
+    {
+    }
+
+    GVNode() : m_height(0), m_width(0), m_shape(Ellipse)
+    {
+    }
 
     QPoint centerPos() const
     {
@@ -118,8 +133,13 @@ class GVNode : public GVElement
 class GVEdge : public GVElement
 {
   public:
-    GVEdge(const QString &name) : GVElement(name) {}
-    GVEdge() {}
+    explicit GVEdge(const QString &name) : GVElement(name)
+    {
+    }
+
+    GVEdge()
+    {
+    }
 
     /// The source and target nodes of the edge
     QString m_source;

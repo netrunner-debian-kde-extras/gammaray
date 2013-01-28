@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2012-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -76,7 +76,8 @@ QVariant ComplexControlModel::doData(int row, int column, int role) const
     drawTransparencyBackground(&painter, pixmap.rect());
     painter.scale(zoomFactor(), zoomFactor());
 
-    QScopedPointer<QStyleOptionComplex> opt(qstyleoption_cast<QStyleOptionComplex*>(complexControlElements[row].styleOptionFactory()));
+    QScopedPointer<QStyleOptionComplex> opt(
+      qstyleoption_cast<QStyleOptionComplex*>(complexControlElements[row].styleOptionFactory()));
     Q_ASSERT(opt);
     fillStyleOption(opt.data(), column);
     m_style->drawComplexControl(complexControlElements[row].control, opt.data(), &painter);
@@ -85,10 +86,12 @@ QVariant ComplexControlModel::doData(int row, int column, int role) const
     for (int i = 0; i < log2(QStyle::SC_All); ++i) {
       QStyle::SubControl sc = static_cast<QStyle::SubControl>(1 << i);
       if (sc & complexControlElements[row].subControls) {
-        QRectF scRect = m_style->subControlRect(complexControlElements[row].control, opt.data(), sc);
+        QRectF scRect =
+          m_style->subControlRect(complexControlElements[row].control, opt.data(), sc);
         scRect.adjust(0, 0, -1.0 / zoomFactor(), -1.0 / zoomFactor());
         if (scRect.isValid() && !scRect.isEmpty()) {
-          painter.setPen(static_cast<Qt::GlobalColor>(colorIndex++)); // HACK: add some real color mapping
+          // HACK: add some real color mapping
+          painter.setPen(static_cast<Qt::GlobalColor>(colorIndex++));
           painter.drawRect(scRect);
         }
       }

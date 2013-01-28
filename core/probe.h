@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -37,6 +37,8 @@ class QTimer;
 
 namespace GammaRay {
 
+class MetaObjectTreeModel;
+
 class ConnectionModel;
 class ObjectListModel;
 class ObjectTreeModel;
@@ -54,7 +56,7 @@ class ProbeCreator : public QObject
       CreateOnly,
       CreateAndFindExisting
     };
-    ProbeCreator(Type t);
+    explicit ProbeCreator(Type t);
 
   private slots:
     void createProbe();
@@ -84,6 +86,7 @@ class GAMMARAY_EXPORT Probe : public QObject, public ProbeInterface
 
     QAbstractItemModel *objectListModel() const;
     QAbstractItemModel *objectTreeModel() const;
+    QAbstractItemModel *metaObjectModel() const;
     QAbstractItemModel *connectionModel() const;
     ToolModel *toolModel() const;
 
@@ -136,6 +139,7 @@ class GAMMARAY_EXPORT Probe : public QObject, public ProbeInterface
 
     ObjectListModel *m_objectListModel;
     ObjectTreeModel *m_objectTreeModel;
+    MetaObjectTreeModel *m_metaObjectTreeModel;
     ConnectionModel *m_connectionModel;
     ToolModel *m_toolModel;
     GammaRay::MainWindow *m_window;

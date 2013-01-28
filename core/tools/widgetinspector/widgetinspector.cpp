@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -32,14 +32,15 @@
 #include "include/objecttypefilterproxymodel.h"
 #include "include/probeinterface.h"
 
-#include <kde/krecursivefilterproxymodel.h>
+#include "kde/krecursivefilterproxymodel.h"
+#include "other/modelutils.h"
 
 #include <QDebug>
 #include <QDesktopWidget>
 #include <QFileDialog>
 #include <QPainter>
 #include <QPixmap>
-#include <QPrinter>
+#include <QMainWindow>
 
 #ifdef HAVE_PRIVATE_QT_HEADERS
 #include <private/qpaintbuffer_p.h> //krazy:exclude=camelcase
@@ -53,7 +54,8 @@ WidgetInspector::WidgetInspector(ProbeInterface *probe, QWidget *parent)
   ui->setupUi(this);
 
   m_overlayWidget->hide();
-  connect(m_overlayWidget, SIGNAL(destroyed(QObject*)), SLOT(handleOverlayWidgetDestroyed(QObject*)));
+  connect(m_overlayWidget, SIGNAL(destroyed(QObject*)),
+          SLOT(handleOverlayWidgetDestroyed(QObject*)));
 
   connect(probe->probe(), SIGNAL(widgetSelected(QWidget*,QPoint)), SLOT(widgetSelected(QWidget*)));
 
@@ -76,14 +78,39 @@ WidgetInspector::WidgetInspector(ProbeInterface *probe, QWidget *parent)
   connect(ui->actionAnalyzePainting, SIGNAL(triggered()), SLOT(analyzePainting()));
 
   addAction(ui->actionSaveAsImage);
+#ifdef HAVE_QT_SVG
   addAction(ui->actionSaveAsSvg);
+#endif
+#ifdef HAVE_QT_PRINTSUPPORT
   addAction(ui->actionSaveAsPdf);
+#endif
+#ifdef HAVE_QT_DESIGNER
   addAction(ui->actionSaveAsUiFile);
+#endif
 #ifdef HAVE_PRIVATE_QT_HEADERS
   addAction(ui->actionAnalyzePainting);
 #endif
 
   setActionsEnabled(false);
+  selectDefaultItem();
+}
+
+static bool isMainWindowSubclassAcceptor(const QVariant &v)
+{
+  return qobject_cast<QMainWindow*>(v.value<QObject*>());
+}
+
+void WidgetInspector::selectDefaultItem()
+{
+  const QAbstractItemModel *viewModel = ui->widgetTreeView->model();
+  const QModelIndexList matches =
+    ModelUtils::match(
+      viewModel, viewModel->index(0, 0),
+      ObjectModel::ObjectRole, isMainWindowSubclassAcceptor);
+
+  if (!matches.isEmpty()) {
+    ui->widgetTreeView->setCurrentIndex(matches.first());
+  }
 }
 
 void WidgetInspector::widgetSelected(const QModelIndex &index)
@@ -91,7 +118,7 @@ void WidgetInspector::widgetSelected(const QModelIndex &index)
   if (index.isValid()) {
     QObject *obj = index.data(ObjectModel::ObjectRole).value<QObject*>();
     QWidget *widget = qobject_cast<QWidget*>(obj);
-    QLayout* layout = qobject_cast<QLayout*>(obj);
+    QLayout *layout = qobject_cast<QLayout*>(obj);
     if (!widget && layout) {
       widget = layout->parentWidget();
     }
@@ -100,7 +127,9 @@ void WidgetInspector::widgetSelected(const QModelIndex &index)
     ui->widgetPreviewWidget->setWidget(widget);
     setActionsEnabled(widget != 0);
 
-    if (widget && qobject_cast<QDesktopWidget*>(widget) == 0) {
+    if (widget &&
+        qobject_cast<QDesktopWidget*>(widget) == 0 &&
+        !widget->inherits("QDesktopScreenWidget")) {
       m_overlayWidget->placeOn(widget);
     } else {
       m_overlayWidget->placeOn(0);
@@ -113,9 +142,10 @@ void WidgetInspector::widgetSelected(const QModelIndex &index)
   }
 }
 
-void WidgetInspector::handleOverlayWidgetDestroyed(QObject* )
+void WidgetInspector::handleOverlayWidgetDestroyed(QObject *)
 {
-  // the target application might have destroyed the overlay widget (e.g. because the parent of the overlay got destroyed)
+  // the target application might have destroyed the overlay widget
+  // (e.g. because the parent of the overlay got destroyed).
   // just recreate a new one in this case
   m_overlayWidget = new OverlayWidget;
   m_overlayWidget->hide();
@@ -221,14 +251,8 @@ void WidgetInspector::saveAsPdf()
     return;
   }
 
-  QPrinter printer(QPrinter::ScreenResolution);
-  printer.setOutputFileName(fileName);
-  printer.setOutputFormat(QPrinter::PdfFormat);
-  printer.setPageMargins(0, 0, 0, 0, QPrinter::DevicePixel);
-  printer.setPaperSize(widget->size(), QPrinter::DevicePixel);
-
   m_overlayWidget->hide();
-  widget->render(&printer);
+  callExternalExportAction("gammaray_save_widget_to_pdf", widget, fileName);
   m_overlayWidget->show();
 }
 

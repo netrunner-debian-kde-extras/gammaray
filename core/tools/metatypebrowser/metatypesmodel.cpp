@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Stephen Kelly <stephen.kelly@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -25,31 +25,56 @@
 
 #include <QDebug>
 #include <QMetaType>
+#include <QStringList>
 
 MetaTypesModel::MetaTypesModel(QObject *parent)
-  : QAbstractItemModel(parent), m_lastMetaType(0)
+  : QAbstractTableModel(parent)
 {
-  for (m_lastMetaType = 0; ; ++m_lastMetaType) {
-    if (!QMetaType::isRegistered(m_lastMetaType)) {
-      break;
-    }
-  }
+    scanMetaTypes(); // TODO do we need to re-run this when new types are registered at runtime?
 }
 
 QVariant MetaTypesModel::data(const QModelIndex &index, int role) const
 {
-  if (role != Qt::DisplayRole) {
+  if (role != Qt::DisplayRole || !index.isValid()) {
     return QVariant();
   }
 
-  if (index.column() == 0) {
-    QString name(QMetaType::typeName(index.row()));
+  int metaTypeId = m_metaTypes.at(index.row());
+  switch (index.column()) {
+  case 0:
+  {
+    QString name(QMetaType::typeName(metaTypeId));
     if (name.isEmpty()) {
       return tr("N/A");
     }
     return name;
-  } else if (index.column() == 1) {
-    return index.row();
+  }
+  case 1:
+    return metaTypeId;
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+  case 2:
+    return QMetaType::sizeOf(metaTypeId);
+  case 3:
+    return (QMetaType::metaObjectForType(metaTypeId) != 0);
+  case 4:
+  {
+    const QMetaType::TypeFlags flags = QMetaType::typeFlags(metaTypeId);
+    QStringList l;
+    #define F(x) if (flags & QMetaType:: x) l.push_back(#x)
+    F(NeedsConstruction);
+    F(NeedsDestruction);
+    F(MovableType);
+    F(PointerToQObject);
+    F(IsEnumeration);
+    F(SharedPointerToQObject);
+    F(WeakPointerToQObject);
+    F(TrackingPointerToQObject);
+    F(WasDeclaredAsMetaType);
+    #undef F
+
+    return l.join(", ");
+  }
+#endif
   }
   return QVariant();
 }
@@ -60,7 +85,7 @@ int MetaTypesModel::rowCount(const QModelIndex &parent) const
     return 0;
   }
 
-  return m_lastMetaType;
+  return m_metaTypes.size();
 }
 
 int MetaTypesModel::columnCount(const QModelIndex &parent) const
@@ -68,34 +93,50 @@ int MetaTypesModel::columnCount(const QModelIndex &parent) const
   if (parent.isValid()) {
     return 0;
   }
+#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
   return 2;
-}
-
-QModelIndex MetaTypesModel::index(int row, int column, const QModelIndex &parent) const
-{
-  Q_UNUSED(parent);
-  return createIndex(row, column);
-}
-
-QModelIndex MetaTypesModel::parent(const QModelIndex &child) const
-{
-  Q_UNUSED(child);
-  return QModelIndex();
+#else
+  return 5;
+#endif
 }
 
 QVariant MetaTypesModel::headerData(int section, Qt::Orientation orientation, int role) const
 {
-  Q_UNUSED(orientation);
-
-  if (role != Qt::DisplayRole) {
+  if (role != Qt::DisplayRole || orientation != Qt::Horizontal) {
     return QVariant();
   }
 
-  if (section == 0) {
+  switch (section) {
+  case 0:
     return tr("Type Name");
+  case 1:
+    return tr("Meta Type Id");
+  case 2:
+    return tr("Size");
+  case 3:
+    return tr("QObject-derived");
+  case 4:
+    return tr("Type Flags");
   }
+  return QVariant();
+}
 
-  return tr("Meta Type Id");
+void MetaTypesModel::scanMetaTypes()
+{
+  beginResetModel();
+  m_metaTypes.clear();
+#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
+  for (int mtId = 0; QMetaType::isRegistered(mtId); ++mtId) {
+    m_metaTypes.push_back(mtId);
+  }
+#else
+  for (int mtId = 0; mtId <= QMetaType::User || QMetaType::isRegistered(mtId); ++mtId) {
+    if (QMetaType::isRegistered(mtId)) {
+      m_metaTypes.push_back(mtId);
+    }
+  }
+#endif
+  endResetModel();
 }
 
 #include "metatypesmodel.moc"

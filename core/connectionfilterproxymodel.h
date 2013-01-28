@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -32,7 +32,7 @@ class ConnectionFilterProxyModel : public QSortFilterProxyModel
 {
   Q_OBJECT
   public:
-    ConnectionFilterProxyModel(QObject *parent = 0);
+    explicit ConnectionFilterProxyModel(QObject *parent = 0);
 
     void filterReceiver(QObject *receiver);
     void filterSender(QObject *sender);

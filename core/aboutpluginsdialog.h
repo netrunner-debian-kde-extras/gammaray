@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2012-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Kevin Funk <kevin.funk@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -34,9 +34,6 @@ class AboutPluginsDialog : public QDialog
 
   public:
     explicit AboutPluginsDialog(QWidget *parent = 0, Qt::WindowFlags f = 0);
-
-  private:
-    void init();
 };
 
 }

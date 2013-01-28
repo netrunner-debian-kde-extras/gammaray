@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Stephen Kelly <stephen.kelly@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -34,7 +34,7 @@ class AllCodecsModel : public QAbstractItemModel
 {
   Q_OBJECT
   public:
-    AllCodecsModel(QObject *parent);
+    explicit AllCodecsModel(QObject *parent);
 
     virtual QVariant headerData(int section,
                                 Qt::Orientation orientation,
@@ -56,7 +56,7 @@ class SelectedCodecsModel : public QAbstractItemModel
 {
   Q_OBJECT
   public:
-    SelectedCodecsModel(QObject *parent);
+    explicit SelectedCodecsModel(QObject *parent);
 
     void setCodecs(const QStringList &codecs);
     QStringList currentCodecs() const;

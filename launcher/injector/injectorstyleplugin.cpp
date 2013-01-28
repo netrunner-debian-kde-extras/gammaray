@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -23,7 +23,12 @@
 
 #include "injectorstyleplugin.h"
 
+#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
 #include <private/qguiplatformplugin_p.h> //krazy:exclude=camelcase
+#else
+#include <qpa/qplatformtheme.h>           //krazy:exclude=camelcase
+#include <private/qguiapplication_p.h>    //krazy:exclude=camelcase
+#endif
 
 #include <QDebug>
 #include <QLibrary>
@@ -42,7 +47,14 @@ QStyle *InjectorStylePlugin::create(const QString &)
   static QGuiPlatformPlugin defaultGuiPlatform;
   return QStyleFactory::create(defaultGuiPlatform.styleName());
 #else
-#pragma message("Qt 5: port this")
+  const QStringList styleNameList =
+    QGuiApplicationPrivate::platform_theme->defaultThemeHint(
+      QPlatformTheme::StyleNames).toStringList();
+  foreach (const QString &styleName, styleNameList) {
+    if (QStyle *style = QStyleFactory::create(styleName)) {
+      return style;
+    }
+  }
   return 0;
 #endif
 }

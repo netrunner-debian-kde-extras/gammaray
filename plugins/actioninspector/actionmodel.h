@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2012-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Kevin Funk <kevin.funk@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -24,13 +24,13 @@
 #ifndef GAMMARAY_ACTIONINSPECTOR_ACTIONMODEL_H
 #define GAMMARAY_ACTIONINSPECTOR_ACTIONMODEL_H
 
-#include "actionvalidator.h"
-
 #include "include/objecttypefilterproxymodel.h"
 
 class QAction;
 
 namespace GammaRay {
+
+class ActionValidator;
 
 /**
  * This QSFPM additionally overwrites index(...) and flags(...)
@@ -84,7 +84,7 @@ class ActionModel : public ObjectFilterProxyModelBase
     QList<QAction*> actions() const;
     QList<QAction*> actions(const QModelIndex &parent, int start, int end);
 
-    ActionValidator m_duplicateFinder;
+    ActionValidator *m_duplicateFinder;
 };
 
 }

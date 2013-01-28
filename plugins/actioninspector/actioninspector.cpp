@@ -2,7 +2,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Kevin Funk <kevin.funk@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -53,7 +53,7 @@ ActionInspector::ActionInspector(ProbeInterface *probe, QWidget *parent)
   searchFilterProxy->setSourceModel(actionFilterProxy);
   searchFilterProxy->setDynamicSortFilter(true);
 
-  QVBoxLayout *vbox = new QVBoxLayout;
+  QVBoxLayout *vbox = new QVBoxLayout(this);
 
   KFilterProxySearchLine *objectSearchLine = new KFilterProxySearchLine(this);
   objectSearchLine->setProxy(searchFilterProxy);
@@ -69,12 +69,6 @@ ActionInspector::ActionInspector(ProbeInterface *probe, QWidget *parent)
           SLOT(handleRowChanged(QModelIndex)));
   connect(objectTreeView, SIGNAL(doubleClicked(QModelIndex)), SLOT(triggerAction(QModelIndex)));
   mObjectTreeView = objectTreeView;
-
-  QWidget *treeViewWidget = new QWidget(this);
-  treeViewWidget->setLayout(vbox);
-
-  QHBoxLayout *hbox = new QHBoxLayout(this);
-  hbox->addWidget(treeViewWidget);
 
   QMetaObject::invokeMethod(this, "delayedInit", Qt::QueuedConnection);
 }
