@@ -3,7 +3,7 @@ Upstream-Name: GammaRay
 
 Files: *
 Copyright: 2006, Bradley T. Hughes
-           2010-2011, Klarälvdalens Datakonsult AB, a KDAB Group company
+           2010-2013, Klarälvdalens Datakonsult AB, a KDAB Group company
 License: GPL-2+
 
 Files: 3rdparty/kde/*
@@ -19,10 +19,6 @@ Files: 3rdparty/qt/*
        launcher/processlist_unix.cpp
 Copyright: 2011, Nokia Corporation and/or its subsidiary(-ies)
 License: LGPL-2.1
-
-Files: cmake/FindQt5Transitional.cmake
-Copyright: 2012, Klarälvdalens Datakonsult AB, a KDAB Group company <info@kdab.com>
-License: BSD-3-clause
 
 Files: cmake/GammaRayMacros.cmake
 Copyright: 2011, Volker Krause <volker.krause@kdab.com>
@@ -62,6 +58,10 @@ Copyright: 2002 Holger Freyther (freyther@kde.org)
            2010-2011, Klarälvdalens Datakonsult AB, a KDAB Group company
            1997, Matthias Kalle Dalheimer (kalle@kde.org)
 License: GPL-2+ or LGPL-2+
+
+Files: debian/*
+Copyright: 2012-2013, Debian KDE Extras Team <pkg-kde-extras@lists.alioth.debian.org>
+License: GPL-2+
 
 License: GPL-2
  For full text of GNU General Public License v2 see
