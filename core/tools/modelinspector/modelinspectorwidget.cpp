@@ -33,6 +33,7 @@
 #include "include/util.h"
 
 #include <kde/krecursivefilterproxymodel.h>
+#include <QComboBox>
 
 using namespace GammaRay;
 
@@ -56,6 +57,8 @@ ModelInspectorWidget::ModelInspectorWidget(ModelInspector *modelInspector,
   ui->modelCellView->setModel(m_cellModel);
 
   connect(probe->probe(), SIGNAL(widgetSelected(QWidget*,QPoint)), SLOT(widgetSelected(QWidget*)) );
+
+  setModelCell(QModelIndex());
 }
 
 void ModelInspectorWidget::modelSelected(const QModelIndex &index)
@@ -66,14 +69,16 @@ void ModelInspectorWidget::modelSelected(const QModelIndex &index)
     ui->modelContentView->setModel(model);
     connect(ui->modelContentView->selectionModel(),
             SIGNAL(currentChanged(QModelIndex,QModelIndex)),
-            SLOT(modelCellSelected(QModelIndex)));
+            SLOT(setModelCell(QModelIndex)));
   } else {
     ui->modelContentView->setModel(0);
   }
-  m_cellModel->setModelIndex(QModelIndex());
+
+  // clear the cell info box
+  setModelCell(QModelIndex());
 }
 
-void ModelInspectorWidget::modelCellSelected(const QModelIndex &index)
+void ModelInspectorWidget::setModelCell(const QModelIndex &index)
 {
   m_cellModel->setModelIndex(index);
 
@@ -86,13 +91,22 @@ void ModelInspectorWidget::modelCellSelected(const QModelIndex &index)
 
 void ModelInspectorWidget::widgetSelected(QWidget *widget)
 {
+  QAbstractItemModel *selectedModel = 0;
+
   QAbstractItemView *view = Util::findParentOfType<QAbstractItemView>(widget);
-  if (view && view->model()) {
+  if (view)
+    selectedModel = view->model();
+
+  QComboBox *box = Util::findParentOfType<QComboBox>(widget);
+  if (!selectedModel && box)
+    selectedModel = box->model();
+
+  if (selectedModel) {
     QAbstractItemModel *model = ui->modelView->model();
     const QModelIndexList indexList =
       model->match(model->index(0, 0),
                    ObjectModel::ObjectRole,
-                   QVariant::fromValue<QObject*>(view->model()), 1,
+                   QVariant::fromValue<QObject*>(selectedModel), 1,
                    Qt::MatchExactly | Qt::MatchRecursive);
     if (indexList.isEmpty()) {
       return;

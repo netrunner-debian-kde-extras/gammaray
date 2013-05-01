@@ -42,6 +42,7 @@
 #include <QScrollBar>
 #include <QSignalTransition>
 #include <QStateMachine>
+#include <QSettings>
 
 #include <QtPlugin>
 
@@ -450,10 +451,12 @@ void StateMachineViewer::addTransition(QAbstractTransition *transition)
 
   QSignalTransition *signalTransition = qobject_cast<QSignalTransition*>(transition);
   if (signalTransition) {
-    const QString label =
-      QString::fromLatin1("%1::%2").
-        arg(Util::displayString(signalTransition->senderObject())).
-        arg(QString::fromLatin1(signalTransition->signal().mid(1)));
+    QString label = signalTransition->objectName();
+    if (label.isEmpty()) {
+        label = QString::fromLatin1("%1::%2").
+                    arg(Util::displayString(signalTransition->senderObject())).
+                    arg(QString::fromLatin1(signalTransition->signal().mid(1)));
+    }
     m_graph->setEdgeAttribute(id, QLatin1String("label"), label);
   }
 
@@ -529,12 +532,30 @@ void StateMachineViewer::startStopClicked()
 
 void StateMachineViewer::exportAsImage()
 {
-  const QString fileName = QFileDialog::getSaveFileName(this, tr("Save As Image"));
+  QSettings settings;
+  const QString key = QLatin1String("StateMachineViewer/imageDir");
+  QString lastDir = settings.value(key).toString();
+
+  const QString fileName = QFileDialog::getSaveFileName(this, tr("Save As Image"),
+                                                        lastDir, tr("Images (*.png *.jpg *.jpeg)"));
   if (fileName.isEmpty()) {
     return;
   }
 
+  lastDir = QFileInfo(fileName).absolutePath();
+  settings.setValue(key, lastDir);
+
   QGraphicsScene *scene = m_ui->graphicsView->scene();
+
+  int quality = -1;
+  const char* format;
+  if (fileName.endsWith(QLatin1String("jpg"), Qt::CaseInsensitive)
+        || fileName.endsWith(QLatin1String("jpeg"), Qt::CaseInsensitive)) {
+    format = "JPG";
+    quality = 90;
+  } else {
+    format = "PNG";
+  }
 
   QImage image(scene->sceneRect().width(), scene->sceneRect().height(),
                QImage::Format_ARGB32_Premultiplied);
@@ -544,7 +565,7 @@ void StateMachineViewer::exportAsImage()
   painter.setRenderHint(QPainter::Antialiasing);
   scene->render(&painter);
 
-  image.save(fileName, "PNG");
+  image.save(fileName, format, quality);
 }
 
 #if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)

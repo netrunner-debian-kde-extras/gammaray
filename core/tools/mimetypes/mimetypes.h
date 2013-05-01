@@ -48,16 +48,8 @@ class MimeTypes : public QWidget
     ~MimeTypes();
 
   private:
-    void fillModel();
-    QVector<QStandardItem*> itemsForType(const QString& mimeTypeName);
-    void makeItemsForType(const QString &mimeTypeName);
-    static QList<QStandardItem*> makeRowForType(const QMimeType &mt);
-    QSet<QString> normalizedMimeTypeNames(const QStringList &typeNames) const;
-
     QScopedPointer<Ui::MimeTypes> ui;
     QStandardItemModel *m_model;
-    QHash<QString, QVector<QStandardItem*> > m_mimeTypeNodes;
-    QMimeDatabase m_db;
 };
 
 class MimeTypesFactory : public QObject, public StandardToolFactory<QObject, MimeTypes>
@@ -69,7 +61,7 @@ class MimeTypesFactory : public QObject, public StandardToolFactory<QObject, Mim
     {
     }
 
-    virtual inline QString name() const Q_DECL_OVERRIDE
+    virtual inline QString name() const
     {
       return tr("Mime Types");
     }
