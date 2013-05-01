@@ -25,7 +25,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/ ${CMAKE_MODULE_PATH})
 
 set(GAMMARAY_VERSION_MAJOR "1")
 set(GAMMARAY_VERSION_MINOR "3")
-set(GAMMARAY_VERSION_PATCH "0")
+set(GAMMARAY_VERSION_PATCH "1")
 set(GAMMARAY_VERSION "${GAMMARAY_VERSION_MAJOR}.${GAMMARAY_VERSION_MINOR}.${GAMMARAY_VERSION_PATCH}")
 set(GAMMARAY_VERSION_STRING "${GAMMARAY_VERSION}")
 
@@ -54,7 +54,7 @@ endif()
 
 message(STATUS "Building ${Prog_NAME} ${GAMMARAY_VERSION_STRING} in ${CMAKE_BUILD_TYPE} mode")
 add_definitions(-DPROGRAM_NAME=\"${Prog_NAME}\")
-add_definitions(-DQT_USE_FAST_CONCATENATION -DQT_USE_FAST_OPERATOR_PLUS -DQT_STRICT_ITERATORS)
+add_definitions(-DQT_USE_FAST_CONCATENATION -DQT_USE_FAST_OPERATOR_PLUS)
 
 include(CheckCXXCompilerFlag)
 include(CheckLibraryExists)
@@ -75,7 +75,7 @@ if(Qt5Core_FOUND)
   find_package(Qt5Svg QUIET)
   find_package(Qt5Script QUIET)
   find_package(Qt5ScriptTools QUIET)
-  find_package(Qt5WebKitWidgets 5.0.1 QUIET) # 5.0.0 has a code generation bug in uic that fails to generate proper code for webkitwidget classes
+  find_package(Qt5WebKitWidgets 5.0.2 QUIET) # 5.0.[01] has a code generation bug in uic that fails to generate proper code for webkitwidget classes
   find_package(Qt5Designer QUIET)
 
   include("cmake/ECMQt4To5Porting.cmake")
@@ -113,6 +113,12 @@ if(Qt5Core_FOUND)
 
   # TODO warnings rather than build errors for the deprecated methods would be nice...
   add_definitions(-DQT_DISABLE_DEPRECATED_BEFORE=0)
+endif()
+
+# disable QT_STRICT_ITERATORS on the Qt5+Windows combo
+# see: https://bugreports.qt-project.org/browse/QTBUG-29608
+if(NOT (Qt5Core_FOUND AND WIN32))
+  add_definitions(-DQT_STRICT_ITERATORS)
 endif()
 
 if(CMAKE_BUILD_TYPE MATCHES "^[Rr]elease$")
