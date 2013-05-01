@@ -15,10 +15,10 @@ postinst-must-call-ldconfig
  3 files changed, 3 insertions(+), 2 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 4254e18..e448b56 100644
+index af187d6..52db6dd 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -126,6 +126,7 @@ if(Qt5Core_FOUND)
+@@ -132,6 +132,7 @@ if(Qt5Core_FOUND)
  else()
    set(PLUGIN_INSTALL_DIR "${LIB_INSTALL_DIR}/qt4/plugins")
  endif()
@@ -27,11 +27,11 @@ index 4254e18..e448b56 100644
  set(
    INSTALL_TARGETS_DEFAULT_ARGS
 diff --git a/core/tools/widgetinspector/CMakeLists.txt b/core/tools/widgetinspector/CMakeLists.txt
-index 94d8798..0a22d8b 100644
+index 2dfdf22..8effc9a 100644
 --- a/core/tools/widgetinspector/CMakeLists.txt
 +++ b/core/tools/widgetinspector/CMakeLists.txt
-@@ -12,4 +12,4 @@ target_link_libraries(gammaray_widget_export_actions
-   ${QT_QTDESIGNER_LIBRARIES}
+@@ -18,4 +18,4 @@ target_link_libraries(gammaray_widget_export_actions
+   ${EXTRA_LIBS}
  )
  
 -install(TARGETS gammaray_widget_export_actions ${INSTALL_TARGETS_DEFAULT_ARGS})
