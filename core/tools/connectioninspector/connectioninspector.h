@@ -24,24 +24,15 @@
 #ifndef GAMMARAY_CONNECTIONINSPECTOR_CONNECTIONINSPECTOR_H
 #define GAMMARAY_CONNECTIONINSPECTOR_CONNECTIONINSPECTOR_H
 
-#include "include/toolfactory.h"
-
-#include <QWidget>
+#include "toolfactory.h"
 
 namespace GammaRay {
 
-namespace Ui {
-  class ConnectionInspector;
-}
-
-class ConnectionInspector : public QWidget
+class ConnectionInspector : public QObject
 {
   Q_OBJECT
   public:
-    explicit ConnectionInspector(ProbeInterface *probe, QWidget *parent = 0);
-
-  private:
-    QScopedPointer<Ui::ConnectionInspector> ui;
+    explicit ConnectionInspector(ProbeInterface *probe, QObject *parent = 0);
 };
 
 class ConnectionInspectorFactory : public QObject,

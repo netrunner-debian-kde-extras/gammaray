@@ -24,31 +24,24 @@
 #ifndef GAMMARAY_MIMETYPES_H
 #define GAMMARAY_MIMETYPES_H
 
-#include "include/toolfactory.h"
+#include <core/toolfactory.h>
 
-#include <QWidget>
 #include <QMimeData>
 #include <QMimeDatabase>
 
-class QMimeType;
 class QStandardItemModel;
 class QStandardItem;
 
 namespace GammaRay {
 
-namespace Ui {
-  class MimeTypes;
-}
-
-class MimeTypes : public QWidget
+class MimeTypes : public QObject
 {
   Q_OBJECT
   public:
-    explicit MimeTypes(ProbeInterface *probe, QWidget *parent = 0);
+    explicit MimeTypes(ProbeInterface *probe, QObject *parent = 0);
     ~MimeTypes();
 
   private:
-    QScopedPointer<Ui::MimeTypes> ui;
     QStandardItemModel *m_model;
 };
 

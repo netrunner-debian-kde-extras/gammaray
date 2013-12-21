@@ -23,9 +23,8 @@
 
 #include "timertop.h"
 #include "timermodel.h"
-#include "ui_timertop.h"
 
-#include "include/probeinterface.h"
+#include <core/probeinterface.h>
 
 #include <QtPlugin>
 
@@ -58,14 +57,12 @@ using namespace GammaRay;
 // Flash delegate when timer triggered
 // Color cell in view redish, depending on how active the timer is
 
-TimerTop::TimerTop(ProbeInterface *probe, QWidget *parent)
-  : QWidget(parent),
-    ui(new Ui::TimerTop),
+TimerTop::TimerTop(ProbeInterface *probe, QObject *parent)
+  : QObject(parent),
     m_updateTimer(new QTimer(this))
 {
   Q_ASSERT(probe);
 
-  ui->setupUi(this);
   ObjectTypeFilterProxyModel<QTimer> * const filterModel =
       new ObjectTypeFilterProxyModel<QTimer>(this);
   filterModel->setDynamicSortFilter(true);
@@ -73,23 +70,8 @@ TimerTop::TimerTop(ProbeInterface *probe, QWidget *parent)
   TimerModel::instance()->setParent(this); // otherwise it's not filtered out
   TimerModel::instance()->setProbe(probe);
   TimerModel::instance()->setSourceModel(filterModel);
-  QSortFilterProxyModel * const sortModel = new QSortFilterProxyModel(this);
-  sortModel->setSourceModel(TimerModel::instance());
-  sortModel->setDynamicSortFilter(true);
-  ui->timerView->setModel(sortModel);
-  ui->timerView->sortByColumn(TimerModel::WakeupsPerSecRole - TimerModel::FirstRole - 1,
-                              Qt::DescendingOrder);
 
-  m_updateTimer->setObjectName("GammaRay update timer");
-  m_updateTimer->setSingleShot(false);
-  m_updateTimer->setInterval(500);
-  m_updateTimer->start();
-  connect(m_updateTimer, SIGNAL(timeout()), this, SLOT(slotUpdateView()));
-}
-
-void TimerTop::slotUpdateView()
-{
-  ui->timerView->viewport()->update();
+  probe->registerModel("com.kdab.GammaRay.TimerModel", TimerModel::instance());
 }
 
 QStringList TimerTopFactory::supportedTypes() const
@@ -100,5 +82,3 @@ QStringList TimerTopFactory::supportedTypes() const
 #if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
 Q_EXPORT_PLUGIN(TimerTopFactory)
 #endif
-
-#include "timertop.moc"

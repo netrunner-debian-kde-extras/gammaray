@@ -24,8 +24,10 @@
 #include "attachhelper.h"
 
 #ifdef Q_OS_WIN32
+#ifndef NOMINMAX
 // compile fix for Qt5+VS2010+QDateTime, see: http://qt-project.org/forums/viewthread/22133
 #define NOMINMAX
+#endif
 
 #include <Windows.h>
 #endif
@@ -75,10 +77,11 @@ void AttachHelper::attach()
   qDebug() << "attaching gammaray";
   QProcess gammaray;
   QStringList args;
+  args << "--inprocess" << "-i" << m_injector;
 #ifdef Q_OS_WIN32
-  args << "-i" << m_injector << "-p" << QString::number(m_proc->pid()->dwProcessId);
+  args << "-p" << QString::number(m_proc->pid()->dwProcessId);
 #else
-  args << "-i" << m_injector << "-p" << QString::number(m_proc->pid());
+  args << "-p" << QString::number(m_proc->pid());
 #endif
   args << "-nodialogs";
   const int ret = gammaray.execute(m_gammaray, args);
@@ -112,4 +115,3 @@ int main(int argc, char **argv) {
   return app.exec();
 }
 
-#include "attachhelper.moc"

@@ -22,81 +22,35 @@
 #include "actioninspector.h"
 #include "actionmodel.h"
 
-#include "include/objectmodel.h"
-#include "include/probeinterface.h"
-#include "include/objecttypefilterproxymodel.h"
-
-#include "kde/kfilterproxysearchline.h"
-#include "kde/krecursivefilterproxymodel.h"
-
-#include <QCoreApplication>
-#include <QDebug>
-#include <QHBoxLayout>
-#include <QHeaderView>
-#include <QSortFilterProxyModel>
-#include <QSplitter>
-#include <QStateMachine>
-#include <QTreeView>
+#include <common/objectmodel.h>
+#include <core/probeinterface.h>
+#include <common/objectbroker.h>
 
 #include <QtPlugin>
 
-using namespace GammaRay;
+#include <iostream>
 
-ActionInspector::ActionInspector(ProbeInterface *probe, QWidget *parent)
-  : QWidget(parent),
-    mProbeIface(probe)
+using namespace GammaRay;
+using namespace std;
+
+ActionInspector::ActionInspector(ProbeInterface *probe, QObject *parent)
+  : QObject(parent)
 {
+  ObjectBroker::registerObject("com.kdab.GammaRay.ActionInspector", this);
+
   ActionModel *actionFilterProxy = new ActionModel(this);
   actionFilterProxy->setSourceModel(probe->objectListModel());
-
-  QSortFilterProxyModel *searchFilterProxy = new KRecursiveFilterProxyModel(this);
-  searchFilterProxy->setSourceModel(actionFilterProxy);
-  searchFilterProxy->setDynamicSortFilter(true);
-
-  QVBoxLayout *vbox = new QVBoxLayout(this);
-
-  KFilterProxySearchLine *objectSearchLine = new KFilterProxySearchLine(this);
-  objectSearchLine->setProxy(searchFilterProxy);
-  vbox->addWidget(objectSearchLine);
-
-  QTreeView *objectTreeView = new QTreeView(this);
-  objectTreeView->setModel(searchFilterProxy);
-  objectTreeView->setSortingEnabled(true);
-  objectTreeView->sortByColumn(ActionModel::ShortcutsPropColumn);
-  objectTreeView->setRootIsDecorated(false);
-  vbox->addWidget(objectTreeView);
-  connect(objectTreeView->selectionModel(), SIGNAL(currentRowChanged(QModelIndex,QModelIndex)),
-          SLOT(handleRowChanged(QModelIndex)));
-  connect(objectTreeView, SIGNAL(doubleClicked(QModelIndex)), SLOT(triggerAction(QModelIndex)));
-  mObjectTreeView = objectTreeView;
-
-  QMetaObject::invokeMethod(this, "delayedInit", Qt::QueuedConnection);
+  probe->registerModel("com.kdab.GammaRay.ActionModel", actionFilterProxy);
 }
 
 ActionInspector::~ActionInspector()
 {
 }
 
-void ActionInspector::delayedInit()
+void ActionInspector::triggerAction(int row)
 {
-  // select the qApp object (if any) in the object treeView
-  const QAbstractItemModel *viewModel = mObjectTreeView->model();
-  const QModelIndexList matches = viewModel->match(viewModel->index(0, 0),
-                                                   ObjectModel::ObjectRole,
-                                                   QVariant::fromValue<QObject*>(qApp));
-  if (!matches.isEmpty()) {
-    mObjectTreeView->setCurrentIndex(matches.first());
-  }
-}
-
-void ActionInspector::handleRowChanged(const QModelIndex &index)
-{
-  Q_UNUSED(index);
-  // TODO: Unused
-}
-
-void ActionInspector::triggerAction(const QModelIndex &index)
-{
+  QAbstractItemModel *model = ObjectBroker::model("com.kdab.GammaRay.ActionModel");
+  const QModelIndex index = model->index(row, 0);
   if (!index.isValid()) {
     return;
   }
@@ -112,5 +66,3 @@ void ActionInspector::triggerAction(const QModelIndex &index)
 #if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
 Q_EXPORT_PLUGIN(ActionInspectorFactory)
 #endif
-
-#include "actioninspector.moc"

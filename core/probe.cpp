@@ -24,21 +24,32 @@
 //krazy:excludeall=null,captruefalse,staticobjects
 
 #include "probe.h"
-#include "mainwindow.h"
 #include "objectlistmodel.h"
 #include "objecttreemodel.h"
 #include "metaobjecttreemodel.h"
 #include "connectionmodel.h"
 #include "toolmodel.h"
 #include "readorwritelocker.h"
-
-#include "hooking/functionoverwriterfactory.h"
+#include "probesettings.h"
+#include "probecontroller.h"
+#include "toolpluginmodel.h"
 
 #include "tools/modelinspector/modeltest.h"
 
+#include "remote/server.h"
+#include "remote/remotemodelserver.h"
+#include "remote/selectionmodelserver.h"
+#include "toolpluginerrormodel.h"
+
+#include <common/objectbroker.h>
+#include <common/streamoperators.h>
+
+#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
 #include <QApplication>
+#endif
 #include <QCoreApplication>
-#include <QDialog>
+#include <QDir>
+#include <QLibrary>
 #include <QMouseEvent>
 #include <QThread>
 #include <QTimer>
@@ -46,33 +57,16 @@
 #include <iostream>
 #include <cstdio>
 
-#ifndef Q_OS_WIN
-#include <dlfcn.h>
-#else
-#include <windows.h>
-#endif
-
-#include <cassert>
-
-#ifdef Q_OS_MAC
-#include <dlfcn.h>
-#include <inttypes.h>
-#include <sys/mman.h>
-#include <sys/types.h>
-#include <sys/errno.h>
-#endif
-
 #define IF_DEBUG(x)
 
 using namespace GammaRay;
 using namespace std;
 
-Probe *Probe::s_instance = 0;
-bool functionsOverwritten = false;
-
-#if (QT_VERSION < QT_VERSION_CHECK(5, 0, 0))
+QAtomicPointer<Probe> Probe::s_instance = QAtomicPointer<Probe>(0);
 
 namespace GammaRay {
+
+#if (QT_VERSION < QT_VERSION_CHECK(5, 0, 0))
 
 static bool probeConnectCallback(void ** args)
 {
@@ -95,8 +89,14 @@ static bool probeDisconnectCallback(void ** args)
   return false;
 }
 
-}
 #endif // QT_VERSION
+
+static QItemSelectionModel* selectionModelFactory(QAbstractItemModel* model)
+{
+  return new SelectionModelServer(model->objectName() + ".selection", model, Probe::instance());
+}
+
+}
 
 // useful for debugging, dumps the object and all it's parents
 // also useable from GDB!
@@ -126,10 +126,11 @@ struct Listener
 
   QThread *filterThread;
   bool trackDestroyed;
+
+  QVector<QObject*> addedBeforeProbeInstance;
 };
 
 Q_GLOBAL_STATIC(Listener, s_listener)
-Q_GLOBAL_STATIC(QVector<QObject*>, s_addedBeforeProbeInsertion)
 
 // ensures proper information is returned by isValidObject by
 // locking it in objectAdded/Removed
@@ -143,60 +144,6 @@ class ObjectLock : public QReadWriteLock
 };
 Q_GLOBAL_STATIC(ObjectLock, s_lock)
 
-ProbeCreator::ProbeCreator(Type type)
-  : m_type(type)
-{
-  //push object into the main thread, as windows creates a
-  //different thread where this runs in
-  moveToThread(QApplication::instance()->thread());
-  // delay to foreground thread
-  QMetaObject::invokeMethod(this, "createProbe", Qt::QueuedConnection);
-}
-
-void ProbeCreator::createProbe()
-{
-  QWriteLocker lock(s_lock());
-  // make sure we are in the ui thread
-  Q_ASSERT(QThread::currentThread() == qApp->thread());
-
-  if (!qApp || Probe::isInitialized()) {
-    // never create it twice
-    return;
-  }
-
-  // Exit early instead of asserting in QWidgetPrivate::init()
-  const QApplication * const qGuiApplication = qobject_cast<const QApplication *>(qApp);
-  if (!qGuiApplication
-#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
-      || qGuiApplication->type() == QApplication::Tty
-#endif
-  ) {
-    cerr << "Unable to attach to a non-GUI application.\n"
-         << "Your application needs to use QApplication, "
-         << "otherwise GammaRay can not work." << endl;
-    return;
-  }
-
-  IF_DEBUG(cout << "setting up new probe instance" << endl;)
-  s_listener()->filterThread = QThread::currentThread();
-  Q_ASSERT(!Probe::s_instance);
-  Probe::s_instance = new Probe;
-  s_listener()->filterThread = 0;
-  IF_DEBUG(cout << "done setting up new probe instance" << endl;)
-
-  Q_ASSERT(Probe::instance());
-  QMetaObject::invokeMethod(Probe::instance(), "delayedInit", Qt::QueuedConnection);
-  foreach (QObject *obj, *(s_addedBeforeProbeInsertion())) {
-    Probe::objectAdded(obj);
-  }
-  s_addedBeforeProbeInsertion()->clear();
-
-  if (m_type == CreateAndFindExisting) {
-    Probe::findExistingObjects();
-  }
-
-  deleteLater();
-}
 
 Probe::Probe(QObject *parent):
   QObject(parent),
@@ -204,12 +151,33 @@ Probe::Probe(QObject *parent):
   m_objectTreeModel(new ObjectTreeModel(this)),
   m_metaObjectTreeModel(new MetaObjectTreeModel(this)),
   m_connectionModel(new ConnectionModel(this)),
-  m_toolModel(new ToolModel(this)),
+  m_toolModel(0),
   m_window(0),
   m_queueTimer(new QTimer(this))
 {
   Q_ASSERT(thread() == qApp->thread());
   IF_DEBUG(cout << "attaching GammaRay probe" << endl;)
+
+  ProbeSettings::receiveSettings();
+  m_toolModel = new ToolModel(this);
+
+  Server *server = new Server(this);
+  ProbeSettings::sendPort(server->port());
+
+  StreamOperators::registerOperators();
+  ObjectBroker::setSelectionModelFactoryCallback(selectionModelFactory);
+  ObjectBroker::registerObject<ProbeControllerInterface*>(new ProbeController(this));
+
+  registerModel(QLatin1String("com.kdab.GammaRay.ObjectTree"), m_objectTreeModel);
+  registerModel(QLatin1String("com.kdab.GammaRay.ObjectList"), m_objectListModel);
+  registerModel(QLatin1String("com.kdab.GammaRay.MetaObjectModel"), m_metaObjectTreeModel);
+  registerModel(QLatin1String("com.kdab.GammaRay.ToolModel"), m_toolModel);
+  registerModel(QLatin1String("com.kdab.GammaRay.ConnectionModel"), m_connectionModel);
+
+  ToolPluginModel *toolPluginModel = new ToolPluginModel(m_toolModel->plugins(), this);
+  registerModel(QLatin1String("com.kdab.GammaRay.ToolPluginModel"), toolPluginModel);
+  ToolPluginErrorModel *toolPluginErrorModel = new ToolPluginErrorModel(m_toolModel->pluginErrors(), this);
+  registerModel(QLatin1String("com.kdab.GammaRay.ToolPluginErrorModel"), toolPluginErrorModel);
 
   if (qgetenv("GAMMARAY_MODELTEST") == "1") {
     new ModelTest(m_objectListModel, m_objectListModel);
@@ -238,15 +206,22 @@ Probe::~Probe()
   QInternal::unregisterCallback(QInternal::DisconnectCallback, &GammaRay::probeDisconnectCallback);
 #endif
 
-  s_instance = 0;
+  ObjectBroker::clear();
+
+  s_instance = QAtomicPointer<Probe>(0);
 }
 
-void Probe::setWindow(GammaRay::MainWindow *window)
+QThread* Probe::filteredThread()
+{
+  return s_listener()->filterThread;
+}
+
+void Probe::setWindow(QObject *window)
 {
   m_window = window;
 }
 
-GammaRay::MainWindow *Probe::window() const
+QObject* Probe::window() const
 {
   return m_window;
 }
@@ -257,12 +232,73 @@ Probe *GammaRay::Probe::instance()
     return NULL;
   }
 
+#if (QT_VERSION < QT_VERSION_CHECK(5, 0, 0))
   return s_instance;
+#else
+  return s_instance.load();
+#endif
 }
 
 bool Probe::isInitialized()
 {
-  return s_instance && qApp;
+  return instance() && qApp;
+}
+
+bool Probe::canShowWidgets()
+{
+#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
+  const QApplication * const qGuiApplication = qobject_cast<const QApplication *>(qApp);
+  return qGuiApplication && qGuiApplication->type() != QApplication::Tty;
+#else
+  return QCoreApplication::instance()->inherits("QApplication");
+#endif
+}
+
+void Probe::createProbe(bool findExisting)
+{
+  Q_ASSERT(!isInitialized());
+
+  // first create the probe and its children
+  // we must not hold the object lock here as otherwise we can deadlock
+  // with other QObject's we create and other threads are using. One
+  // example are QAbstractSocketEngine.
+  IF_DEBUG(cout << "setting up new probe instance" << endl;)
+  s_listener()->filterThread = QThread::currentThread();
+  Probe *probe = new Probe;
+  s_listener()->filterThread = 0;
+  IF_DEBUG(cout << "done setting up new probe instance" << endl;)
+
+  // now we can get the lock and add items which where added before this point in time
+  {
+    QWriteLocker lock(s_lock());
+    // now we set the instance while holding the lock,
+    // all future calls to object{Added,Removed} will
+    // act directly on the data structures there instead
+    // of using addedBeforeProbeInstance
+    // this will only happen _after_ the object lock above is released though
+    Q_ASSERT(!instance());
+
+    s_instance = QAtomicPointer<Probe>(probe);
+
+    // add objects to the probe that were tracked before its creation
+    foreach (QObject *obj, s_listener()->addedBeforeProbeInstance) {
+      objectAdded(obj);
+    }
+    s_listener()->addedBeforeProbeInstance.clear();
+
+    // try to find existing objects by other means
+    if (findExisting) {
+      probe->findExistingObjects();
+    }
+  }
+
+  // eventually initialize the rest
+  QMetaObject::invokeMethod(probe, "delayedInit", Qt::QueuedConnection);
+}
+
+void Probe::startupHookReceived()
+{
+  s_listener()->trackDestroyed = false;
 }
 
 void Probe::delayedInit()
@@ -275,18 +311,48 @@ void Probe::delayedInit()
     qputenv("DYLD_FORCE_FLAT_NAMESPACE", "");
   }
 
-  QCoreApplication::instance()->installEventFilter(s_instance);
+  QCoreApplication::instance()->installEventFilter(this);
 
-  IF_DEBUG(cout << "creating GammaRay::MainWindow" << endl;)
-  s_listener()->filterThread = QThread::currentThread();
-  GammaRay::MainWindow *window = new GammaRay::MainWindow;
-  s_listener()->filterThread = 0;
-  IF_DEBUG(cout << "creation done" << endl;)
+  QString appName = qApp->applicationName();
+  if (appName.isEmpty() && !qApp->arguments().isEmpty()) {
+    appName = qApp->arguments().first().remove(qApp->applicationDirPath());
+    if (appName.startsWith('.')) {
+        appName = appName.right(appName.length() - 1);
+    }
+    if (appName.startsWith('/')) {
+        appName = appName.right(appName.length() - 1);
+    }
+  }
+  if (appName.isEmpty()) {
+    appName = tr("PID %1").arg(qApp->applicationPid());
+  }
+  Server::instance()->setLabel(appName);
 
-  window->setAttribute(Qt::WA_DeleteOnClose);
-  instance()->setWindow(window);
-  instance()->setParent(window);
-  window->show();
+  if (ProbeSettings::value("InProcessUi", false).toBool() && canShowWidgets()) {
+    IF_DEBUG(cout << "creating GammaRay::MainWindow" << endl;)
+    s_listener()->filterThread = QThread::currentThread();
+
+    QString path = ProbeSettings::value("ProbePath").toString();
+    if (!path.isEmpty())
+      path += QDir::separator();
+    path += "gammaray_inprocessui";
+    QLibrary lib;
+    lib.setFileName(path);
+    if (!lib.load()) {
+      std::cerr << "Failed to load in-process UI module: " << qPrintable(lib.errorString()) << std::endl;
+    } else {
+      void(*factory)() = reinterpret_cast<void(*)()>(lib.resolve("gammaray_create_inprocess_mainwindow"));
+      if (!factory)
+        std::cerr << Q_FUNC_INFO << ' ' << qPrintable(lib.errorString()) << endl;
+      else
+        factory();
+    }
+
+    s_listener()->filterThread = 0;
+    IF_DEBUG(cout << "creation done" << endl;)
+  } else {
+    cerr << "Unable to show in-process UI in a non-QWidget based application." << endl;
+  }
 }
 
 bool Probe::filterObject(QObject *obj) const
@@ -298,6 +364,13 @@ bool Probe::filterObject(QObject *obj) const
   return obj == this || obj == window() ||
           Util::descendantOf(this, obj) ||
           Util::descendantOf(window(), obj);
+}
+
+void Probe::registerModel(const QString& objectName, QAbstractItemModel* model)
+{
+  RemoteModelServer *ms = new RemoteModelServer(objectName, model);
+  ms->setModel(model);
+  ObjectBroker::registerModelInternal(objectName, model);
 }
 
 QAbstractItemModel *Probe::objectListModel() const
@@ -336,7 +409,7 @@ bool Probe::isValidObject(QObject *obj) const
   return m_validObjects.contains(obj);
 }
 
-QReadWriteLock *Probe::objectLock() const
+QReadWriteLock *Probe::objectLock()
 {
   return s_lock();
 }
@@ -351,68 +424,72 @@ void Probe::objectAdded(QObject *obj, bool fromCtor)
              << hex << obj
              << (fromCtor ? " (from ctor)" : "") << endl;)
     return;
-  } else if (isInitialized()) {
-    if (instance()->filterObject(obj)) {
-      IF_DEBUG(cout
-               << "objectAdded Filter: "
-               << hex << obj
-               << (fromCtor ? " (from ctor)" : "") << endl;)
-      return;
-    } else if (instance()->m_validObjects.contains(obj)) {
-      // this happens when we get a child event before the objectAdded call from the ctor
-      // or when we add an item from s_addedBeforeProbeInsertion who got added already
-      // due to the add-parent-before-child logic
-      IF_DEBUG(cout
-               << "objectAdded Known: "
-               << hex << obj
-               << (fromCtor ? " (from ctor)" : "") << endl;)
-      Q_ASSERT(fromCtor || s_addedBeforeProbeInsertion()->contains(obj));
-      return;
-    }
+  }
 
-    // make sure we already know the parent
-    if (obj->parent() && !instance()->m_validObjects.contains(obj->parent())) {
-      objectAdded(obj->parent(), fromCtor);
-    }
-    Q_ASSERT(!obj->parent() || instance()->m_validObjects.contains(obj->parent()));
-
-    instance()->m_validObjects << obj;
-    if (s_listener()->trackDestroyed) {
-      // when we did not use a preload variant that
-      // overwrites qt_removeObject we must track object
-      // deletion manually
-      connect(obj, SIGNAL(destroyed(QObject*)),
-              instance(), SLOT(handleObjectDestroyed(QObject*)),
-              Qt::DirectConnection);
-    }
-
-    if (!fromCtor && obj->parent() && instance()->m_queuedObjects.contains(obj->parent())) {
-      // when a child event triggers a call to objectAdded while inside the ctor
-      // the parent is already tracked but it's call to objectFullyConstructed
-      // was delayed. hence we must do the same for the child for integrity
-      fromCtor = true;
-    }
-
-    IF_DEBUG(cout << "objectAdded: " << hex << obj
-                  << (fromCtor ? " (from ctor)" : "")
-                  << ", p: " << obj->parent() << endl;)
-
-    if (fromCtor) {
-      Q_ASSERT(!instance()->m_queuedObjects.contains(obj));
-      instance()->m_queuedObjects << obj;
-      if (!instance()->m_queueTimer->isActive()) {
-        // timers must not be started from a different thread
-        QMetaObject::invokeMethod(instance()->m_queueTimer, "start", Qt::AutoConnection);
-      }
-    } else {
-      instance()->objectFullyConstructed(obj);
-    }
-  } else {
+  if (!isInitialized()) {
     IF_DEBUG(cout
              << "objectAdded Before: "
              << hex << obj
              << (fromCtor ? " (from ctor)" : "") << endl;)
-    s_addedBeforeProbeInsertion()->push_back(obj);
+    s_listener()->addedBeforeProbeInstance << obj;
+    return;
+  }
+
+  if (instance()->filterObject(obj)) {
+    IF_DEBUG(cout
+              << "objectAdded Filter: "
+              << hex << obj
+              << (fromCtor ? " (from ctor)" : "") << endl;)
+    return;
+  }
+
+  if (instance()->m_validObjects.contains(obj)) {
+    // this happens when we get a child event before the objectAdded call from the ctor
+    // or when we add an item from addedBeforeProbeInstance who got added already
+    // due to the add-parent-before-child logic
+    IF_DEBUG(cout
+              << "objectAdded Known: "
+              << hex << obj
+              << (fromCtor ? " (from ctor)" : "") << endl;)
+    return;
+  }
+
+  // make sure we already know the parent
+  if (obj->parent() && !instance()->m_validObjects.contains(obj->parent())) {
+    objectAdded(obj->parent(), fromCtor);
+  }
+  Q_ASSERT(!obj->parent() || instance()->m_validObjects.contains(obj->parent()));
+
+  instance()->m_validObjects << obj;
+  if (!instance()->hasReliableObjectTracking()) {
+    // when we did not use a preload variant that
+    // overwrites qt_removeObject we must track object
+    // deletion manually
+    connect(obj, SIGNAL(destroyed(QObject*)),
+            instance(), SLOT(handleObjectDestroyed(QObject*)),
+            Qt::DirectConnection);
+  }
+
+  if (!fromCtor && obj->parent() && instance()->m_queuedObjects.contains(obj->parent())) {
+    // when a child event triggers a call to objectAdded while inside the ctor
+    // the parent is already tracked but it's call to objectFullyConstructed
+    // was delayed. hence we must do the same for the child for integrity
+    fromCtor = true;
+  }
+
+  IF_DEBUG(cout << "objectAdded: " << hex << obj
+                << (fromCtor ? " (from ctor)" : "")
+                << ", p: " << obj->parent() << endl;)
+
+  if (fromCtor) {
+    Q_ASSERT(!instance()->m_queuedObjects.contains(obj));
+    instance()->m_queuedObjects << obj;
+    if (!instance()->m_queueTimer->isActive()) {
+      // timers must not be started from a different thread
+      QMetaObject::invokeMethod(instance()->m_queueTimer, "start", Qt::AutoConnection);
+    }
+  } else {
+    instance()->objectFullyConstructed(obj);
   }
 }
 
@@ -447,7 +524,9 @@ void Probe::objectFullyConstructed(QObject *obj)
     // deleted already
     IF_DEBUG(cout << "stale fully constructed: " << hex << obj << endl;)
     return;
-  } else if (filterObject(obj)) {
+  }
+
+  if (filterObject(obj)) {
     // when the call was delayed from the ctor construction,
     // the parent might not have been set properly yet. hence
     // apply the filter again
@@ -482,33 +561,43 @@ void Probe::objectFullyConstructed(QObject *obj)
 void Probe::objectRemoved(QObject *obj)
 {
   QWriteLocker lock(s_lock());
-  if (isInitialized()) {
-    IF_DEBUG(cout << "object removed:" << hex << obj << " " << obj->parent() << endl;)
 
-    bool success = instance()->m_validObjects.remove(obj);
-    if (!success) {
-      // object was not tracked by the probe, probably a gammaray object
+  if (!isInitialized()) {
+    IF_DEBUG(cout
+             << "objectRemoved Before: "
+             << hex << obj
+             << " have statics: " << s_listener() << endl;)
+
+    if (!s_listener())
       return;
-    }
 
-    instance()->m_queuedObjects.removeOne(obj);
-
-    instance()->m_objectListModel->objectRemoved(obj);
-
-    instance()->connectionRemoved(obj, 0, 0, 0);
-    instance()->connectionRemoved(0, 0, obj, 0);
-
-    emit instance()->objectDestroyed(obj);
-  } else if (s_addedBeforeProbeInsertion()) {
-    for (QVector<QObject*>::iterator it = s_addedBeforeProbeInsertion()->begin();
-         it != s_addedBeforeProbeInsertion()->end();) {
+    QVector<QObject*> &addedBefore = s_listener()->addedBeforeProbeInstance;
+    for (QVector<QObject*>::iterator it = addedBefore.begin(); it != addedBefore.end();) {
       if (*it == obj) {
-        it = s_addedBeforeProbeInsertion()->erase(it);
+        it = addedBefore.erase(it);
       } else {
         ++it;
       }
     }
+    return;
   }
+
+  IF_DEBUG(cout << "object removed:" << hex << obj << " " << obj->parent() << endl;)
+
+  bool success = instance()->m_validObjects.remove(obj);
+  if (!success) {
+    // object was not tracked by the probe, probably a gammaray object
+    return;
+  }
+
+  instance()->m_queuedObjects.removeOne(obj);
+
+  instance()->m_objectListModel->objectRemoved(obj);
+
+  instance()->connectionRemoved(obj, 0, 0, 0);
+  instance()->connectionRemoved(0, 0, obj, 0);
+
+  emit instance()->objectDestroyed(obj);
 }
 
 void Probe::handleObjectDestroyed(QObject *obj)
@@ -519,7 +608,7 @@ void Probe::handleObjectDestroyed(QObject *obj)
 void Probe::objectParentChanged()
 {
   if (sender()) {
-    emit objectReparanted(sender());
+    emit objectReparented(sender());
   }
 }
 
@@ -587,68 +676,84 @@ bool Probe::eventFilter(QObject *receiver, QEvent *event)
         // object is known already, just update the position in the tree
         // BUT: only when we did not queue this item before
         IF_DEBUG(cout << "update pos: " << hex << obj << endl;)
-        emit objectReparanted(obj);
+        emit objectReparented(obj);
       }
     } else if (tracked) {
       objectRemoved(obj);
     }
   }
-  if (event->type() == QEvent::MouseButtonRelease) {
-    QMouseEvent *mouseEv = static_cast<QMouseEvent*>(event);
-    if (mouseEv->button() == Qt::LeftButton &&
-        mouseEv->modifiers() & (Qt::ControlModifier | Qt::ShiftModifier)) {
-      QWidget *widget = QApplication::widgetAt(mouseEv->globalPos());
-      if (widget) {
-        emit widgetSelected(widget, widget->mapFromGlobal(mouseEv->globalPos()));
-      }
-    }
-  }
-
-  // make modal dialogs non-modal so that the gammaray window is still reachable
-  if (event->type() == QEvent::Show) {
-    QDialog *dlg = qobject_cast<QDialog*>(receiver);
-    if (dlg) {
-      dlg->setWindowModality(Qt::NonModal);
-    }
-  }
 
   // we have no preloading hooks, so recover all objects we see
-  if (s_listener()->trackDestroyed && event->type() != QEvent::ChildAdded &&
+  if (!hasReliableObjectTracking() && event->type() != QEvent::ChildAdded &&
       event->type() != QEvent::ChildRemoved && !filterObject(receiver)) {
     QWriteLocker lock(s_lock());
     const bool tracked = m_validObjects.contains(receiver);
     if (!tracked) {
-      objectAdded(receiver);
+      discoverObject(receiver);
     }
   }
+
+  // filters provided by plugins
+  if (!filterObject(receiver)) {
+    foreach (QObject *filter, m_globalEventFilters)
+      filter->eventFilter(receiver, event);
+  }
+
   return QObject::eventFilter(receiver, event);
 }
 
 void Probe::findExistingObjects()
 {
-  addObjectRecursive(QCoreApplication::instance());
-  foreach (QObject *obj, QApplication::topLevelWidgets()) {
-    addObjectRecursive(obj);
-  }
+  discoverObject(QCoreApplication::instance());
 }
 
-void Probe::addObjectRecursive(QObject *obj)
+void Probe::discoverObject(QObject* obj)
 {
   if (!obj) {
     return;
   }
-  objectRemoved(obj); // in case we find it twice
+
+  QWriteLocker lock(s_lock());
+  if (m_validObjects.contains(obj))
+    return;
+
   objectAdded(obj);
   foreach (QObject *child, obj->children()) {
-    addObjectRecursive(child);
+    discoverObject(child);
   }
 }
 
+void Probe::installGlobalEventFilter(QObject* filter)
+{
+  Q_ASSERT(!m_globalEventFilters.contains(filter));
+  m_globalEventFilters.push_back(filter);
+}
+
+bool Probe::hasReliableObjectTracking() const
+{
+  return !s_listener()->trackDestroyed;
+}
+
+void Probe::selectObject(QObject* object, const QPoint& pos)
+{
+  emit objectSelected(object, pos);
+}
+
+//BEGIN: SignalSlotsLocationStore
+
 // taken from qobject.cpp
 const int gammaray_flagged_locations_count = 2;
-static const char *gammaray_flagged_locations[gammaray_flagged_locations_count] = {0};
+const char *gammaray_flagged_locations[gammaray_flagged_locations_count] = {0};
 
-const char *Probe::connectLocation(const char *member)
+static int gammaray_idx = 0;
+
+void SignalSlotsLocationStore::flagLocation(const char *method)
+{
+  gammaray_flagged_locations[gammaray_idx] = method;
+  gammaray_idx = (gammaray_idx+1) % gammaray_flagged_locations_count;
+}
+
+const char *SignalSlotsLocationStore::extractLocation(const char *member)
 {
   for (int i = 0; i < gammaray_flagged_locations_count; ++i) {
     if (member == gammaray_flagged_locations[i]) {
@@ -663,146 +768,5 @@ const char *Probe::connectLocation(const char *member)
   return 0;
 }
 
-extern "C" Q_DECL_EXPORT void qt_startup_hook()
-{
-  s_listener()->trackDestroyed = false;
+//END
 
-  new ProbeCreator(ProbeCreator::CreateOnly);
-#if !defined Q_OS_WIN && !defined Q_OS_MAC
-  if (!functionsOverwritten) {
-    static void(*next_qt_startup_hook)() = (void (*)()) dlsym(RTLD_NEXT, "qt_startup_hook");
-    next_qt_startup_hook();
-  }
-#endif
-}
-
-extern "C" Q_DECL_EXPORT void qt_addObject(QObject *obj)
-{
-  Probe::objectAdded(obj, true);
-#if !defined Q_OS_WIN && !defined Q_OS_MAC
-  if (!functionsOverwritten) {
-    static void (*next_qt_addObject)(QObject *obj) =
-      (void (*)(QObject *obj)) dlsym(RTLD_NEXT, "qt_addObject");
-    next_qt_addObject(obj);
-  }
-#endif
-}
-
-extern "C" Q_DECL_EXPORT void qt_removeObject(QObject *obj)
-{
-  Probe::objectRemoved(obj);
-#if !defined Q_OS_WIN && !defined Q_OS_MAC
-  if (!functionsOverwritten) {
-    static void (*next_qt_removeObject)(QObject *obj) =
-      (void (*)(QObject *obj)) dlsym(RTLD_NEXT, "qt_removeObject");
-    next_qt_removeObject(obj);
-  }
-#endif
-}
-
-#ifndef GAMMARAY_UNKNOWN_CXX_MANGLED_NAMES
-#ifndef Q_OS_WIN
-Q_DECL_EXPORT const char *qFlagLocation(const char *method)
-#else
-Q_DECL_EXPORT const char *myFlagLocation(const char *method)
-#endif
-{
-  static int gammaray_idx = 0;
-  gammaray_flagged_locations[gammaray_idx] = method;
-  gammaray_idx = (gammaray_idx+1) % gammaray_flagged_locations_count;
-
-#ifndef Q_OS_WIN
-  static const char *(*next_qFlagLocation)(const char *method) =
-    (const char * (*)(const char *method)) dlsym(RTLD_NEXT, "_Z13qFlagLocationPKc");
-
-  Q_ASSERT_X(next_qFlagLocation, "",
-             "Recompile with GAMMARAY_UNKNOWN_CXX_MANGLED_NAMES enabled, "
-             "your compiler uses an unsupported C++ name mangling scheme");
-  return next_qFlagLocation(method);
-#else
-  return method;
-#endif
-}
-#endif
-
-#if defined(Q_OS_WIN) || defined(Q_OS_MAC)
-void overwriteQtFunctions()
-{
-  functionsOverwritten = true;
-  AbstractFunctionOverwriter *overwriter = FunctionOverwriterFactory::createFunctionOverwriter();
-
-  overwriter->overwriteFunction(QLatin1String("qt_startup_hook"), (void*)qt_startup_hook);
-  overwriter->overwriteFunction(QLatin1String("qt_addObject"), (void*)qt_addObject);
-  overwriter->overwriteFunction(QLatin1String("qt_removeObject"), (void*)qt_removeObject);
-#if defined(Q_OS_WIN)
-#ifdef ARCH_64
-#ifdef __MINGW32__
-  overwriter->overwriteFunction(
-    QLatin1String("_Z13qFlagLocationPKc"), (void*)myFlagLocation);
-#else
-  overwriter->overwriteFunction(
-    QLatin1String("?qFlagLocation@@YAPEBDPEBD@Z"), (void*)myFlagLocation);
-#endif
-#else
-# ifdef __MINGW32__
-  overwriter->overwriteFunction(
-    QLatin1String("_Z13qFlagLocationPKc"), (void*)myFlagLocation);
-# else
-  overwriter->overwriteFunction(
-    QLatin1String("?qFlagLocation@@YAPBDPBD@Z"), (void*)myFlagLocation);
-# endif
-#endif
-#endif
-}
-#endif
-
-#ifdef Q_OS_WIN
-extern "C" Q_DECL_EXPORT void gammaray_probe_inject();
-
-extern "C" BOOL WINAPI DllMain(HINSTANCE/*hInstance*/, DWORD dwReason, LPVOID/*lpvReserved*/)
-{
-  switch(dwReason) {
-  case DLL_PROCESS_ATTACH:
-  {
-    overwriteQtFunctions();
-
-    gammaray_probe_inject();
-    break;
-  }
-  case DLL_PROCESS_DETACH:
-  {
-      //Unloading does not work, because we overwrite existing code
-      exit(-1);
-      break;
-  }
-  };
-  return TRUE;
-}
-#endif
-
-extern "C" Q_DECL_EXPORT void gammaray_probe_inject()
-{
-  if (!qApp) {
-    return;
-  }
-  printf("gammaray_probe_inject()\n");
-  // make it possible to re-attach
-  new ProbeCreator(ProbeCreator::CreateAndFindExisting);
-}
-
-#ifdef Q_OS_MAC
-// we need a way to execute some code upon load, so let's abuse
-// static initialization
-class HitMeBabyOneMoreTime
-{
-  public:
-    HitMeBabyOneMoreTime()
-    {
-      overwriteQtFunctions();
-    }
-
-};
-static HitMeBabyOneMoreTime britney;
-#endif
-
-#include "probe.moc"

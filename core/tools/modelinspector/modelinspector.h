@@ -24,32 +24,55 @@
 #ifndef GAMMARAY_MODELINSPECTOR_MODELINSPECTOR_H
 #define GAMMARAY_MODELINSPECTOR_MODELINSPECTOR_H
 
-#include "include/toolfactory.h"
+#include "toolfactory.h"
 
-#include <QWidget>
+#include <common/modelinspectorinterface.h>
+
+class QItemSelection;
+class QItemSelectionModel;
 
 namespace GammaRay {
 
 class ModelModel;
+class ModelCellModel;
 class ModelTester;
+class RemoteModelServer;
 
-class ModelInspector : public QObject, public ToolFactory
+class ModelInspector : public ModelInspectorInterface
+{
+  Q_OBJECT
+  Q_INTERFACES(GammaRay::ModelInspectorInterface)
+  public:
+    explicit ModelInspector(ProbeInterface *probe, QObject *parent = 0);
+
+  private slots:
+    void modelSelected(const QItemSelection &selected);
+    void selectionChanged(const QItemSelection &selected);
+
+    void objectSelected(QObject* object);
+
+  private:
+    ModelModel *m_modelModel;
+    QItemSelectionModel *m_modelSelectionModel;
+
+    RemoteModelServer *m_modelContentServer;
+    QItemSelectionModel *m_modelContentSelectionModel;
+
+    ModelCellModel *m_cellModel;
+
+    ModelTester *m_modelTester;
+};
+
+class ModelInspectorFactory : public QObject, public StandardToolFactory<QAbstractItemModel, ModelInspector>
 {
   Q_OBJECT
   Q_INTERFACES(GammaRay::ToolFactory)
   public:
-    explicit ModelInspector(QObject *parent = 0);
-    virtual QString id() const;
-    virtual QString name() const;
-    virtual QStringList supportedTypes() const;
-    virtual void init(ProbeInterface *probe);
-    virtual QWidget *createWidget(ProbeInterface *probe, QWidget *parentWidget);
+    explicit ModelInspectorFactory(QObject *parent) : QObject(parent)
+    {
+    }
 
-    ModelModel *modelModel() const;
-
-  private:
-    ModelModel *m_modelModel;
-    ModelTester *m_modelTester;
+    QString name() const;
 };
 
 }

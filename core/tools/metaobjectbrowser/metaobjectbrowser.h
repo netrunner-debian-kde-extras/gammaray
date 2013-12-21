@@ -24,28 +24,26 @@
 #ifndef GAMMARAY_METAOBJECTBROWSER_METATYPEBROWSER_H
 #define GAMMARAY_METAOBJECTBROWSER_METATYPEBROWSER_H
 
-#include "include/toolfactory.h"
+#include "toolfactory.h"
 
-#include <QWidget>
-
-class QModelIndex;
+class QItemSelection;
 
 namespace GammaRay {
 
-class PropertyWidget;
+class PropertyController;
 
-class MetaObjectBrowser : public QWidget
+class MetaObjectBrowser : public QObject
 {
   Q_OBJECT
 
   public:
-    explicit MetaObjectBrowser(ProbeInterface *probe, QWidget *parent = 0);
+    explicit MetaObjectBrowser(ProbeInterface *probe, QObject *parent = 0);
 
   private Q_SLOTS:
-    void objectSelected(const QModelIndex &index);
+    void objectSelected(const QItemSelection &selection);
 
   private:
-     PropertyWidget *m_propertyWidget;
+     PropertyController *m_propertyController;
 };
 
 class MetaObjectBrowserFactory : public QObject,

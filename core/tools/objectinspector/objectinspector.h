@@ -24,32 +24,33 @@
 #ifndef GAMMARAY_OBJECTINSPECTOR_OBJECTINSPECTOR_H
 #define GAMMARAY_OBJECTINSPECTOR_OBJECTINSPECTOR_H
 
-#include "include/toolfactory.h"
+#include "toolfactory.h"
 
-#include <QWidget>
+#include <QObject>
 
+class QItemSelection;
+class QItemSelectionModel;
 class QModelIndex;
 
 namespace GammaRay {
 
-namespace Ui {
-  class ObjectInspector;
-}
+class PropertyController;
 
-class ObjectInspector : public QWidget
+class ObjectInspector : public QObject
 {
   Q_OBJECT
   public:
-    explicit ObjectInspector(ProbeInterface *probe, QWidget *parent = 0);
-
-    void selectDefaultItem();
+    explicit ObjectInspector(ProbeInterface *probe, QObject *parent = 0);
 
   private slots:
+    void selectDefaultItem();
     void objectSelected(const QModelIndex &index);
-    void widgetSelected(QWidget *widget);
+    void objectSelectionChanged(const QItemSelection &selection);
+    void objectSelected(QObject *object);
 
   private:
-    QScopedPointer<Ui::ObjectInspector> ui;
+    PropertyController *m_propertyController;
+    QItemSelectionModel *m_selectionModel;
 };
 
 class ObjectInspectorFactory : public QObject, public StandardToolFactory<QObject, ObjectInspector>

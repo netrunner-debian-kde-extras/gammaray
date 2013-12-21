@@ -23,7 +23,7 @@
 #ifndef GAMMARAY_STATEMACHINEVIEWER_STATEMODEL_H
 #define GAMMARAY_STATEMACHINEVIEWER_STATEMODEL_H
 
-#include "include/objectmodelbase.h"
+#include <core/objectmodelbase.h>
 
 class QAbstractTransition;
 class QStateMachine;
@@ -40,7 +40,7 @@ class StateModel : public ObjectModelBase<QAbstractItemModel>
     enum Roles {
       TransitionsRole = ObjectModel::UserRole + 1,
       IsInitialStateRole,
-      StateObjectRole = Qt::UserRole + 11
+      StateObjectRole = ObjectModel::UserRole + 11
     };
     explicit StateModel(QObject *parent = 0);
     ~StateModel();
@@ -58,7 +58,7 @@ class StateModel : public ObjectModelBase<QAbstractItemModel>
     StateModelPrivate * const d_ptr;
 
   private:
-    Q_PRIVATE_SLOT(d_func(), void transitionTriggered(QAbstractTransition*))
+    Q_PRIVATE_SLOT(d_func(), void stateConfigurationChanged())
 };
 
 }

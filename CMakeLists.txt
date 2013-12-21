@@ -1,37 +1,38 @@
 # This is the top-level CMakeLists.txt file for the GammaRay project.
 #
-# Pass the following variables to cmake to control the build:
-#
-# -DGAMMARAY_UNKNOWN_CXX_MANGLED_NAMES=[on|off]
-#  Set this if your compiler uses an unsupported C++ name mangling scheme
-#  Default=off
-#
 # To build the man page from POD, run 'make man' after CMake (assumes perl is available)
 # To install the resulting man page, run 'make install'
 # Not available on Windows.
 #
 # To build the apidox, run 'make docs' after CMake (assumes doxygen is available)
-# Not available on Windows.
 #
 
 project(GammaRay)
-cmake_minimum_required(VERSION 2.8)
+
+if(WIN32)
+  # needed for automoc and QtMain to work correctly
+  cmake_minimum_required(VERSION 2.8.11)
+  cmake_policy(SET CMP0020 NEW)
+else()
+  cmake_minimum_required(VERSION 2.8.6)
+endif()
 
 if(NOT Prog_NAME)
   set(Prog_NAME "GammaRay")
 endif()
 
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/ ${CMAKE_MODULE_PATH})
+set(CMAKE_AUTOMOC ON)
 
 set(GAMMARAY_VERSION_MAJOR "1")
-set(GAMMARAY_VERSION_MINOR "3")
-set(GAMMARAY_VERSION_PATCH "1")
+set(GAMMARAY_VERSION_MINOR "9")
+set(GAMMARAY_VERSION_PATCH "95")
 set(GAMMARAY_VERSION "${GAMMARAY_VERSION_MAJOR}.${GAMMARAY_VERSION_MINOR}.${GAMMARAY_VERSION_PATCH}")
 set(GAMMARAY_VERSION_STRING "${GAMMARAY_VERSION}")
+set(GAMMARAY_SOVERSION "2.0.0")
+set(GAMMARAY_PLUGIN_VERSION "${GAMMARAY_VERSION_MAJOR}.${GAMMARAY_VERSION_MINOR}")
 
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
-
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
 
 enable_testing()
 
@@ -59,35 +60,55 @@ add_definitions(-DQT_USE_FAST_CONCATENATION -DQT_USE_FAST_OPERATOR_PLUS)
 include(CheckCXXCompilerFlag)
 include(CheckLibraryExists)
 include(GammaRayMacros)
+include(GammaRayMacrosInternal)
 include(MacroLogFeature)
 
 set(QT_MIN_VERSION "4.7.0")
 
-# try Qt5 first, and prefer that if found
-find_package(Qt5Core QUIET)
+option(
+  GAMMARAY_ENFORCE_QT4_BUILD
+  "Enable if you want to enfore a build with Qt4"
+  OFF
+)
+
+option(
+  GAMMARAY_PROBE_ONLY_BUILD
+  "Build only the probe, not the host tools (client, launcher, etc)."
+  OFF
+)
+
+# try Qt5 first, and prefer that (if found), but only if not disabled via option
+if(NOT GAMMARAY_ENFORCE_QT4_BUILD)
+  find_package(Qt5Core QUIET)
+endif()
+
 if(Qt5Core_FOUND)
   find_package(Qt5Gui REQUIRED)
-  find_package(Qt5Widgets REQUIRED)
-  find_package(Qt5Concurrent REQUIRED)
   find_package(Qt5Test REQUIRED)
+  find_package(Qt5Network REQUIRED)
 
+  find_package(Qt5Concurrent QUIET)
+  find_package(Qt5Widgets QUIET)
   find_package(Qt5PrintSupport QUIET)
   find_package(Qt5Svg QUIET)
   find_package(Qt5Script QUIET)
   find_package(Qt5ScriptTools QUIET)
+  find_package(Qt5Location QUIET) # workaround for 5.1 webkit that tries to find a qtlocation with a matching version if none (with any version) has been found before...
   find_package(Qt5WebKitWidgets 5.0.2 QUIET) # 5.0.[01] has a code generation bug in uic that fails to generate proper code for webkitwidget classes
   find_package(Qt5Designer QUIET)
 
   include("cmake/ECMQt4To5Porting.cmake")
   include_directories(${QT_INCLUDES}) # TODO: Port away from this.
 
+  set(HAVE_QT_CONCURRENT ${Qt5Concurrent_FOUND})
+  set(HAVE_QT_WIDGETS ${Qt5Widgets_FOUND})
   set(HAVE_QT_SVG ${Qt5Svg_FOUND})
   set(HAVE_QT_DESIGNER ${Qt5Designer_FOUND})
   set(HAVE_QT_PRINTSUPPORT ${Qt5PrintSupport_FOUND})
 
   set(QT_QTWEBKIT_FOUND ${Qt5WebKitWidgets_FOUND}) # backward compat with Qt4 webkit code
 
-  if(Qt5_POSITION_INDEPENDENT_CODE)
+  if(Qt5_POSITION_INDEPENDENT_CODE AND NOT WIN32)
     if(CMAKE_VERSION VERSION_LESS 2.8.9) # TODO remove once we increase the cmake requirement
       set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
     else()
@@ -97,11 +118,17 @@ if(Qt5Core_FOUND)
 
 # Qt4
 else()
-  find_package(Qt4 ${QT_MIN_VERSION} REQUIRED QtCore QtGui)
+  set(QT_USE_IMPORTED_TARGETS true)
+  find_package(Qt4 ${QT_MIN_VERSION} REQUIRED QtCore QtGui QtTest QtNetwork)
+  find_package(Qt4 ${QT_MIN_VERSION} QUIET COMPONENTS QtScript QtScriptTools QtWebKit QtDesigner QtSvg)
 
-  include_directories(${QT_INCLUDES})
+  include(${QT_USE_FILE})
+  set(HAVE_QT_CONCURRENT true)
+  set(HAVE_QT_WIDGETS true)
   set(HAVE_QT_SVG true)
-  set(HAVE_QT_DESIGNER true)
+  if(QT_QTDESIGNER_FOUND)
+    set(HAVE_QT_DESIGNER true)
+  endif()
   set(HAVE_QT_PRINTSUPPORT true)
 endif()
 
@@ -125,19 +152,53 @@ if(CMAKE_BUILD_TYPE MATCHES "^[Rr]elease$")
   add_definitions(-DQT_NO_DEBUG_OUTPUT)
 endif()
 
+set(BIN_INSTALL_DIR "bin")
 set(LIB_SUFFIX "" CACHE STRING "Define suffix of directory name (32/64)")
 set(LIB_INSTALL_DIR "lib${LIB_SUFFIX}")
-if(Qt5Core_FOUND)
-  set(PLUGIN_INSTALL_DIR "${LIB_INSTALL_DIR}/qt5/plugins")
+set(INCLUDE_INSTALL_DIR "include/gammaray")
+if(WIN32)
+  set(PLUGIN_INSTALL_DIR "plugins")
 else()
-  set(PLUGIN_INSTALL_DIR "${LIB_INSTALL_DIR}/qt4/plugins")
+  set(PLUGIN_INSTALL_DIR "${LIB_INSTALL_DIR}/gammaray")
 endif()
+if(WIN32)
+  set(LIBEXEC_INSTALL_DIR "${BIN_INSTALL_DIR}")
+else()
+  set(LIBEXEC_INSTALL_DIR "${LIB_INSTALL_DIR}/gammaray/libexec")
+endif()
+
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/${BIN_INSTALL_DIR})
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/${LIB_INSTALL_DIR})
 
 set(
   INSTALL_TARGETS_DEFAULT_ARGS
-  RUNTIME DESTINATION bin
+  RUNTIME DESTINATION ${BIN_INSTALL_DIR}
   LIBRARY DESTINATION ${LIB_INSTALL_DIR}
   ARCHIVE DESTINATION ${LIB_INSTALL_DIR} COMPONENT Devel
+)
+
+file(RELATIVE_PATH GAMMARAY_RELATIVE_PROBE_PATH "${CMAKE_INSTALL_PREFIX}/${BIN_INSTALL_DIR}" "${CMAKE_INSTALL_PREFIX}/${PLUGIN_INSTALL_DIR}")
+file(RELATIVE_PATH GAMMARAY_RELATIVE_PROBE_TO_PLUGIN_PATH "${CMAKE_INSTALL_PREFIX}/${PLUGIN_INSTALL_DIR}/${GAMMARAY_PLUGIN_VERSION}/${GAMMARAY_PROBE_ABI}" "${CMAKE_INSTALL_PREFIX}/${PLUGIN_INSTALL_DIR}/${GAMMARAY_PLUGIN_VERSION}/${GAMMARAY_PROBE_ABI}")
+file(RELATIVE_PATH GAMMARAY_RELATIVE_BIN_TO_PLUGIN_PATH "${CMAKE_INSTALL_PREFIX}/${BIN_INSTALL_DIR}" "${CMAKE_INSTALL_PREFIX}/${PLUGIN_INSTALL_DIR}")
+
+macro_log_feature(
+  HAVE_QT_CONCURRENT
+  "QtConcurrent"
+  "Qt concurrency library"
+  "included with Qt"
+  FALSE
+  ""
+  "Required for the GammaRay launcher process list"
+)
+
+macro_log_feature(
+  HAVE_QT_WIDGETS
+  "Qt Widgets"
+  "Qt Widgets"
+  "included with Qt"
+  FALSE
+  ""
+  "Required for the GammaRay client UI and widget-related tools"
 )
 
 macro_log_feature(
@@ -270,42 +331,47 @@ endif()
 include(CheckIncludeFiles)
 check_include_files(stdint.h HAVE_STDINT_H)
 
-configure_file(
-  ${CMAKE_CURRENT_SOURCE_DIR}/config-gammaray.h.cmake
-  ${CMAKE_CURRENT_BINARY_DIR}/config-gammaray.h
-)
+# strip off sysroot for cross-compilation
+if(CMAKE_FIND_ROOT_PATH)
+  string(REPLACE "${CMAKE_FIND_ROOT_PATH}" "" GAMMARAY_LOCAL_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
+else()
+  set(GAMMARAY_LOCAL_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
+endif()
+
+include(GammaRayProbeABI) # this needs to be run after we know what exactly we are building
+
 configure_file(
   ${CMAKE_CURRENT_SOURCE_DIR}/config-gammaray-version.h.cmake
   ${CMAKE_CURRENT_BINARY_DIR}/config-gammaray-version.h
 )
 
-if(CMAKE_COMPILER_IS_GNUCXX)
+if(CMAKE_COMPILER_IS_GNUCXX OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
   check_cxx_compiler_flag(-Wunused-but-set-variable HAVE_GCC_UNUSED_BUT_SET)
   check_cxx_compiler_flag(-Wlogical-op HAVE_GCC_LOGICAL_OP)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated -Wextra -Woverloaded-virtual -Winit-self -Wmissing-include-dirs -Wunused -Wno-div-by-zero -Wundef -Wpointer-arith -Wcast-qual -Wcast-align -Wmissing-noreturn -Werror=return-type -fvisibility=hidden")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated -Wextra -Woverloaded-virtual -Winit-self -Wmissing-include-dirs -Wunused -Wno-div-by-zero -Wundef -Wpointer-arith -Wcast-qual -Wcast-align -Wmissing-noreturn -Werror=return-type")
   if(HAVE_GCC_UNUSED_BUT_SET)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wunused-but-set-variable")
   endif()
   if(HAVE_GCC_LOGICAL_OP)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wlogical-op")
   endif()
-endif()
-
-if(MINGW)
-  # mingw will error out on the crazy casts in probe.cpp without this
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fpermissive")
+  if(MINGW)
+    # mingw will error out on the crazy casts in probe.cpp without this
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fpermissive")
+  else()
+    # visibility attributes not supported on mingw, don't use -fvisibility option
+    # see: http://stackoverflow.com/questions/7994415/mingw-fvisibility-hidden-does-not-seem-to-work
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility=hidden")
+  endif()
 endif()
 
 # linker flags
 if(CMAKE_SYSTEM_NAME MATCHES Linux OR CMAKE_SYSTEM_NAME STREQUAL GNU)
-  if(CMAKE_COMPILER_IS_GNUCXX)
+  if(CMAKE_COMPILER_IS_GNUCXX OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--fatal-warnings -Wl,--no-undefined -lc ${CMAKE_SHARED_LINKER_FLAGS}")
     set(CMAKE_MODULE_LINKER_FLAGS "-Wl,--fatal-warnings -Wl,--no-undefined -lc ${CMAKE_MODULE_LINKER_FLAGS}")
   endif()
 endif()
-
-add_subdirectory(core)
-add_subdirectory(launcher)
 
 set(GRAPHVIZ_MIN_VERSION "2.20")
 find_package(Graphviz)
@@ -321,6 +387,7 @@ macro_log_feature(
 if(GRAPHVIZ_FOUND)
   add_definitions(-DGRAPHVIZ_MAJOR_VERSION=${GRAPHVIZ_MAJOR_VERSION} -DGRAPHVIZ_MINOR_VERSION=${GRAPHVIZ_MINOR_VERSION})
 endif()
+set(HAVE_GRAPHVIZ ${GRAPHVIZ_FOUND})
 
 #VTK discovery works a lot better if you give CMake a hint using the VTK_DIR variable
 find_path(VTK_DIR VTKConfig.cmake
@@ -336,8 +403,9 @@ macro_log_feature(
   ""
   "Needed for the object visualization plugin"
 )
+set(HAVE_VTK ${VTK_FOUND})
 
-if(UNIX AND NOT APPLE)
+if(UNIX AND NOT APPLE AND NOT GAMMARAY_PROBE_ONLY_BUILD)
   set(XDG_APPS_INSTALL_DIR share/applications)
   install(FILES GammaRay.desktop DESTINATION ${XDG_APPS_INSTALL_DIR})
 
@@ -369,7 +437,7 @@ endif()
 
 set(LICENSE_FILE "License.txt")
 set(README_FILE "ReadMe.txt")
-if(NOT APPLE)
+if(NOT APPLE AND NOT GAMMARAY_PROBE_ONLY_BUILD)
   install(FILES "${LICENSE_FILE}" "${README_FILE}" DESTINATION ${DOC_INSTALL_DIR})
 endif()
 
@@ -395,32 +463,69 @@ if(CPPCHECK_EXECUTABLE)
   )
 endif()
 
-if(UNIX)
+find_program(POD2MAN_EXECUTABLE pod2man)
+
+if(POD2MAN_EXECUTABLE AND NOT GAMMARAY_PROBE_ONLY_BUILD)
   #man page generation using pod2man
   add_custom_command(
     OUTPUT ${CMAKE_BINARY_DIR}/gammaray.1
-    COMMAND pod2man -c "KDAB Products" -r "\"${GAMMARAY_VERSION}\"" -s 1 ${CMAKE_SOURCE_DIR}/gammaray.pod ${CMAKE_BINARY_DIR}/gammaray.1
+    COMMAND ${POD2MAN_EXECUTABLE} -c "KDAB Products" -r "\"${GAMMARAY_VERSION}\"" -s 1 ${CMAKE_SOURCE_DIR}/gammaray.pod ${CMAKE_BINARY_DIR}/gammaray.1
     DEPENDS ${CMAKE_SOURCE_DIR}/gammaray.pod
   )
   add_custom_target(man ALL DEPENDS ${CMAKE_BINARY_DIR}/gammaray.1)
 
   install(FILES ${CMAKE_BINARY_DIR}/gammaray.1 DESTINATION ${CMAKE_INSTALL_PREFIX}/share/man/man1)
+endif()
 
-  file(GLOB API_LIST include/*.h include/*.dox images/*.html)
+configure_file(
+  ${CMAKE_CURRENT_SOURCE_DIR}/config-gammaray.h.cmake
+  ${CMAKE_CURRENT_BINARY_DIR}/config-gammaray.h
+)
+
+include(ExternalProject)
+
+add_subdirectory(common)
+add_subdirectory(core)
+add_subdirectory(hooking)
+if(NOT GAMMARAY_PROBE_ONLY_BUILD)
+  add_subdirectory(launcher)
+endif()
+if(Qt5Widgets_FOUND OR QT_QTGUI_FOUND)
+  add_subdirectory(ui)
+  add_subdirectory(inprocessui)
+  if(NOT GAMMARAY_PROBE_ONLY_BUILD)
+    add_subdirectory(client)
+  endif()
+endif()
+add_subdirectory(tests)
+add_subdirectory(plugins)
+
+find_package(Doxygen)
+macro_log_feature(
+  DOXYGEN_FOUND
+  "Doxygen"
+  "Documentation system"
+  "http://www.doxygen.org"
+  FALSE
+  ""
+  "Needed to build the optional API documention"
+)
+if(DOXYGEN_FOUND)
+  file(GLOB _dox_deps include/*.dox images/*.html)
+  gammaray_all_installed_headers(_all_hdrs common core ui)
+  list(APPEND _all_hdrs ${_dox_deps})
+  gammaray_join_list(DOXYGEN_INPUT " " ${_all_hdrs})
 
   #apidox generation using doxygen
+  configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile
+  )
+
   add_custom_command(
     OUTPUT ${CMAKE_BINARY_DIR}/apidocs/html/index.html
-    COMMAND echo \"PROJECT_NUMBER = ${GAMMARAY_VERSION}\" > ${CMAKE_BINARY_DIR}/versfoo
-    COMMAND echo \"INPUT = ${CMAKE_SOURCE_DIR}/include\" > ${CMAKE_BINARY_DIR}/inputfoo
-    COMMAND echo \"IMAGE_PATH = ${CMAKE_SOURCE_DIR}/images\" > ${CMAKE_BINARY_DIR}/imgfoo
-    COMMAND echo \"HTML_FOOTER = ${CMAKE_SOURCE_DIR}/images/footer.html\" > ${CMAKE_BINARY_DIR}/footfoo
-    COMMAND cat ${CMAKE_SOURCE_DIR}/Doxyfile
-                ${CMAKE_BINARY_DIR}/versfoo
-                ${CMAKE_BINARY_DIR}/inputfoo
-                ${CMAKE_BINARY_DIR}/imgfoo
-                ${CMAKE_BINARY_DIR}/footfoo | doxygen -
-    DEPENDS ${API_LIST} ${CMAKE_SOURCE_DIR}/Doxyfile
+    COMMAND ${DOXYGEN_EXECUTABLE} ${CMAKE_BINARY_DIR}/Doxyfile
+    DEPENDS ${_all_hdrs} ${_dox_deps} ${CMAKE_SOURCE_DIR}/Doxyfile.cmake
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
   )
   add_custom_target(docs
@@ -428,11 +533,5 @@ if(UNIX)
   )
 
 endif()
-
-include(ExternalProject)
-
-add_subdirectory(include)
-add_subdirectory(tests)
-add_subdirectory(plugins)
 
 macro_display_feature_log()

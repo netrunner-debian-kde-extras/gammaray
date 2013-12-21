@@ -24,30 +24,22 @@
 #ifndef GAMMARAY_RESOURCEBROWSER_RESOURCEBROWSER_H
 #define GAMMARAY_RESOURCEBROWSER_RESOURCEBROWSER_H
 
-#include "include/toolfactory.h"
+#include "toolfactory.h"
+#include <common/resourcebrowserinterface.h>
 
-#include <QWidget>
-
-class QItemSelection;
+class QModelIndex;
 
 namespace GammaRay {
 
-namespace Ui {
-  class ResourceBrowser;
-}
-
-class ResourceBrowser : public QWidget
+class ResourceBrowser : public ResourceBrowserInterface
 {
   Q_OBJECT
+  Q_INTERFACES(GammaRay::ResourceBrowserInterface)
   public:
-    explicit ResourceBrowser(ProbeInterface *probe, QWidget *parent = 0);
+    explicit ResourceBrowser(ProbeInterface *probe, QObject *parent = 0);
 
   private slots:
-    void resourceSelected(const QItemSelection &selected, const QItemSelection &deselected);
-    void setupLayout();
-
-  private:
-    QScopedPointer<Ui::ResourceBrowser> ui;
+    void currentChanged(const QModelIndex &current);
 };
 
 class ResourceBrowserFactory : public QObject, public StandardToolFactory<QObject, ResourceBrowser>

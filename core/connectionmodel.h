@@ -28,16 +28,38 @@
 #include <QSharedPointer>
 #include <QVector>
 
+#include "gammaray_core_export.h"
+#include <common/modelroles.h>
+
 namespace GammaRay {
 
-struct Connection;
+struct Connection
+{
+  Connection()
+  : sender(0), receiver(0), type(Qt::AutoConnection), valid(false)
+  { }
+  QObject *sender;
+  QByteArray signal;
+  QObject *receiver;
+  QByteArray method;
+  QByteArray location;
+  Qt::ConnectionType type;
+  bool valid;
+};
 
-class ConnectionModel : public QAbstractTableModel
+}
+
+Q_DECLARE_TYPEINFO(GammaRay::Connection, Q_MOVABLE_TYPE);
+Q_DECLARE_METATYPE(GammaRay::Connection)
+
+namespace GammaRay {
+
+class GAMMARAY_CORE_EXPORT ConnectionModel : public QAbstractTableModel
 {
   Q_OBJECT
   public:
     enum Role {
-      SenderRole = Qt::UserRole + 1,
+      SenderRole = UserRole + 1,
       ReceiverRole,
       ConnectionValidRole
     };
@@ -56,11 +78,9 @@ class ConnectionModel : public QAbstractTableModel
     int rowCount(const QModelIndex &parent = QModelIndex()) const;
 
   private slots:
-    void connectionAddedMainThread(QObject *sender, const char *signal,
-                                   QObject *receiver, const char *method,
-                                   Qt::ConnectionType type);
-    void connectionRemovedMainThread(QObject *sender, const char *signal,
-                                     QObject *receiver, const char *method);
+    void connectionAddedMainThread(const GammaRay::Connection &connection);
+    void connectionRemovedMainThread(QObject *sender, const QByteArray &normalizedSignal,
+                                     QObject *receiver, const QByteArray &normalizedMethod);
 
   private:
     QVector<Connection> m_connections;

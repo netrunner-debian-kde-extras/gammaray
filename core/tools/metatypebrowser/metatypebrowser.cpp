@@ -22,28 +22,17 @@
 */
 
 #include "metatypebrowser.h"
-#include "ui_metatypebrowser.h"
 
 #include "metatypesmodel.h"
 
-#include <QSortFilterProxyModel>
+#include <common/objectbroker.h>
 
 using namespace GammaRay;
 
-MetaTypeBrowser::MetaTypeBrowser(ProbeInterface *probe, QWidget *parent)
-  : QWidget(parent),
-    ui(new Ui::MetaTypeBrowser)
+MetaTypeBrowser::MetaTypeBrowser(ProbeInterface *probe, QObject *parent)
+  : QObject(parent)
 {
-  Q_UNUSED(probe);
-  ui->setupUi(this);
-
   MetaTypesModel *mtm = new MetaTypesModel(this);
-  QSortFilterProxyModel *proxy = new QSortFilterProxyModel(this);
-  proxy->setSourceModel(mtm);
-  ui->metaTypeView->setModel(proxy);
-  ui->metaTypeView->header()->setResizeMode(0, QHeaderView::ResizeToContents);
-  ui->metaTypeSearchLine->setProxy(proxy);
-  ui->metaTypeView->header()->setSortIndicator(1, Qt::AscendingOrder); // sort by type id
+  probe->registerModel("com.kdab.GammaRay.MetaTypeModel", mtm);
 }
 
-#include "metatypebrowser.moc"

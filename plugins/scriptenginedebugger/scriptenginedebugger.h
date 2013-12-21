@@ -24,38 +24,26 @@
 #ifndef GAMMARAY_SCRIPTENGINEDEBUGGER_SCRIPTENGINEDEBUGGER_H
 #define GAMMARAY_SCRIPTENGINEDEBUGGER_SCRIPTENGINEDEBUGGER_H
 
-#include "include/toolfactory.h"
+#include "scriptenginedebuggerwidget.h"
+#include <core/toolfactory.h>
 
-#include <QWidget>
 #include <QScriptEngine>
-
-class QScriptEngineDebugger;
 
 namespace GammaRay {
 
-namespace Ui {
-  class ScriptEngineDebugger;
-}
-
-class ScriptEngineDebugger : public QWidget
+class ScriptEngineDebugger : public QObject
 {
   Q_OBJECT
   public:
-    explicit ScriptEngineDebugger(ProbeInterface *probe, QWidget *parent = 0);
+    explicit ScriptEngineDebugger(ProbeInterface *probe, QObject *parent = 0);
     virtual ~ScriptEngineDebugger();
-  private slots:
-    void scriptEngineSelected(int index);
-
-  private:
-    QScopedPointer<Ui::ScriptEngineDebugger> ui;
-    QScriptEngineDebugger *debugger;
 };
 
 class ScriptEngineDebuggerFactory
-  : public QObject, public StandardToolFactory<QScriptEngine, ScriptEngineDebugger>
+  : public QObject, public StandardToolFactory2<QScriptEngine, ScriptEngineDebugger, ScriptEngineDebuggerWidget>
 {
   Q_OBJECT
-  Q_INTERFACES(GammaRay::ToolFactory)
+  Q_INTERFACES(GammaRay::ToolFactory GammaRay::ToolUiFactory)
   Q_PLUGIN_METADATA(IID "org.qt-project.Qt.ScriptEngineDebugger")
 
   public:

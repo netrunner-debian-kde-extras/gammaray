@@ -23,14 +23,20 @@
 
 #include "config-gammaray.h"
 #include "config-gammaray-version.h"
-#include "probefinder.h"
 #include "injector/injectorfactory.h"
-#include "launcherwindow.h"
+#include "launchoptions.h"
+#include "launcherfinder.h"
+#include "launcher.h"
+#include "probefinder.h"
 
+#ifdef HAVE_QT_WIDGETS
 #include <QApplication>
+#else
+#include <QCoreApplication>
+#endif
+
 #include <QDebug>
 #include <QStringList>
-#include <QFileInfo>
 
 using namespace GammaRay;
 
@@ -52,42 +58,64 @@ static void usage(const char *argv0)
   out << "                          \t" << InjectorFactory::availableInjectors().join(", ")
       << endl;
   out << " -p, --pid <pid>          \tattach to running Qt application" << endl;
+  out << "     --inprocess          \tuse in-process UI" << endl;
+  out << "     --inject-only        \tonly inject the probe, don't show the UI" << endl;
+  out << "     --listen <address>   \tspecify the address the server should listen on [default: 0.0.0.0]" << endl;
+  out << "     --no-listen          \tdisables remote access entirely (implies --inprocess)" << endl;
+  out << "     --list-probes        \tlist all installed probes" << endl;
+  out << "     --probe <abi>        \tspecify which probe to use" << endl;
   out << " -h, --help               \tprint program help and exit" << endl;
   out << " -v, --version            \tprint program version and exit" << endl;
+#ifdef HAVE_QT_WIDGETS
   out << endl
       << "When run without any options, " << argv0 << " will present a list of running\n"
       << "Qt-applications from which you can attach the selected injector. Else,\n"
       << "you can attach to a running process by specifying its pid, or you can\n"
       << "start a new Qt-application by specifying its name (and optional arguments)."
       << endl;
+#endif
+}
+
+static bool startLauncher()
+{
+  const QString launcherPath = LauncherFinder::findLauncher(LauncherFinder::LauncherUI);
+  QProcess proc;
+  proc.setProcessChannelMode(QProcess::ForwardedChannels);
+  proc.start(launcherPath);
+  if (!proc.waitForFinished(-1))
+    return false;
+  return proc.exitCode() == 0;
 }
 
 int main(int argc, char **argv)
 {
-  QApplication::setOrganizationName("KDAB");
-  QApplication::setOrganizationDomain("kdab.com");
-  QApplication::setApplicationName("GammaRay");
+  QCoreApplication::setOrganizationName("KDAB");
+  QCoreApplication::setOrganizationDomain("kdab.com");
+  QCoreApplication::setApplicationName("GammaRay");
 
   QStringList args;
   for (int i = 1; i < argc; ++i) {
     args.push_back(QString::fromLocal8Bit(argv[i]));
   }
-  QApplication app(argc, argv);
+#ifdef HAVE_QT_WIDGETS
+  QApplication app(argc, argv); // for style inspector
+#else
+  QCoreApplication app(argc, argv);
+#endif
 
   QStringList builtInArgs = QStringList() << QLatin1String("-style")
                                           << QLatin1String("-stylesheet")
                                           << QLatin1String("-graphicssystem");
 
-  QString injectorType;
-  int pid = -1;
+  LaunchOptions options;
   while (!args.isEmpty() && args.first().startsWith('-')) {
     const QString arg = args.takeFirst();
     if ((arg == QLatin1String("-i") || arg == QLatin1String("--injector")) && !args.isEmpty()) {
-      injectorType = args.takeFirst();
+      options.setInjectorType(args.takeFirst());
       continue;
     }
     if ((arg == QLatin1String("-p") || arg == QLatin1String("--pid")) && !args.isEmpty()) {
-      pid = args.takeFirst().toInt();
+      options.setPid( args.takeFirst().toInt() );
       continue;
     }
     if (arg == QLatin1String("-h") || arg == QLatin1String("--help")) {
@@ -100,6 +128,34 @@ int main(int argc, char **argv)
           << "a KDAB Group company, info@kdab.com" << endl;
       return 0;
     }
+    if (arg == QLatin1String("--inprocess")) {
+      options.setUiMode(LaunchOptions::InProcessUi);
+    }
+    if (arg == QLatin1String("--inject-only")) {
+      options.setUiMode(LaunchOptions::NoUi);
+    }
+    if (arg == QLatin1String("--listen") && !args.isEmpty()) {
+      options.setProbeSetting("TCPServer", args.takeFirst());
+    }
+    if ( arg == QLatin1String("--no-listen")) {
+      options.setProbeSetting("RemoteAccessEnabled", false);
+      options.setUiMode(LaunchOptions::InProcessUi);
+    }
+    if ( arg == QLatin1String("--list-probes")) {
+      foreach( const QString &abi, ProbeFinder::listProbeABIs())
+        out << abi << endl;
+      return 0;
+    }
+    if ( arg == QLatin1String("--probe") && !args.isEmpty()) {
+      const QString abi = args.takeFirst();
+      if (!ProbeFinder::listProbeABIs().contains(abi)) {
+        out << abi << "is not a known probe, see --list-probes." << endl;
+        return 1;
+      }
+      options.setProbeABI(abi);
+    }
+
+    // debug/test options
     if (arg == QLatin1String("-filtertest")) {
       qputenv("GAMMARAY_TEST_FILTER", "1");
     }
@@ -116,74 +172,33 @@ int main(int argc, char **argv)
       }
     }
   }
+  options.setLaunchArguments(args);
 
-  if (args.isEmpty() && pid <= 0) {
-    LauncherWindow dialog;
-    if (dialog.exec() == QDialog::Accepted) {
-      args = dialog.launchArguments();
-      bool ok;
-      pid = dialog.pid().toInt(&ok);
-      if (!ok && args.isEmpty()) {
-        return 0;
-      }
-    } else {
+  if (!options.isValid()) {
+    if (startLauncher())
       return 0;
-    }
-  }
-
-  const QString probeDll = ProbeFinder::findProbe(QLatin1String("gammaray_probe"));
-  qputenv("GAMMARAY_PROBE_PATH", QFileInfo(probeDll).absolutePath().toLocal8Bit());
-
-  AbstractInjector::Ptr injector;
-  if (injectorType.isEmpty()) {
-    if (pid > 0) {
-      injector = InjectorFactory::defaultInjectorForAttach();
-    } else {
-      injector = InjectorFactory::defaultInjectorForLaunch();
-    }
-  } else {
-    injector = InjectorFactory::createInjector(injectorType);
-  }
-
-  if (injector) {
-    if (pid > 0) {
-      if (!injector->attach(pid, probeDll, QLatin1String("gammaray_probe_inject"))) {
-        err << "Unable to attach injector " << injector->name() << endl;
-        err << "Exit code: " << injector->exitCode() << endl;
-        if (!injector->errorString().isEmpty()) {
-          err << "Error: " << injector->errorString() << endl;
-        }
-        return 1;
-      } else {
-        return 0;
-      }
-    } else {
-      if (!injector->launch(args, probeDll, QLatin1String("gammaray_probe_inject"))) {
-        err << "Failed to launch injector " << injector->name() << endl;
-        err << "Exit code: " << injector->exitCode() << endl;
-        if (!injector->errorString().isEmpty()) {
-          err << "Error: " << injector->errorString() << endl;
-        }
-        return 1;
-      }
-      return injector->exitCode();
-    }
+    usage(argv[0]);
     return 1;
   }
 
-  if (injectorType.isEmpty()) {
-    if (pid > 0) {
-#if defined(Q_OS_WIN)
-      err << "Sorry, but at this time there is no attach injector on the Windows platform" << endl;
-      err << "Only the launch injector windll is available on Windows" << endl;
-#else
-      err << "Uh-oh, there is no default attach injector" << endl;
-#endif
-    } else {
-      err << "Uh-oh, there is no default launch injector" << endl;
+  if (!options.isValid())
+    return 0;
+  Q_ASSERT(options.isValid());
+
+  // TODO auto-detect probe ABI
+  if (options.probeABI().isEmpty()) {
+    const QStringList availableProbes = ProbeFinder::listProbeABIs();
+    if (availableProbes.isEmpty()) {
+      out << "No probes found, this is likely an installation problem." << endl;
+      return 1;
     }
-  } else {
-    err << "Injector " << injectorType << " not found." << endl;
+    if (availableProbes.size() > 1) {
+      out << "No probe ABI specified and ABI auto-detection not implemented yet, picking " << availableProbes.first() << " at random." << endl;
+      out << "To specify the probe ABI explicitly use --probe <abi>, available probes are: " << availableProbes.join(", ") << endl;
+    }
+    options.setProbeABI(availableProbes.first());
   }
-  return 1;
+
+  Launcher launcher(options);
+  return app.exec();
 }

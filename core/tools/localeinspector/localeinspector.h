@@ -22,30 +22,15 @@
 #ifndef GAMMARAY_LOCALEINSPECTOR_LOCALEINSPECTOR_H
 #define GAMMARAY_LOCALEINSPECTOR_LOCALEINSPECTOR_H
 
-#include "include/toolfactory.h"
-
-#include <QWidget>
-
-namespace Ui {
-  class LocaleInspector;
-}
+#include "toolfactory.h"
 
 namespace GammaRay {
 
-class LocaleModel;
-
-class LocaleInspector : public QWidget
+class LocaleInspector : public QObject
 {
   Q_OBJECT
   public:
-    explicit LocaleInspector(ProbeInterface *probe, QWidget *parent = 0);
-
-  private slots:
-    void initSplitterPosition();
-
-  private:
-    QScopedPointer< ::Ui::LocaleInspector> ui;
-    LocaleModel *m_localeModel;
+    explicit LocaleInspector(ProbeInterface *probe, QObject *parent = 0);
 };
 
 class LocaleInspectorFactory : public QObject, public StandardToolFactory<QObject, LocaleInspector>

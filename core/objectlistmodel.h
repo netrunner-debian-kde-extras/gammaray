@@ -24,10 +24,11 @@
 #ifndef GAMMARAY_OBJECTLISTMODEL_H
 #define GAMMARAY_OBJECTLISTMODEL_H
 
-#include "include/objectmodelbase.h"
+#include "objectmodelbase.h"
 
-#include <QReadWriteLock>
+#include <QMutex>
 #include <QVector>
+#include <QSet>
 
 namespace GammaRay {
 
@@ -56,12 +57,16 @@ class ObjectListModel : public ObjectModelBase<QAbstractTableModel>
 
   private slots:
     void objectAddedMainThread(QObject *obj);
-    void objectRemovedMainThread(QObject *obj);
+    void objectRemovedMainThread(QObject *obj, bool fromBackground);
 
   private:
-    mutable QReadWriteLock m_lock;
-    // vector for stable iterators/indexes, esp. for the model methods
+    void removeObject(QObject *obj);
+
+    // sorted vector for stable iterators/indexes, esp. for the model methods
     QVector<QObject*> m_objects;
+
+    mutable QMutex m_mutex;
+    QSet<QObject*> m_invalidatedObjects;
 };
 
 }

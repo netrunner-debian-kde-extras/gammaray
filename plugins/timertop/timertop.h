@@ -23,10 +23,9 @@
 #ifndef GAMMARAY_TIMERTOP_TIMERTOP_H
 #define GAMMARAY_TIMERTOP_TIMERTOP_H
 
-#include "include/toolfactory.h"
+#include <core/toolfactory.h>
 
 #include <QTimer>
-#include <QWidget>
 
 namespace GammaRay {
 
@@ -34,17 +33,13 @@ namespace Ui {
   class TimerTop;
 }
 
-class TimerTop : public QWidget
+class TimerTop : public QObject
 {
   Q_OBJECT
   public:
-    explicit TimerTop(ProbeInterface *probe, QWidget *parent = 0);
-
-  private slots:
-    void slotUpdateView();
+    explicit TimerTop(ProbeInterface *probe, QObject *parent = 0);
 
   private:
-    QScopedPointer<Ui::TimerTop> ui;
     QTimer *m_updateTimer;
 };
 

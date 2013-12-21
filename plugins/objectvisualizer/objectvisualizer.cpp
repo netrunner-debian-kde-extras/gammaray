@@ -20,99 +20,24 @@
 */
 
 #include "objectvisualizer.h"
-#include "vtkcontainer.h"
-#include "vtkpanel.h"
-#include "vtkwidget.h"
-
-#include "include/objectmodel.h"
-#include "include/probeinterface.h"
-
-#include "kde/kfilterproxysearchline.h"
-#include "kde/krecursivefilterproxymodel.h"
-
-#include <QCoreApplication>
-#include <QDebug>
-#include <QHBoxLayout>
-#include <QSortFilterProxyModel>
-#include <QSplitter>
-#include <QStateMachine>
-#include <QTreeView>
+#include "objectvisualizermodel.h"
 
 #include <QtPlugin>
 
 using namespace GammaRay;
 
-GraphViewer::GraphViewer(ProbeInterface *probe, QWidget *parent)
-  : QWidget(parent),
-    mWidget(new GraphWidget(this)),
-    mProbeIface(probe)
+GraphViewer::GraphViewer(ProbeInterface *probe, QObject *parent)
+  : QObject(parent)
 {
-  QSortFilterProxyModel *objectFilter = new KRecursiveFilterProxyModel(this);
-  objectFilter->setSourceModel(probe->objectTreeModel());
-  objectFilter->setDynamicSortFilter(true);
-
-  QVBoxLayout *vbox = new QVBoxLayout;
-  KFilterProxySearchLine *objectSearchLine = new KFilterProxySearchLine(this);
-  objectSearchLine->setProxy(objectFilter);
-  vbox->addWidget(objectSearchLine);
-  QTreeView *objectTreeView = new QTreeView(this);
-  objectTreeView->setModel(objectFilter);
-  objectTreeView->setSortingEnabled(true);
-  vbox->addWidget(objectTreeView);
-  connect(objectTreeView->selectionModel(), SIGNAL(currentRowChanged(QModelIndex,QModelIndex)),
-          SLOT(handleRowChanged(QModelIndex)));
-  mObjectTreeView = objectTreeView;
-
-  QWidget *treeViewWidget = new QWidget(this);
-  treeViewWidget->setLayout(vbox);
-
-  QSplitter *splitter = new QSplitter(this);
-  splitter->addWidget(treeViewWidget);
-  splitter->addWidget(mWidget);
-  QHBoxLayout *hbox = new QHBoxLayout(this);
-  hbox->addWidget(splitter);
-
-  QMetaObject::invokeMethod(this, "delayedInit", Qt::QueuedConnection);
+  ObjectVisualizerModel *model = new ObjectVisualizerModel(this);
+  model->setSourceModel(probe->objectTreeModel());
+  probe->registerModel("com.kdab.GammaRay.ObjectVisualizerModel", model);
 }
 
 GraphViewer::~GraphViewer()
 {
 }
 
-void GraphViewer::delayedInit()
-{
-  // make all existing objects known to the vtk widget
-  const QAbstractItemModel *listModel = mProbeIface->objectListModel();
-  for (int i = 0; i < listModel->rowCount(); ++i) {
-    const QModelIndex index = listModel->index(i, 0);
-    QObject *object = index.data(ObjectModel::ObjectRole).value<QObject*>();
-    Q_ASSERT(object);
-    mWidget->vtkWidget()->addObject(object);
-  }
-  connect(mProbeIface->probe(), SIGNAL(objectCreated(QObject*)),
-          mWidget->vtkWidget(), SLOT(addObject(QObject*)));
-  connect(mProbeIface->probe(), SIGNAL(objectDestroyed(QObject*)),
-          mWidget->vtkWidget(), SLOT(removeObject(QObject*)));
-
-  // select the qApp object (if any) in the object treeView
-  const QAbstractItemModel *viewModel = mObjectTreeView->model();
-  const QModelIndexList matches = viewModel->match(viewModel->index(0, 0),
-      ObjectModel::ObjectRole, QVariant::fromValue<QObject*>(qApp), 1,
-      Qt::MatchFlags(Qt::MatchExactly|Qt::MatchRecursive));
-
-  if (!matches.isEmpty()) {
-    Q_ASSERT(matches.first().data(ObjectModel::ObjectRole).value<QObject*>() == qApp);
-    mObjectTreeView->setCurrentIndex(matches.first());
-  }
-}
-
-void GraphViewer::handleRowChanged(const QModelIndex &index)
-{
-  QObject *object = index.data(ObjectModel::ObjectRole).value<QObject*>();
-  Q_ASSERT(object);
-  mWidget->vtkWidget()->setObjectFilter(object);
-}
-
+#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
 Q_EXPORT_PLUGIN(GraphViewerFactory)
-
-#include "objectvisualizer.moc"
+#endif

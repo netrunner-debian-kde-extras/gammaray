@@ -22,7 +22,7 @@
 */
 
 #include "kjobmodel.h"
-#include "include/util.h"
+#include <core/util.h>
 
 #include <KJob>
 
@@ -205,5 +205,3 @@ int KJobModel::indexOfJob(QObject *obj) const
   }
   return -1;
 }
-
-#include "kjobmodel.moc"
