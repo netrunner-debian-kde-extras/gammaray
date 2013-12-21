@@ -1,5 +1,1 @@
-widget-export-actions-location.patch
-harfbuzz-search-path.patch
-find-widget-export-actions-when-attaching.patch
-gammaray-probe-versioned-soname.patch
 use-empty-rpath.patch

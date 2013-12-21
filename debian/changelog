@@ -1,8 +1,12 @@
 gammaray (1.9.95-1) UNRELEASED; urgency=low
 
   * New upstream release.
-  * Refreshed d/patches/widget-export-actions-location.patch and
-    d/patches/gammaray-probe-versioned-soname.patch.
+  * Refreshed d/patches/use-empty-rpath.patch.
+  * Removed no longer needed patches:
+    - widget-export-actions-location.patch
+    - harfbuzz-search-path.patch
+    - find-widget-export-actions-when-attaching.patch
+    - gammaray-probe-versioned-soname.patch.
   * Use xz for orig tarball compression.
 
  -- Jakub Adam <jakub.adam@ktknet.cz>  Sat, 21 Dec 2013 09:25:42 +0100
