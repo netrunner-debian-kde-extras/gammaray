@@ -1,28 +1,13 @@
-# VTK includes QtGui/... stuff => breaks compilation with Qt5
-if(NOT Qt5Core_FOUND)
-
-if(VTK_FOUND)
-
-add_definitions(-DHAVE_VTK -DVTK_EXCLUDE_STRSTREAM_HEADERS)
-
 include_directories(
+  ${CMAKE_BINARY_DIR}
   ${CMAKE_CURRENT_BINARY_DIR}
-  ${VTK_INCLUDE_DIRS}
 )
 
-link_directories(${VTK_LIBRARY_DIRS})
-
+# probe part
 set(gammaray_objectvisualizer_plugin_srcs
-  ../../3rdparty/kde/kfilterproxysearchline.cpp
-  ../../3rdparty/kde/krecursivefilterproxymodel.cpp
-
   objectvisualizer.cpp
-  vtkcontainer.cpp
-  vtkpanel.cpp
-  vtkwidget.cpp
+  objectvisualizermodel.cpp
 )
-
-qt4_automoc(${gammaray_objectvisualizer_plugin_srcs})
 
 gammaray_add_plugin(gammaray_objectvisualizer_plugin
   gammaray_objectvisualizer.desktop
@@ -31,12 +16,57 @@ gammaray_add_plugin(gammaray_objectvisualizer_plugin
 
 target_link_libraries(gammaray_objectvisualizer_plugin
   ${QT_QTCORE_LIBRARIES}
-  ${QT_QTGUI_LIBRARIES}
+  gammaray_core
+)
+
+######## START VTK VISUALIZATION
+# VTK includes QtGui/... stuff => breaks compilation with Qt5
+if(VTK_FOUND AND NOT Qt5Core_FOUND AND NOT GAMMARAY_PROBE_ONLY_BUILD)
+
+set(OPTIONAL_VTK_LIBRARIES
+)
+
+add_definitions(-DVTKGUI_ENABLED -DVTK_EXCLUDE_STRSTREAM_HEADERS)
+
+include_directories(
+  ${VTK_INCLUDE_DIRS}
+)
+
+include(${VTK_USE_FILE})
+
+link_directories(${VTK_LIBRARY_DIRS})
+
+set(gammaray_objectvisualizer_ui_plugin_srcs
+  objectvisualizerwidget.cpp
+  vtkcontainer.cpp
+  vtkpanel.cpp
+  vtkwidget.cpp
+)
+
+list(APPEND OPTIONAL_VTK_LIBRARIES
   ${VTK_LIBRARIES}
-  QVTK
-  gammaray_probe
+)
+
+if(${VTK_MAJOR_VERSION} EQUAL 5)
+  list(APPEND OPTIONAL_VTK_LIBRARIES QVTK)
+elseif(${VTK_MAJOR_VERSION} EQUAL 6)
+  list(APPEND OPTIONAL_VTK_LIBRARIES vtkGUISupportQt)
+endif()
+
+gammaray_add_plugin(gammaray_objectvisualizer_ui_plugin
+  gammaray_objectvisualizer_ui.desktop
+  ${gammaray_objectvisualizer_ui_plugin_srcs}
+)
+
+target_link_libraries(gammaray_objectvisualizer_ui_plugin
+  ${QT_QTCORE_LIBRARIES}
+  ${QT_QTGUI_LIBRARIES}
+  ${OPTIONAL_VTK_LIBRARIES}
+  ${VTK_QT_LIBRARY}
+  gammaray_common
+  gammaray_ui
 )
 
 endif()
 
-endif()
+######## END VTK VISUALIZATION

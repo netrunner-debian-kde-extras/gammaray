@@ -24,7 +24,7 @@
 #ifndef GAMMARAY_OBJECTTREEMODEL_H
 #define GAMMARAY_OBJECTTREEMODEL_H
 
-#include "include/objectmodelbase.h"
+#include "objectmodelbase.h"
 
 #include <QVector>
 
@@ -46,7 +46,7 @@ class ObjectTreeModel : public ObjectModelBase<QAbstractItemModel>
   private slots:
     void objectAdded(QObject *obj);
     void objectRemoved(QObject *obj);
-    void objectReparanted(QObject *obj);
+    void objectReparented(QObject *obj);
 
   private:
     QModelIndex indexForObject(QObject *object) const;

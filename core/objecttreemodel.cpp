@@ -45,8 +45,8 @@ ObjectTreeModel::ObjectTreeModel(Probe *probe)
           this, SLOT(objectAdded(QObject*)));
   connect(probe, SIGNAL(objectDestroyed(QObject*)),
           this, SLOT(objectRemoved(QObject*)));
-  connect(probe, SIGNAL(objectReparanted(QObject*)),
-          this, SLOT(objectReparanted(QObject*)));
+  connect(probe, SIGNAL(objectReparented(QObject*)),
+          this, SLOT(objectReparented(QObject*)));
 }
 
 static QObject *parentObject(QObject *obj)
@@ -55,10 +55,16 @@ static QObject *parentObject(QObject *obj)
     return obj->parent();
   }
 
+  // FIXME: this is still valid, but way too unstable since we miss reparentings
+  // so for now rather live with the wrong hierarchy than crashes/asserts
+#if 0
   // QQuickItem does very ugly things with its parent, so we have to try harder to get hold of it...
   if (obj->inherits("QQuickItem")) {
-    return obj->property("parent").value<QObject*>();
+    QObject *p = obj->property("parent").value<QObject*>();
+    if (Probe::instance()->isValidObject(p))
+      return p;
   }
+#endif
 
   return 0;
 }
@@ -100,10 +106,12 @@ void ObjectTreeModel::objectAdded(QObject *obj)
   Q_ASSERT(index.isValid() || !parentObject(obj));
 
   QVector<QObject*> &children = m_parentChildMap[ parentObject(obj) ];
+  QVector<QObject*>::iterator it = std::lower_bound(children.begin(), children.end(), obj);
+  const int row = std::distance(children.begin(), it);
 
-  beginInsertRows(index, children.size(), children.size());
+  beginInsertRows(index, row, row);
 
-  children.push_back(obj);
+  children.insert(it, obj);
   m_childParentMap.insert(obj, parentObject(obj));
 
   endInsertRows();
@@ -134,22 +142,22 @@ void ObjectTreeModel::objectRemoved(QObject *obj)
 
   QVector<QObject*> &siblings = m_parentChildMap[ parentObj ];
 
-  int index = siblings.indexOf(obj);
-
-  if (index == -1) {
+  QVector<QObject*>::iterator it = std::lower_bound(siblings.begin(), siblings.end(), obj);
+  if (it == siblings.end() || *it != obj) {
     return;
   }
+  const int row = std::distance(siblings.begin(), it);
 
-  beginRemoveRows(parentIndex, index, index);
+  beginRemoveRows(parentIndex, row, row);
 
-  siblings.remove(index);
+  siblings.erase(it);
   m_childParentMap.remove(obj);
   m_parentChildMap.remove(obj);
 
   endRemoveRows();
 }
 
-void ObjectTreeModel::objectReparanted(QObject *obj)
+void ObjectTreeModel::objectReparented(QObject *obj)
 {
   // slot, hence should always land in main thread due to auto connection
   Q_ASSERT(thread() == QThread::currentThread());
@@ -219,11 +227,13 @@ QModelIndex ObjectTreeModel::indexForObject(QObject *object) const
   if (!parentIndex.isValid() && parent) {
     return QModelIndex();
   }
-  int row = m_parentChildMap[ parent ].indexOf(object);
-  if (row < 0) {
+  const QVector<QObject*> &siblings = m_parentChildMap[ parent ];
+  QVector<QObject*>::const_iterator it = std::lower_bound(siblings.constBegin(), siblings.constEnd(), object);
+  if (it == siblings.constEnd() || *it != object) {
     return QModelIndex();
   }
+
+  const int row = std::distance(siblings.constBegin(), it);
   return index(row, 0, parentIndex);
 }
 
-#include "objecttreemodel.moc"

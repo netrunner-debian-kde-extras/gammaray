@@ -23,60 +23,23 @@
 
 #include "proxytoolfactory.h"
 
-#include <QDir>
-#include <QFileInfo>
-#include <QLabel>
-#include <QPluginLoader>
-#include <QSettings>
-
-#include <iostream>
-
 using namespace GammaRay;
+using namespace std;
 
 ProxyToolFactory::ProxyToolFactory(const QString &path, QObject *parent)
-  : QObject(parent), m_factory(0)
+  : ProxyFactory<ToolFactory>(path, parent)
 {
-  const QFileInfo pluginInfo(path);
-  m_id = pluginInfo.baseName();
-
-  QSettings desktopFile(path, QSettings::IniFormat);
-  desktopFile.beginGroup(QLatin1String("Desktop Entry"));
-  m_name = desktopFile.value(QLatin1String("Name")).toString();
-  m_supportedTypes =
-    desktopFile.value(
-      QLatin1String("X-GammaRay-Types")).toString().split(QLatin1Char(';'),
-                                                          QString::SkipEmptyParts);
-  m_pluginPath =
-    pluginInfo.dir().absoluteFilePath(desktopFile.value(QLatin1String("Exec")).toString());
-
-  const QString dllBaseName = desktopFile.value(QLatin1String("Exec")).toString();
-  if (dllBaseName.isEmpty()) {
-    m_errorString = tr("Invalid 'Exec' line in plugin spec file");
-    return;
-  }
-
-  foreach (const QString &entry,
-           pluginInfo.dir().entryList(QStringList(dllBaseName + QLatin1Char('*')), QDir::Files)) {
-    const QString path = pluginInfo.dir().absoluteFilePath(entry);
-    if (QLibrary::isLibrary(path)) {
-      m_pluginPath = path;
-      break;
-    }
-  }
+  m_name = value(QLatin1String("Name")).toString();
+  m_supportedTypes = value(QLatin1String("X-GammaRay-Types")).toString().split(QLatin1Char(';'), QString::SkipEmptyParts);
 }
 
 bool ProxyToolFactory::isValid() const
 {
   return
-    !m_id.isEmpty() &&
+    !id().isEmpty() &&
     !m_name.isEmpty() &&
     !m_pluginPath.isEmpty() &&
     !m_supportedTypes.isEmpty();
-}
-
-QString ProxyToolFactory::id() const
-{
-  return m_id;
 }
 
 QString ProxyToolFactory::name() const
@@ -91,27 +54,11 @@ QStringList ProxyToolFactory::supportedTypes() const
 
 void ProxyToolFactory::init(ProbeInterface *probe)
 {
-  QPluginLoader loader(m_pluginPath, this);
-  QObject *obj = loader.instance();
-  obj->setParent(this);
-  m_factory = qobject_cast<ToolFactory*>(obj);
-  if (!m_factory) {
-    std::cerr << "error loading plugin " << qPrintable(m_pluginPath)
-              << ": " << qPrintable(loader.errorString()) << std::endl;
+  loadPlugin();
+  ToolFactory *fac = factory();
+  if (!fac) {
     return;
   }
-  Q_ASSERT(m_factory);
-
-  m_factory->init(probe);
+  Q_ASSERT(fac);
+  fac->init(probe);
 }
-
-QWidget *ProxyToolFactory::createWidget(ProbeInterface *probe, QWidget *parentWidget)
-{
-  if (!m_factory) {
-    return new QLabel(tr("Plugin '%1' could not be loaded.").arg(m_pluginPath), parentWidget);
-  }
-  Q_ASSERT(m_factory);
-  return m_factory->createWidget(probe, parentWidget);
-}
-
-#include "proxytoolfactory.moc"

@@ -20,6 +20,8 @@
 #ifndef KDEUI_EXPORT_H
 #define KDEUI_EXPORT_H
 
+#include "ui/gammaray_ui_export.h"
+
 #define KDEUI_EXPORT
 
 #endif

@@ -24,35 +24,29 @@
 #ifndef GAMMARAY_WEBINSPECTOR_WEBINSPECTOR_H
 #define GAMMARAY_WEBINSPECTOR_WEBINSPECTOR_H
 
-#include "include/toolfactory.h"
+#include <core/toolfactory.h>
+#include "webinspectorwidget.h"
 
 #include <QWebPage>
 #include <QWidget>
 
 namespace GammaRay {
 
-namespace Ui {
-  class WebInspector;
-}
-
-class WebInspector : public QWidget
+class WebInspector : public QObject
 {
   Q_OBJECT
   public:
-    explicit WebInspector(GammaRay::ProbeInterface *probe, QWidget *parent = 0);
+    explicit WebInspector(GammaRay::ProbeInterface *probe, QObject *parent = 0);
 
   private slots:
-    void webPageSelected(int index);
-
-  private:
-    QScopedPointer<Ui::WebInspector> ui;
+    void objectAdded(QObject *obj);
 };
 
 class WebInspectorFactory
-  : public QObject, public StandardToolFactory<QWebPage, WebInspector>
+  : public QObject, public StandardToolFactory2<QWebPage, WebInspector, WebInspectorWidget>
 {
   Q_OBJECT
-  Q_INTERFACES(GammaRay::ToolFactory)
+  Q_INTERFACES(GammaRay::ToolFactory GammaRay::ToolUiFactory)
   Q_PLUGIN_METADATA(IID "com.kdab.gammaray.WebInspector")
 
   public:

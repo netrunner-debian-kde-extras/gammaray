@@ -1,28 +1,55 @@
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
-
-qt4_automoc(test_connections.cpp)
-
-add_executable(connectiontest test_connections.cpp)
-
-target_link_libraries(connectiontest
-  ${QT_QTCORE_LIBRARIES}
-  ${QT_QTGUI_LIBRARIES}
-  ${QT_QTTEST_LIBRARIES}
+include_directories(
+  ${CMAKE_CURRENT_BINARY_DIR}
+  ${CMAKE_SOURCE_DIR}
 )
 
-qt4_automoc(attachhelper.cpp)
+### BENCH SUITE
+
+if(Qt5Widgets_FOUND OR QT_QTGUI_FOUND)
+  add_executable(benchsuite benchsuite.cpp)
+
+  target_link_libraries(benchsuite
+    ${QT_QTCORE_LIBRARIES}
+    ${QT_QTGUI_LIBRARIES}
+    ${QT_QTTEST_LIBRARIES}
+    gammaray_common
+    gammaray_core
+  )
+
+  if(QNXNTO)
+    target_link_libraries(benchsuite cpp)
+  endif()
+
+### CONNECTIONTEST
+
+  add_executable(connectiontest test_connections.cpp)
+
+  target_link_libraries(connectiontest
+    ${QT_QTCORE_LIBRARIES}
+    ${QT_QTGUI_LIBRARIES}
+    ${QT_QTTEST_LIBRARIES}
+  )
+
+  if(QNXNTO)
+    target_link_libraries(connectiontest cpp)
+  endif()
+endif()
 
 add_executable(attachhelper attachhelper.cpp)
 
 target_link_libraries(attachhelper ${QT_QTCORE_LIBRARIES})
 
+if(QNXNTO)
+  target_link_libraries(attachhelper cpp)
+endif()
+
 if(UNIX AND NOT APPLE)
   add_test(connectiontest-preload
-    ${PROJECT_BINARY_DIR}/bin/gammaray -unittest -i preload
+    ${PROJECT_BINARY_DIR}/bin/gammaray --inprocess -unittest -i preload
     ${PROJECT_BINARY_DIR}/bin/connectiontest
   )
   add_test(connectiontest-style
-    ${PROJECT_BINARY_DIR}/bin/gammaray -unittest -i style
+    ${PROJECT_BINARY_DIR}/bin/gammaray --inprocess -unittest -i style
     ${PROJECT_BINARY_DIR}/bin/connectiontest
   )
 
@@ -47,7 +74,7 @@ if(UNIX AND NOT APPLE)
   find_program(GDB_EXECUTABLE gdb)
   if(GDB_EXECUTABLE)
     add_test(connectiontest-gdb
-      ${PROJECT_BINARY_DIR}/bin/gammaray -unittest -i gdb
+      ${PROJECT_BINARY_DIR}/bin/gammaray --inprocess -unittest -i gdb
       ${PROJECT_BINARY_DIR}/bin/connectiontest
     )
     add_test(attachtest-gdb
@@ -56,7 +83,7 @@ if(UNIX AND NOT APPLE)
     )
     if(RUN_FILTER_TESTS)
       add_test(connectiontest-gdb-filter
-        ${PROJECT_BINARY_DIR}/bin/gammaray -unittest -filtertest -i gdb
+        ${PROJECT_BINARY_DIR}/bin/gammaray --inprocess -unittest -filtertest -i gdb
         ${PROJECT_BINARY_DIR}/bin/connectiontest
       )
     endif()

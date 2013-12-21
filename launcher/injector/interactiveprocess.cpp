@@ -32,6 +32,9 @@
 #ifndef __MINGW32__
 #define fileno _fileno
 #endif
+#elif defined(Q_OS_QNX)
+#include <unistd.h>
+using std::fileno;
 #else
 #include <unistd.h>
 #endif
@@ -51,4 +54,3 @@ void InteractiveProcess::setupChildProcess()
   ::dup2(stdinClone, fileno(stdin));
 }
 
-#include "interactiveprocess.moc"

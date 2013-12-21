@@ -52,9 +52,6 @@ bool PreloadInjector::launch(const QStringList &programAndArgs,
 #ifdef Q_OS_MAC
   env.insert("DYLD_FORCE_FLAT_NAMESPACE", QLatin1String("1"));
   env.insert("DYLD_INSERT_LIBRARIES", probeDll);
-  //env.insert("DYLD_PRINT_ENV", QLatin1String("1"));
-  //env.insert("DYLD_PRINT_LIBRARIES", QLatin1String("1"));
-  //env.insert("DYLD_PRINT_INITIALIZERS", QLatin1String("1"));
   env.insert("GAMMARAY_UNSET_DYLD", "1");
 #else
   env.insert("LD_PRELOAD", probeDll);
@@ -77,7 +74,11 @@ bool PreloadInjector::launch(const QStringList &programAndArgs,
 
   if (env.value("GAMMARAY_GDB").toInt()) {
     QStringList newArgs;
-    newArgs << "gdb" << "--eval-command" << "run" << "--args";
+    newArgs << "gdb";
+#ifndef Q_OS_MAC
+    newArgs << "--eval-command" << "run";
+#endif
+    newArgs << "--args";
     newArgs += args;
     args = newArgs;
   } else if (env.value("GAMMARAY_MEMCHECK").toInt()) {
@@ -104,6 +105,10 @@ bool PreloadInjector::launch(const QStringList &programAndArgs,
   mProcessError = proc.error();
   mExitStatus = proc.exitStatus();
   mErrorString = proc.errorString();
+
+  if (mProcessError == QProcess::FailedToStart) {
+    mErrorString.prepend(QString("Could not start '%1': ").arg(program));
+  }
 
   return mExitCode == EXIT_SUCCESS && mExitStatus == QProcess::NormalExit
           && mProcessError == QProcess::UnknownError;

@@ -21,9 +21,14 @@
 */
 
 #include "vtkwidget.h"
+#include "objectvisualizermodel.h"
 
-#include "include/util.h"
+#include "common/objectmodel.h"
+#include "core/util.h"
 
+#include <QAbstractItemModel>
+#include <QDebug>
+#include <QItemSelectionModel>
 #include <QTimer>
 
 #include <vtkRenderer.h>
@@ -66,7 +71,9 @@ VtkWidget::VtkWidget(QWidget *parent)
   : QVTKWidget(parent),
     m_mousePressed(false),
     m_updateTimer(new QTimer(this)),
-    m_objectFilter(0),
+    m_model(0),
+    m_selectionModel(0),
+    m_repopulateTimer(new QTimer(this)),
     m_colorIndex(0)
 {
   setupRenderer();
@@ -76,6 +83,10 @@ VtkWidget::VtkWidget(QWidget *parent)
   m_updateTimer->setInterval(0);
   m_updateTimer->setSingleShot(true);
   connect(m_updateTimer, SIGNAL(timeout()), SLOT(renderViewImpl()));
+
+  m_repopulateTimer->setInterval(100);
+  m_repopulateTimer->setSingleShot(true);
+  connect(m_repopulateTimer, SIGNAL(timeout()), SLOT(doRepopulate()));
 }
 
 VtkWidget::~VtkWidget()
@@ -83,6 +94,29 @@ VtkWidget::~VtkWidget()
   clear();
 
   DEBUG("")
+}
+
+void VtkWidget::setModel(QAbstractItemModel *model)
+{
+  m_model = model;
+
+  connect(m_model, SIGNAL(rowsInserted(QModelIndex,int,int)),
+          SLOT(objectRowsInserted(QModelIndex,int,int)));
+
+  connect(m_model, SIGNAL(rowsAboutToBeRemoved(QModelIndex,int,int)),
+          SLOT(objectRowsAboutToBeRemoved(QModelIndex,int,int)));
+
+  connect(m_model, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
+          SLOT(objectDataChanged(QModelIndex,QModelIndex)));
+
+  doRepopulate(); // no delay here, otherwise we race against the signals
+}
+
+void VtkWidget::setSelectionModel(QItemSelectionModel *selectionModel)
+{
+  m_selectionModel = selectionModel;
+  connect(selectionModel, SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
+          SLOT(selectionChanged()));
 }
 
 void VtkWidget::setupRenderer()
@@ -211,14 +245,7 @@ void VtkWidget::setupGraph()
   DEBUG("end")
 }
 
-bool VtkWidget::addObject(QObject *object)
-{
-  m_availableObjects << object;
-
-  return addObjectInternal(object);
-}
-
-bool VtkWidget::addObjectInternal(QObject *object)
+qulonglong VtkWidget::addObject(const QModelIndex &index)
 {
   // ignore new objects during scene interaction
   // TODO: Add some code to add the objects later on => queue objects
@@ -227,23 +254,26 @@ bool VtkWidget::addObjectInternal(QObject *object)
           << object
           << " "
           << object->metaObject()->className())
-    return false;
+    return 0;
   }
 
-  const QString className = QLatin1String(object->metaObject()->className());
+  qulonglong objectId = index.data(ObjectVisualizerModel::ObjectId).toULongLong();
+  const QString className = index.data(ObjectVisualizerModel::ClassName).toString();
+#if 0 // FIXME this breaks the graph structure since this will cause orphan children!
   if (className == "QVTKInteractorInternal") {
-    return false;
+    return 0;
+  }
+#endif
+
+  if (!objectId || m_objectIdMap.contains(objectId)) {
+    return 0;
   }
 
-  if (m_objectIdMap.contains(object)) {
-    return false;
+  if (!filterAcceptsObject(index)) {
+    return 0;
   }
 
-  if (!filterAcceptsObject(object)) {
-    return false;
-  }
-
-  const QString label = Util::displayString(object);
+  const QString label = index.data(ObjectVisualizerModel::ObjectDisplayName).toString();
   const int weight = 1; // TODO: Make weight somewhat usable?
   m_vertexPropertyArr->SetValue(0, vtkUnicodeString::from_utf16(label.utf16()));
   m_vertexPropertyArr->SetValue(1, weight);
@@ -261,38 +291,45 @@ bool VtkWidget::addObjectInternal(QObject *object)
 
   const vtkIdType type = m_graph->AddVertex(m_vertexPropertyArr);
   DEBUG("Add: " << type << " " << object->metaObject()->className())
-  m_objectIdMap[object] = type;
+  m_objectIdMap[objectId] = type;
 
-  QObject *parentObject = object->parent();
-  if (parentObject) {
-    if (!m_objectIdMap.contains(parentObject)) {
-      addObject(parentObject);
-    }
-    if (m_objectIdMap.contains(parentObject)) {
-      const vtkIdType parentType = m_objectIdMap[parentObject];
+  // recursively add our children
+  for (int i = 0; i < index.model()->rowCount(index); ++i) {
+    addObject(index.child(i, 0));
+  }
+
+  // add edge to parent
+  if (index.parent().isValid()) {
+    const qulonglong parentId = index.parent().data(ObjectVisualizerModel::ObjectId).toULongLong();
+    if (parentId) {
+      Q_ASSERT(m_objectIdMap.contains(parentId));
+      const vtkIdType parentType = m_objectIdMap.value(parentId);
       m_graph->AddEdge(parentType, type);
     }
   }
 
   renderView();
-  return true;
+  return objectId;
 }
 
-bool VtkWidget::removeObject(QObject *object)
+bool VtkWidget::removeObject(const QModelIndex &index)
 {
-  m_availableObjects.remove(object);
+  for (int i = 0; i < index.model()->rowCount(index); ++i) {
+    removeObject(index.child(i, 0));
+  }
 
-  return removeObjectInternal(object);
+  const qulonglong objectId = index.data(ObjectVisualizerModel::ObjectId).toULongLong();
+  return removeObjectInternal(objectId);
 }
 
-bool VtkWidget::removeObjectInternal(QObject *object)
+bool VtkWidget::removeObjectInternal(qulonglong objectId)
 {
-  if (!m_objectIdMap.contains(object)) {
+  if (!m_objectIdMap.contains(objectId)) {
     return false;
   }
 
   // Remove id-for-object from VTK's graph data structure
-  const vtkIdType type = m_objectIdMap[object];
+  const vtkIdType type = m_objectIdMap[objectId];
   const int size = m_graph->GetNumberOfVertices();
   m_graph->RemoveVertex(type);
 
@@ -301,14 +338,14 @@ bool VtkWidget::removeObjectInternal(QObject *object)
   const vtkIdType lastId = m_objectIdMap.size() - 1;
   DEBUG("Type: " << type << " Last: " << lastId)
   if (type != lastId) {
-    QObject *lastObject = m_objectIdMap.key(lastId);
-    Q_ASSERT(lastObject);
-    m_objectIdMap[lastObject] = type;
+    qulonglong lastObjectId = m_objectIdMap.key(lastId);
+    Q_ASSERT(lastObjectId);
+    m_objectIdMap[lastObjectId] = type;
   }
 
   // Remove object from our map
   if (size > m_graph->GetNumberOfVertices()) {
-    const bool count = m_objectIdMap.remove(object);
+    const bool count = m_objectIdMap.remove(objectId);
     Q_ASSERT(count == 1);
   } else {
     DEBUG("Warning: Should not happen: Could not remove vertice with id: " << type)
@@ -328,8 +365,8 @@ void VtkWidget::clear()
 {
   // TODO: there must be an easier/faster way to clean the graph data
   // Just re-create the vtk graph data object?
-  Q_FOREACH (QObject *object, m_objectIdMap.keys()) {
-    removeObjectInternal(object);
+  Q_FOREACH (const qulonglong &objectId, m_objectIdMap) {
+    removeObjectInternal(objectId);
   }
   m_objectIdMap.clear();
 
@@ -344,33 +381,36 @@ void VtkWidget::renderViewImpl()
   m_view->ResetCamera();
 }
 
-void VtkWidget::setObjectFilter(QObject *object)
+void VtkWidget::selectionChanged()
 {
-  if (m_objectFilter == object) {
-    return;
-  }
-
-  m_objectFilter = object;
   repopulate();
   resetCamera();
 }
 
 void VtkWidget::repopulate()
 {
+  if (!m_repopulateTimer->isActive()) {
+    m_repopulateTimer->start();
+  }
+}
+
+void VtkWidget::doRepopulate()
+{
   DEBUG("")
 
   clear();
 
-  Q_FOREACH (QObject *object, m_availableObjects) {
-    addObject(object);
+  for (int i = 0; i < m_model->rowCount(); ++i) {
+    const QModelIndex index = m_model->index(i, 0);
+    addObject(index);
   }
 }
 
 // TODO: Move to Util.h?
-static bool descendantOf(QObject *ascendant, QObject *obj)
+static bool descendantOf(const QModelIndex &ascendant, const QModelIndex &index)
 {
-  QObject *parent = obj->parent();
-  if (!parent) {
+  const QModelIndex parent = index.parent();
+  if (!parent.isValid()) {
     return false;
   }
   if (parent == ascendant) {
@@ -379,18 +419,60 @@ static bool descendantOf(QObject *ascendant, QObject *obj)
   return descendantOf(ascendant, parent);
 }
 
-bool VtkWidget::filterAcceptsObject(QObject *object) const
+static QModelIndex mapToSource(const QModelIndex &proxyIndex)
 {
-  if (m_objectFilter) {
-    if (object == m_objectFilter) {
-      return true;
-    } else if (descendantOf(m_objectFilter, object)) {
-      return true;
-    } else {
-      return false;
-    }
+  if (proxyIndex.model()->inherits("GammaRay::ObjectVisualizerModel")) {
+    return proxyIndex;
   }
-  return true;
+
+  const QAbstractProxyModel *proxyModel =
+    qobject_cast<const QAbstractProxyModel*>(proxyIndex.model());
+
+  if (proxyModel) {
+    return mapToSource(proxyModel->mapToSource(proxyIndex));
+  } else {
+    return proxyIndex;
+  }
 }
 
-#include "vtkwidget.moc"
+bool VtkWidget::filterAcceptsObject(const QModelIndex &index) const
+{
+  if (!m_selectionModel) {
+    return true;
+  }
+
+  QModelIndexList rows = m_selectionModel->selectedRows();
+  foreach (const QModelIndex &row, rows) {
+    const QModelIndex sourceRow = mapToSource(row);
+    if (index == sourceRow) {
+      return true;
+    }
+    return descendantOf(sourceRow, index);
+  }
+
+  return true; // empty selection
+}
+
+void VtkWidget::objectRowsInserted(const QModelIndex &parent, int start, int end)
+{
+  for (int i = start; i <= end; ++i) {
+    const QModelIndex index = m_model->index(i, 0, parent);
+    addObject(index);
+  }
+}
+
+void VtkWidget::objectRowsAboutToBeRemoved(const QModelIndex &parent, int start, int end)
+{
+  for (int i = start; i <= end; ++i) {
+    const QModelIndex index = m_model->index(i, 0, parent);
+    removeObject(index);
+  }
+}
+
+void VtkWidget::objectDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight)
+{
+  for (int i = topLeft.row(); i <= bottomRight.row(); ++i) {
+    const QModelIndex index = m_model->index(i, 0, topLeft.parent());
+    addObject(index);
+  }
+}

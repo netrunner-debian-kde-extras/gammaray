@@ -23,30 +23,32 @@
 #ifndef GAMMARAY_MESSAGEHANDLER_MESSAGEHANDLER_H
 #define GAMMARAY_MESSAGEHANDLER_MESSAGEHANDLER_H
 
-#include "include/toolfactory.h"
+#include "toolfactory.h"
 
-#include <QWidget>
-
-class QSortFilterProxyModel;
+#include "messagehandlerinterface.h"
 
 namespace GammaRay {
 
+struct DebugMessage;
 class MessageModel;
 
 namespace Ui {
   class MessageHandler;
 }
 
-class MessageHandler : public QWidget
+class MessageHandler : public MessageHandlerInterface
 {
   Q_OBJECT
+  Q_INTERFACES(GammaRay::MessageHandlerInterface)
   public:
-    explicit MessageHandler(ProbeInterface *probe, QWidget *parent = 0);
-    void setModel(MessageModel *model);
+    explicit MessageHandler(ProbeInterface *probe, QObject *parent = 0);
+    ~MessageHandler();
+
+  private slots:
+    void ensureHandlerInstalled();
+    void handleFatalMessage(const GammaRay::DebugMessage &message);
 
   private:
-    QScopedPointer<Ui::MessageHandler> ui;
-    QSortFilterProxyModel *m_messageProxy;
     MessageModel *m_messageModel;
 };
 
@@ -56,20 +58,11 @@ class MessageHandlerFactory : public QObject, public StandardToolFactory<QObject
   Q_INTERFACES(GammaRay::ToolFactory)
   public:
     explicit MessageHandlerFactory(QObject *parent);
-    virtual ~MessageHandlerFactory();
 
     virtual inline QString name() const
     {
       return tr("Messages");
     }
-
-    virtual QWidget *createWidget(ProbeInterface *probe, QWidget *parentWidget);
-
-  private slots:
-    void ensureHandlerInstalled();
-
-  private:
-    MessageModel *m_messageModel;
 };
 
 }

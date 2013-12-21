@@ -23,57 +23,110 @@
 
 #include "modelinspector.h"
 
-#include "modelinspectorwidget.h"
 #include "modelmodel.h"
+#include "modelcellmodel.h"
 #include "modeltester.h"
 
-#include "include/probeinterface.h"
+#include "probeinterface.h"
+
+#include <common/objectbroker.h>
+#include <remote/remotemodelserver.h>
+#include <remote/selectionmodelserver.h>
+
+#include <QDebug>
 
 using namespace GammaRay;
 
-ModelInspector::ModelInspector(QObject *parent) :
-  QObject(parent),
+ModelInspector::ModelInspector(ProbeInterface* probe, QObject *parent) :
+  ModelInspectorInterface(parent),
   m_modelModel(0),
+  m_modelContentServer(0),
+  m_modelContentSelectionModel(0),
   m_modelTester(0)
-{
-}
-
-QString ModelInspector::id() const
-{
-  return metaObject()->className();
-}
-
-QString ModelInspector::name() const
-{
- return tr("Models");
-}
-
-QStringList ModelInspector::supportedTypes() const
-{
-  return QStringList(QAbstractItemModel::staticMetaObject.className());
-}
-
-void ModelInspector::init(ProbeInterface *probe)
 {
   m_modelModel = new ModelModel(this);
   connect(probe->probe(), SIGNAL(objectCreated(QObject*)),
           m_modelModel, SLOT(objectAdded(QObject*)));
   connect(probe->probe(), SIGNAL(objectDestroyed(QObject*)),
           m_modelModel, SLOT(objectRemoved(QObject*)));
+  probe->registerModel("com.kdab.GammaRay.ModelModel", m_modelModel);
+
+  m_modelSelectionModel = ObjectBroker::selectionModel(m_modelModel);
+  connect(m_modelSelectionModel, SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
+          SLOT(modelSelected(QItemSelection)));
+  connect(probe->probe(), SIGNAL(objectSelected(QObject*,QPoint)), SLOT(objectSelected(QObject*)) );
+
+  m_modelContentServer = new RemoteModelServer("com.kdab.GammaRay.ModelContent", this);
+
+  m_cellModel = new ModelCellModel(this);
+  probe->registerModel("com.kdab.GammaRay.ModelCellModel", m_cellModel);
+  selectionChanged(QItemSelection());
 
   m_modelTester = new ModelTester(this);
   connect(probe->probe(), SIGNAL(objectCreated(QObject*)),
           m_modelTester, SLOT(objectAdded(QObject*)));
 }
 
-QWidget *ModelInspector::createWidget(ProbeInterface *probe, QWidget *parentWidget)
+QString ModelInspectorFactory::name() const
 {
-  return new ModelInspectorWidget(this, probe, parentWidget);
+ return tr("Models");
 }
 
-ModelModel *ModelInspector::modelModel() const
+void ModelInspector::modelSelected(const QItemSelection& selected)
 {
-  return m_modelModel;
+  if (m_modelContentSelectionModel && m_modelContentSelectionModel->model())
+    ObjectBroker::unregisterSelectionModel(m_modelContentSelectionModel);
+  delete m_modelContentSelectionModel;
+  m_modelContentSelectionModel = 0;
+
+  QModelIndex index;
+  if (selected.size() >= 1)
+    index = selected.first().topLeft();
+
+  if (index.isValid()) {
+    QObject *obj = index.data(ObjectModel::ObjectRole).value<QObject*>();
+    QAbstractItemModel *model = qobject_cast<QAbstractItemModel*>(obj);
+    m_modelContentServer->setModel(model);
+
+    m_modelContentSelectionModel = new SelectionModelServer("com.kdab.GammaRay.ModelContent.selection", model, this);
+    ObjectBroker::registerSelectionModel(m_modelContentSelectionModel);
+    connect(m_modelContentSelectionModel,
+            SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
+            SLOT(selectionChanged(QItemSelection)));
+  } else {
+    m_modelContentServer->setModel(0);
+  }
+
+  // clear the cell info box
+  selectionChanged(QItemSelection());
 }
 
-#include "modelinspector.moc"
+void ModelInspector::objectSelected(QObject* object)
+{
+  QAbstractItemModel *selectedModel = qobject_cast<QAbstractItemModel*>(object);
+  if (selectedModel) {
+    const QModelIndexList indexList =
+      m_modelModel->match(m_modelModel->index(0, 0),
+                   ObjectModel::ObjectRole,
+                   QVariant::fromValue<QObject*>(selectedModel), 1,
+                   Qt::MatchExactly | Qt::MatchRecursive);
+    if (indexList.isEmpty()) {
+      return;
+    }
+
+    const QModelIndex index = indexList.first();
+    m_modelSelectionModel->select(index, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
+  }
+}
+
+void ModelInspector::selectionChanged(const QItemSelection& selected)
+{
+  QModelIndex index;
+  if (selected.size() >= 1)
+    index = selected.first().topLeft();
+
+  m_cellModel->setModelIndex(index);
+
+  emit cellSelected(index.row(), index.column(), QString::number(index.internalId()), Util::addressToString(index.internalPointer()));
+}
+

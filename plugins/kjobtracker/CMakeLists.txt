@@ -1,4 +1,7 @@
+# ugly workaround for FindKDE4Internal messing with the install rpath (https://github.com/KDAB/GammaRay/issues/36)
+set(_old_CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_RPATH})
 find_package(KDE4)
+set(CMAKE_INSTALL_RPATH ${_old_CMAKE_INSTALL_RPATH})
 
 if(KDE4_FOUND AND NOT Qt5Core_FOUND)
   set(_KDE4_USABLE TRUE)
@@ -30,13 +33,11 @@ add_definitions(
 set(gammaray_kjob_plugin_srcs
   kjobmodel.cpp
   kjobtracker.cpp
-  ${CMAKE_SOURCE_DIR}/3rdparty/kde/kfilterproxysearchline.cpp
+  kjobtrackerwidget.cpp
 )
 
-qt4_automoc(${gammaray_kjob_plugin_srcs})
-
 qt4_wrap_ui(gammaray_kjob_plugin_srcs
-  kjobtracker.ui
+  kjobtrackerwidget.ui
 )
 
 gammaray_add_plugin(gammaray_kjobtracker_plugin
@@ -46,7 +47,8 @@ gammaray_add_plugin(gammaray_kjobtracker_plugin
 
 target_link_libraries(gammaray_kjobtracker_plugin
   ${KDE4_KDECORE_LIBS}
-  gammaray_probe
+  gammaray_core
+  gammaray_ui
 )
 
 endif()

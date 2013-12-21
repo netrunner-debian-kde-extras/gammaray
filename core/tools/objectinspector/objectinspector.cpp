@@ -22,87 +22,83 @@
 */
 
 #include "objectinspector.h"
-#include "ui_objectinspector.h"
+#include "propertycontroller.h"
+#include "probeinterface.h"
 
-#include "include/objectmodel.h"
-#include "include/probeinterface.h"
+#include <common/objectbroker.h>
+#include <common/objectmodel.h>
 
-#include <kde/krecursivefilterproxymodel.h>
-
-#include <QLineEdit>
+#include <QCoreApplication>
+#include <QItemSelectionModel>
 
 using namespace GammaRay;
 
-ObjectInspector::ObjectInspector(ProbeInterface *probe, QWidget *parent)
-  : QWidget(parent),
-    ui(new Ui::ObjectInspector)
+ObjectInspector::ObjectInspector(ProbeInterface *probe, QObject *parent)
+  : QObject(parent),
+  m_propertyController(new PropertyController("com.kdab.GammaRay.ObjectInspector", this))
 {
-  ui->setupUi(this);
+  m_selectionModel = ObjectBroker::selectionModel(ObjectBroker::model("com.kdab.GammaRay.ObjectTree"));
 
-  QSortFilterProxyModel *objectFilter = new KRecursiveFilterProxyModel(this);
-  objectFilter->setSourceModel(probe->objectTreeModel());
-  objectFilter->setDynamicSortFilter(true);
-  ui->objectTreeView->setModel(objectFilter);
-  ui->objectTreeView->header()->setResizeMode(0, QHeaderView::Stretch);
-  ui->objectTreeView->header()->setResizeMode(1, QHeaderView::Interactive);
-  ui->objectSearchLine->setProxy(objectFilter);
-  connect(ui->objectTreeView->selectionModel(),
-          SIGNAL(currentChanged(QModelIndex,QModelIndex)),
-          SLOT(objectSelected(QModelIndex)));
+  connect(m_selectionModel,
+          SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
+          SLOT(objectSelectionChanged(QItemSelection)));
 
-  if (qgetenv("GAMMARAY_TEST_FILTER") == "1") {
-    QMetaObject::invokeMethod(ui->objectSearchLine->lineEdit(), "setText",
-                              Qt::QueuedConnection,
-                              Q_ARG(QString, QLatin1String("Object")));
-  }
+  connect(probe->probe(), SIGNAL(objectSelected(QObject*,QPoint)), SLOT(objectSelected(QObject*)));
 
-  connect(probe->probe(), SIGNAL(widgetSelected(QWidget*,QPoint)), SLOT(widgetSelected(QWidget*)));
-
-  selectDefaultItem();
+  // when we end up here the object model isn't populated yet
+  QMetaObject::invokeMethod(this, "selectDefaultItem", Qt::QueuedConnection);
 }
 
 void ObjectInspector::selectDefaultItem()
 {
   // select the qApp object (if any) in the object treeView
-  const QAbstractItemModel *viewModel = ui->objectTreeView->model();
+  const QAbstractItemModel *viewModel = m_selectionModel->model();
   const QModelIndexList matches = viewModel->match(viewModel->index(0, 0),
       ObjectModel::ObjectRole, QVariant::fromValue<QObject*>(qApp), 1,
       Qt::MatchFlags(Qt::MatchExactly|Qt::MatchRecursive));
 
   if (!matches.isEmpty()) {
-    ui->objectTreeView->setCurrentIndex(matches.first());
+    m_selectionModel->setCurrentIndex(matches.first(), QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
   }
+}
+
+void ObjectInspector::objectSelectionChanged(const QItemSelection& selection)
+{
+  if (selection.isEmpty())
+    objectSelected(QModelIndex());
+  else
+    objectSelected(selection.first().topLeft());
 }
 
 void ObjectInspector::objectSelected(const QModelIndex &index)
 {
   if (index.isValid()) {
     QObject *obj = index.data(ObjectModel::ObjectRole).value<QObject*>();
-    ui->objectPropertyWidget->setObject(obj);
+    m_propertyController->setObject(obj);
   } else {
-    ui->objectPropertyWidget->setObject(0);
+    m_propertyController->setObject(0);
   }
 }
 
-void ObjectInspector::widgetSelected(QWidget *widget)
+void ObjectInspector::objectSelected(QObject *object)
 {
-  QAbstractItemModel *model = ui->objectTreeView->model();
+  const QAbstractItemModel *model = m_selectionModel->model();
   const QModelIndexList indexList =
   model->match(model->index(0, 0),
                ObjectModel::ObjectRole,
-               QVariant::fromValue<QObject*>(widget), 1,
+               QVariant::fromValue<QObject*>(object), 1,
                Qt::MatchExactly | Qt::MatchRecursive);
   if (indexList.isEmpty()) {
     return;
   }
 
   const QModelIndex index = indexList.first();
-  ui->objectTreeView->selectionModel()->select(
+  m_selectionModel->select(
     index,
     QItemSelectionModel::Select | QItemSelectionModel::Clear |
     QItemSelectionModel::Rows | QItemSelectionModel::Current);
-  ui->objectTreeView->scrollTo(index);
+  // TODO: move this to the client side!
+  //ui->objectTreeView->scrollTo(index);
   objectSelected(index);
 }
 
-#include "objectinspector.moc"

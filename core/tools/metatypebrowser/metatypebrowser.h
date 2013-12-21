@@ -21,27 +21,18 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef GAMMARAY_METATYPEBROWSER_METATYPEBROWSER_H
-#define GAMMARAY_METATYPEBROWSER_METATYPEBROWSER_H
+#ifndef GAMMARAY_METATYPEBROWSER_H
+#define GAMMARAY_METATYPEBROWSER_H
 
-#include "include/toolfactory.h"
-
-#include <QWidget>
+#include "toolfactory.h"
 
 namespace GammaRay {
 
-namespace Ui {
-  class MetaTypeBrowser;
-}
-
-class MetaTypeBrowser : public QWidget
+class MetaTypeBrowser : public QObject
 {
   Q_OBJECT
   public:
-    explicit MetaTypeBrowser(ProbeInterface *probe, QWidget *parent = 0);
-
-  private:
-    QScopedPointer<Ui::MetaTypeBrowser> ui;
+    explicit MetaTypeBrowser(ProbeInterface *probe, QObject *parent = 0);
 };
 
 class MetaTypeBrowserFactory : public QObject, public StandardToolFactory<QObject, MetaTypeBrowser>

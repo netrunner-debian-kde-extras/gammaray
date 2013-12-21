@@ -109,7 +109,8 @@ QModelIndex GammaRay::ObjectEnumModel::index(int row, int column, const QModelIn
 
 QModelIndex GammaRay::ObjectEnumModel::parent(const QModelIndex &child) const
 {
-  if (child.internalId() == -1) {
+  // note: Qt4 doesn't have qintptr
+  if (static_cast<qptrdiff>(child.internalId()) == -1) {
     return SuperClass::parent(child);
   }
   return SuperClass::index(child.internalId(), 0, QModelIndex());

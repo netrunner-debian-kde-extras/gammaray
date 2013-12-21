@@ -28,9 +28,12 @@
 
 #include <QCoreApplication>
 #include <QDebug>
+#include <QDir>
 #include <QFileInfo>
 #include <QProcess>
+#ifdef HAVE_QT_WIDGETS
 #include <QStyleFactory>
+#endif
 
 #include <cstdlib>
 
@@ -95,8 +98,9 @@ bool StyleInjector::launch(const QStringList &programAndArgs,
 
 bool StyleInjector::selfTest()
 {
+#ifdef HAVE_QT_WIDGETS
   // TODO: be a bit more clever in finding the plugin location (also when actually using it above)
-  QCoreApplication::addLibraryPath(QLatin1String(GAMMARAY_PLUGIN_INSTALL_DIR));
+  QCoreApplication::addLibraryPath(QLatin1String(GAMMARAY_LOCAL_INSTALL_PREFIX) + QDir::separator() + QLatin1String(GAMMARAY_PLUGIN_INSTALL_DIR));
   if (!QStyleFactory::keys().contains(QLatin1String("gammaray-injector"))) {
     mErrorString = QObject::tr("Injector style plugin is not found in the Qt style "
                                "plug-in search path or cannot be loaded");
@@ -104,6 +108,10 @@ bool StyleInjector::selfTest()
   }
 
   return true;
+#else
+  mErrorString = QObject::tr("GammaRay was compiled without QtWidget support, style injector is not available.");
+  return false;
+#endif
 }
 
 int StyleInjector::exitCode()

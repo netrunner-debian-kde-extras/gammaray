@@ -22,42 +22,30 @@
 #ifndef GAMMARAY_ACTIONINSPECTOR_ACTIONINSPECTOR_H
 #define GAMMARAY_ACTIONINSPECTOR_ACTIONINSPECTOR_H
 
-#include "include/toolfactory.h"
+#include <core/toolfactory.h>
+#include "actioninspectorwidget.h"
 
 #include <QAction>
-#include <QWidget>
-
-class QTreeView;
-class QModelIndex;
 
 namespace GammaRay {
 
-class ProbeInterface;
-
-class ActionInspector : public QWidget
+class ActionInspector : public QObject
 {
   Q_OBJECT
 
   public:
-    explicit ActionInspector(ProbeInterface *probe, QWidget *parent = 0);
+    explicit ActionInspector(ProbeInterface *probe, QObject *parent = 0);
     virtual ~ActionInspector();
 
-  private Q_SLOTS:
-    void delayedInit();
-
-    void handleRowChanged(const QModelIndex &index);
-    void triggerAction(const QModelIndex &index);
-
-  private:
-    QTreeView *mObjectTreeView;
-    ProbeInterface *mProbeIface;
+  public Q_SLOTS:
+    void triggerAction(int row);
 };
 
 class ActionInspectorFactory : public QObject,
-    public StandardToolFactory<QAction, ActionInspector>
+    public StandardToolFactory2<QAction, ActionInspector, ActionInspectorWidget>
 {
   Q_OBJECT
-  Q_INTERFACES(GammaRay::ToolFactory)
+  Q_INTERFACES(GammaRay::ToolFactory GammaRay::ToolUiFactory)
   Q_PLUGIN_METADATA(IID "com.kdab.gammaray.ActionInspector")
 
   public:

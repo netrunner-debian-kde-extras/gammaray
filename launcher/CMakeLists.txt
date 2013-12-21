@@ -5,10 +5,12 @@ include_directories(
   ${CMAKE_CURRENT_BINARY_DIR}
 
   ${CMAKE_BINARY_DIR}
+  ${CMAKE_SOURCE_DIR}
   ${CMAKE_SOURCE_DIR}/3rdparty
 )
 
-set(gammaray_runner_srcs
+# shared launcher code
+set(gammaray_launcher_shared_srcs
   injector/abstractinjector.cpp
   injector/injectorfactory.cpp
   injector/preloadinjector.cpp
@@ -18,48 +20,41 @@ set(gammaray_runner_srcs
   injector/preloadcheck.cpp
 
   probefinder.cpp
-  main.cpp
-  promolabel.cpp
-  splashscreen.cpp
-  launcherwindow.cpp
-  launchpage.cpp
-  selftestpage.cpp
-
-  attachdialog.cpp
-  processmodel.cpp
-  processfiltermodel.cpp
-
-  ${CMAKE_SOURCE_DIR}/3rdparty/kde/krecursivefilterproxymodel.cpp
-  ${CMAKE_SOURCE_DIR}/3rdparty/kde/kfilterproxysearchline.cpp
+  launchoptions.cpp
+  clientlauncher.cpp
+  launcherfinder.cpp
 )
 if(NOT WIN32)
-  set(gammaray_runner_srcs
-    ${gammaray_runner_srcs}
-    injector/gdbinjector.cpp
-    processlist_unix.cpp
-  )
-else()
-  set(gammaray_runner_srcs
-    ${gammaray_runner_srcs}
-    processlist_win.cpp
-  )
+  list(APPEND gammaray_launcher_shared_srcs injector/gdbinjector.cpp)
 endif()
+add_library(gammaray_launcher_shared STATIC ${gammaray_launcher_shared_srcs})
+target_link_libraries(gammaray_launcher_shared ${QT_QTCORE_LIBRARIES})
 
-qt4_wrap_ui(gammaray_runner_srcs
-  attachdialog.ui
-  launcherwindow.ui
-  launchpage.ui
-  selftestpage.ui
+# command line launcher
+set(gammaray_runner_srcs
+  launcher.cpp
+  main.cpp
 )
-# TODO we don't need all the class icons here, so split the qrc file accordingly
-qt4_add_resources(gammaray_runner_srcs ${CMAKE_SOURCE_DIR}/resources/gammaray.qrc)
-qt4_automoc(${gammaray_runner_srcs})
 
 add_executable(gammaray ${gammaray_runner_srcs})
 
-target_link_libraries(gammaray ${QT_QTCORE_LIBRARIES} ${QT_QTGUI_LIBRARIES})
-if(UNIX AND NOT APPLE)
+target_link_libraries(gammaray ${QT_QTCORE_LIBRARIES} gammaray_launcher_shared gammaray_common)
+if(HAVE_QT_WIDGETS)
+  # needed for style inspector
+  target_link_libraries(gammaray ${QT_QTGUI_LIBRARIES})
+endif()
+
+if(QNXNTO)
+  target_link_libraries(gammaray cpp)
+endif()
+
+if(UNIX AND NOT APPLE AND NOT QNXNTO)
   target_link_libraries(gammaray dl) # for preload check
 endif()
 
 install(TARGETS gammaray ${INSTALL_TARGETS_DEFAULT_ARGS})
+
+# UI launcher
+if(HAVE_QT_CONCURRENT AND HAVE_QT_WIDGETS)
+  add_subdirectory(ui)
+endif()

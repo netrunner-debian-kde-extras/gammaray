@@ -21,9 +21,8 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <config-gammaray.h>
 #include "gdbinjector.h"
-
-#include "splashscreen.h"
 
 #include <QDebug>
 #include <QProcess>
@@ -48,8 +47,6 @@ GdbInjector::GdbInjector() :
 bool GdbInjector::launch(const QStringList &programAndArgs,
                         const QString &probeDll, const QString &probeFunc)
 {
-  showSplashScreen();
-
   QStringList gdbArgs;
   gdbArgs.push_back(QLatin1String("--args"));
   gdbArgs.append(programAndArgs);
@@ -73,7 +70,6 @@ bool GdbInjector::launch(const QStringList &programAndArgs,
 bool GdbInjector::attach(int pid, const QString &probeDll, const QString &probeFunc)
 {
   Q_ASSERT(pid > 0);
-  showSplashScreen();
   if (!startGdb(QStringList() << QLatin1String("-pid") << QString::number(pid))) {
     return false;
   }
@@ -114,7 +110,7 @@ bool GdbInjector::injectAndDetach(const QString &probeDll, const QString &probeF
 #endif
 //  execGdbCmd(qPrintable(QString::fromLatin1("call (void) %1()").arg(probeFunc)));
   execGdbCmd(qPrintable(QString::fromLatin1("print %1").arg(probeFunc)));
-  execGdbCmd("call $()");
+  execGdbCmd("call (void) $()");
 
   if (qgetenv("GAMMARAY_UNITTEST") != "1") {
     execGdbCmd("detach");
@@ -134,8 +130,6 @@ bool GdbInjector::injectAndDetach(const QString &probeDll, const QString &probeF
     mProcessError = m_process->error();
     mErrorString = m_process->errorString();
   }
-
-  hideSplashScreen();
 
   return mExitCode == EXIT_SUCCESS && mExitStatus == QProcess::NormalExit;
 }
@@ -213,7 +207,9 @@ void GdbInjector::addBreakpoint(const QByteArray &method)
 
 bool GdbInjector::selfTest()
 {
-  return startGdb(QStringList() << QLatin1String("--version"));
+  if (startGdb(QStringList() << QLatin1String("--version"))) {
+    return m_process->waitForFinished(-1);
+  }
+  return false;
 }
 
-#include "gdbinjector.moc"

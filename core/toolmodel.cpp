@@ -24,31 +24,27 @@
 #include "config-gammaray.h"
 #include "toolmodel.h"
 
-#include "include/toolfactory.h"
+#include "toolfactory.h"
+#include "proxytoolfactory.h"
 
-#include "tools/codecbrowser/codecbrowser.h"
 #include "tools/connectioninspector/connectioninspector.h"
-#include "tools/fontbrowser/fontbrowser.h"
 #include "tools/localeinspector/localeinspector.h"
 #include "tools/metatypebrowser/metatypebrowser.h"
 #include "tools/modelinspector/modelinspector.h"
 #include "tools/objectinspector/objectinspector.h"
 #include "tools/resourcebrowser/resourcebrowser.h"
-#include "tools/sceneinspector/sceneinspector.h"
-#include "tools/selectionmodelinspector/selectionmodelinspector.h"
 #include "tools/textdocumentinspector/textdocumentinspector.h"
-#include "tools/widgetinspector/widgetinspector.h"
 #include "tools/messagehandler/messagehandler.h"
-#include "tools/styleinspector/styleinspector.h"
 #include "tools/metaobjectbrowser/metaobjectbrowser.h"
 #if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
 #include "tools/standardpaths/standardpaths.h"
 #include "tools/mimetypes/mimetypes.h"
 #endif
 
-#include "pluginmanager.h"
+#include <common/pluginmanager.h>
 #include "probe.h"
 #include "readorwritelocker.h"
+#include "probesettings.h"
 
 #include <QCoreApplication>
 #include <QDebug>
@@ -62,36 +58,36 @@ ToolModel::ToolModel(QObject *parent): QAbstractListModel(parent)
 {
   // built-in tools
   m_tools.push_back(new ObjectInspectorFactory(this));
-  m_tools.push_back(new WidgetInspectorFactory(this));
-  m_tools.push_back(new ModelInspector(this));
-  m_tools.push_back(new SceneInspectorFactory(this));
+  m_tools.push_back(new ModelInspectorFactory(this));
 #if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
   m_tools.push_back(new ConnectionInspectorFactory(this));
 #endif
   m_tools.push_back(new ResourceBrowserFactory(this));
   m_tools.push_back(new MetaObjectBrowserFactory(this));
   m_tools.push_back(new MetaTypeBrowserFactory(this));
-  m_tools.push_back(new SelectionModelInspectorFactory(this));
-  m_tools.push_back(new FontBrowserFactory(this));
-  m_tools.push_back(new CodecBrowserFactory(this));
   m_tools.push_back(new TextDocumentInspectorFactory(this));
   m_tools.push_back(new MessageHandlerFactory(this));
   m_tools.push_back(new LocaleInspectorFactory(this));
-  m_tools.push_back(new StyleInspectorFactory(this));
 #if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
   m_tools.push_back(new StandardPathsFactory(this));
   m_tools.push_back(new MimeTypesFactory(this));
 #endif
 
-  Q_FOREACH (ToolFactory *factory, PluginManager::instance(this)->plugins()) {
+  const QString pluginPath = ProbeSettings::value("ProbePath").toString() + QDir::separator() + QLatin1String(GAMMARAY_RELATIVE_PROBE_TO_PLUGIN_PATH);
+  m_pluginManager.reset(new ToolPluginManager(pluginPath, this));
+  Q_FOREACH (ToolFactory *factory, m_pluginManager->plugins()) {
     m_tools.push_back(factory);
   }
 
   // everything but the object inspector is inactive initially
   const int numberOfTools(m_tools.size());
-  for (int i = 1; i < numberOfTools; ++i) {
+  for (int i = 0; i < numberOfTools; ++i) {
     m_inactiveTools.insert(m_tools.at(i));
   }
+}
+
+ToolModel::~ToolModel()
+{
 }
 
 QVariant ToolModel::headerData(int section, Qt::Orientation orientation, int role) const
@@ -116,24 +112,12 @@ QVariant ToolModel::data(const QModelIndex &index, int role) const
   ToolFactory *toolIface = m_tools.at(index.row());
   if (role == Qt::DisplayRole) {
     return toolIface->name();
-  } else if (role == ToolFactoryRole) {
+  } else if (role == ToolModelRole::ToolFactory) {
     return QVariant::fromValue(toolIface);
-  } else if (role == ToolWidgetRole) {
-    return QVariant::fromValue(m_toolWidgets.value(toolIface));
-  } else if (role == ToolIdRole) {
+  } else if (role == ToolModelRole::ToolId) {
     return toolIface->id();
   }
   return QVariant();
-}
-
-bool ToolModel::setData(const QModelIndex &index, const QVariant &value, int role)
-{
-  if (index.isValid() && role == Qt::EditRole) {
-    ToolFactory *toolIface = m_tools.at(index.row());
-    m_toolWidgets.insert(toolIface, value.value<QWidget*>());
-    return true;
-  }
-  return QAbstractItemModel::setData(index, value, role);
 }
 
 int ToolModel::rowCount(const QModelIndex &parent) const
@@ -156,11 +140,19 @@ Qt::ItemFlags ToolModel::flags(const QModelIndex &index) const
   return flags;
 }
 
+QMap<int, QVariant> ToolModel::itemData(const QModelIndex& index) const
+{
+  QMap<int, QVariant> map = QAbstractListModel::itemData(index);
+  map.insert(ToolModelRole::ToolId, data(index, ToolModelRole::ToolId));
+  // the other custom roles are useless on the client anyway, since they contain raw pointers
+  return map;
+}
+
 void ToolModel::objectAdded(QObject *obj)
 {
   // delay to main thread if required
   QMetaObject::invokeMethod(this, "objectAddedMainThread",
-                            Qt::AutoConnection, Q_ARG(QObject *, obj));
+                            Qt::AutoConnection, Q_ARG(QObject*, obj));
 }
 
 void ToolModel::objectAddedMainThread(QObject *obj)
@@ -187,4 +179,13 @@ void ToolModel::objectAdded(const QMetaObject *mo)
   }
 }
 
-#include "toolmodel.moc"
+QVector< ToolFactory* > ToolModel::plugins() const
+{
+  return m_pluginManager->plugins();
+}
+
+PluginLoadErrors ToolModel::pluginErrors() const
+{
+  return m_pluginManager->errors();
+}
+

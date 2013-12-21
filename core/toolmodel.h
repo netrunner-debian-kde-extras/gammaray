@@ -24,13 +24,20 @@
 #ifndef GAMMARAY_TOOLMODEL_H
 #define GAMMARAY_TOOLMODEL_H
 
+#include <common/pluginmanager.h>
+#include <common/modelroles.h>
+
 #include <QAbstractListModel>
 #include <QSet>
 #include <QVector>
+#include <QPointer>
 
 namespace GammaRay {
 
 class ToolFactory;
+class ProxyToolFactory;
+
+typedef PluginManager<ToolFactory, ProxyToolFactory> ToolPluginManager;
 
 /**
  * Manages the list of available probing tools.
@@ -39,18 +46,19 @@ class ToolModel : public QAbstractListModel
 {
   Q_OBJECT
   public:
-    enum Role {
-      ToolFactoryRole = Qt::UserRole + 1,
-      ToolWidgetRole,
-      ToolIdRole
-    };
     explicit ToolModel(QObject *parent = 0);
+    ~ToolModel();
     virtual QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const;
-    virtual bool setData(const QModelIndex &index, const QVariant &value, int role = Qt::EditRole);
     virtual int rowCount(const QModelIndex &parent = QModelIndex()) const;
     virtual Qt::ItemFlags flags(const QModelIndex &index) const;
     virtual QVariant headerData(int section, Qt::Orientation orientation,
                                 int role = Qt::DisplayRole) const;
+    virtual QMap<int, QVariant> itemData(const QModelIndex& index) const;
+
+    /** returns all tools provided by plugins for the ToolPluginModel. */
+    QVector<ToolFactory*> plugins() const;
+    /** returns all plugin load errors. */
+    PluginLoadErrors pluginErrors() const;
 
   public slots:
     /** Check if we have to activate tools for this type */
@@ -67,8 +75,9 @@ class ToolModel : public QAbstractListModel
 
   private:
     QVector<ToolFactory*> m_tools;
-    QHash<ToolFactory*, QWidget*> m_toolWidgets;
     QSet<ToolFactory*> m_inactiveTools;
+    QPointer<QWidget> m_parentWidget;
+    QScopedPointer<ToolPluginManager> m_pluginManager;
 };
 
 }

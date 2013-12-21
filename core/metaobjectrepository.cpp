@@ -24,58 +24,28 @@
 #include "metaobjectrepository.h"
 #include "metaobject.h"
 
-#include "include/metatypedeclarations.h"
+#include <common/metatypedeclarations.h>
 
-#include <QGraphicsItem>
-#include <QGraphicsLayoutItem>
-#include <QGraphicsProxyWidget>
-#include <QGraphicsWidget>
+#include <QAbstractSocket>
+#include <QFile>
+#include <QNetworkProxy>
 #include <QObject>
 #include <QPalette>
 #include <QPen>
-#include <QStyle>
-#include <QWidget>
+#include <QSocketNotifier>
+#include <QTcpServer>
 
-#define MO_ADD_BASECLASS(Base) \
-  Q_ASSERT(hasMetaObject(QLatin1String(#Base))); \
-  mo->addBaseClass(metaObject(QLatin1String(#Base)));
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+#include <QOpenGLContext>
+#include <QOpenGLShader>
+#include <QScreen>
+#include <QSurface>
+#include <QWindow>
+#endif
 
-#define MO_ADD_METAOBJECT0(Class) \
-  mo = new MetaObjectImpl<Class>; \
-  mo->setClassName(QLatin1String(#Class)); \
-  addMetaObject(mo);
-
-#define MO_ADD_METAOBJECT1(Class, Base1) \
-  mo = new MetaObjectImpl<Class, Base1>; \
-  mo->setClassName(QLatin1String(#Class)); \
-  MO_ADD_BASECLASS(Base1) \
-  addMetaObject(mo);
-
-#define MO_ADD_METAOBJECT2(Class, Base1, Base2) \
-  mo = new MetaObjectImpl<Class, Base1, Base2>; \
-  mo->setClassName(QLatin1String(#Class)); \
-  MO_ADD_BASECLASS(Base1) \
-  MO_ADD_BASECLASS(Base2) \
-  addMetaObject(mo);
-
-#define MO_ADD_PROPERTY(Class, Type, Getter, Setter) \
-  mo->addProperty(new MetaPropertyImpl<Class, Type>( \
-    QLatin1String(#Getter), \
-    &Class::Getter, \
-    static_cast<void (Class::*)(Type)>(&Class::Setter)) \
-  );
-
-#define MO_ADD_PROPERTY_CR(Class, Type, Getter, Setter) \
-  mo->addProperty(new MetaPropertyImpl<Class, Type, const Type&>( \
-    QLatin1String(#Getter), \
-    &Class::Getter, \
-    static_cast<void (Class::*)(const Type&)>(&Class::Setter)) \
-  );
-
-#define MO_ADD_PROPERTY_RO(Class, Type, Getter) \
-  mo->addProperty(new MetaPropertyImpl<Class, Type>( \
-    QLatin1String(#Getter), \
-    &Class::Getter));
+#if QT_VERSION >= QT_VERSION_CHECK(5, 1, 0)
+#include <QSaveFile>
+#endif
 
 using namespace GammaRay;
 
@@ -93,9 +63,8 @@ class StaticMetaObjectRepository : public MetaObjectRepository
 
 Q_GLOBAL_STATIC(StaticMetaObjectRepository, s_instance)
 
-MetaObjectRepository::MetaObjectRepository()
+MetaObjectRepository::MetaObjectRepository() : m_initialized(false)
 {
-  initBuiltInTypes();
 }
 
 MetaObjectRepository::~MetaObjectRepository()
@@ -105,8 +74,12 @@ MetaObjectRepository::~MetaObjectRepository()
 
 void MetaObjectRepository::initBuiltInTypes()
 {
+  m_initialized = true;
   initQObjectTypes();
-  initGraphicsViewTypes();
+  initIOTypes();
+  initNetworkTypes();
+  initGuiTypes();
+  initOpenGLTypes();
 }
 
 void MetaObjectRepository::initQObjectTypes()
@@ -125,127 +98,196 @@ void MetaObjectRepository::initQObjectTypes()
   MO_ADD_PROPERTY_RO(QPaintDevice, int, physicalDpiX);
   MO_ADD_PROPERTY_RO(QPaintDevice, int, physicalDpiY);
   MO_ADD_PROPERTY_RO(QPaintDevice, int, widthMM);
-
-  MO_ADD_METAOBJECT2(QWidget, QObject, QPaintDevice);
-  MO_ADD_PROPERTY_RO(QWidget, QWidget*, focusProxy);
-
-  MO_ADD_METAOBJECT1(QStyle, QObject);
-  MO_ADD_PROPERTY_RO(QStyle, const QStyle*, proxy);
-  MO_ADD_PROPERTY_RO(QStyle, QPalette, standardPalette);
 }
 
-void MetaObjectRepository::initGraphicsViewTypes()
-{
-  MetaObject *mo = 0; //createMetaObject( "QGraphicsItem" );
-  MO_ADD_METAOBJECT0(QGraphicsItem);
-  MO_ADD_PROPERTY   (QGraphicsItem, bool,                             acceptDrops,               setAcceptDrops);
-  MO_ADD_PROPERTY   (QGraphicsItem, bool,                             acceptHoverEvents,         setAcceptHoverEvents);
-  MO_ADD_PROPERTY   (QGraphicsItem, bool,                             acceptTouchEvents,         setAcceptTouchEvents);
-  MO_ADD_PROPERTY   (QGraphicsItem, Qt::MouseButtons,                 acceptedMouseButtons,      setAcceptedMouseButtons);
-  MO_ADD_PROPERTY_RO(QGraphicsItem, QRectF,                           boundingRect);
-  MO_ADD_PROPERTY   (QGraphicsItem, qreal,                            boundingRegionGranularity, setBoundingRegionGranularity);
-  MO_ADD_PROPERTY_RO(QGraphicsItem, QGraphicsItem::CacheMode,         cacheMode);
-  MO_ADD_PROPERTY_RO(QGraphicsItem, QRectF,                           childrenBoundingRect);
-  MO_ADD_PROPERTY_RO(QGraphicsItem, QPainterPath,                     clipPath);
-  MO_ADD_PROPERTY_CR(QGraphicsItem, QCursor,                          cursor,                    setCursor);
-  MO_ADD_PROPERTY_RO(QGraphicsItem, qreal,                            effectiveOpacity);
-  MO_ADD_PROPERTY   (QGraphicsItem, bool,                             filtersChildEvents,        setFiltersChildEvents);
-  MO_ADD_PROPERTY   (QGraphicsItem, QGraphicsItem::GraphicsItemFlags, flags,                     setFlags);
-  MO_ADD_PROPERTY_RO(QGraphicsItem, QGraphicsItem*,                   focusItem);
-  MO_ADD_PROPERTY_RO(QGraphicsItem, QGraphicsItem*,                   focusProxy);
-  MO_ADD_PROPERTY_RO(QGraphicsItem, QGraphicsEffect*,                 graphicsEffect);
-  MO_ADD_PROPERTY_RO(QGraphicsItem, QGraphicsItemGroup*,              group);
-  MO_ADD_PROPERTY_RO(QGraphicsItem, bool,                             hasCursor);
-  MO_ADD_PROPERTY_RO(QGraphicsItem, bool,                             hasFocus);
-  MO_ADD_PROPERTY   (QGraphicsItem, Qt::InputMethodHints,             inputMethodHints,          setInputMethodHints);
-  MO_ADD_PROPERTY_RO(QGraphicsItem, bool,                             isActive);
-  MO_ADD_PROPERTY_RO(QGraphicsItem, bool,                             isClipped);
-  MO_ADD_PROPERTY   (QGraphicsItem, bool,                             isEnabled,                 setEnabled);
-#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
-  MO_ADD_PROPERTY_RO(QGraphicsItem, bool,                             isObscured);
+
+Q_DECLARE_METATYPE(QAbstractSocket::SocketType)
+Q_DECLARE_METATYPE(QHostAddress)
+Q_DECLARE_METATYPE(QIODevice::OpenMode)
+Q_DECLARE_METATYPE(QSocketNotifier::Type)
+
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+Q_DECLARE_METATYPE(QAbstractSocket::PauseModes)
+Q_DECLARE_METATYPE(QFileDevice::FileError)
+Q_DECLARE_METATYPE(QFileDevice::Permissions)
+#else // !Qt5
+Q_DECLARE_METATYPE(QAbstractSocket::SocketError)
+Q_DECLARE_METATYPE(QAbstractSocket::SocketState)
+#ifndef QT_NO_NETWORKPROXY
+Q_DECLARE_METATYPE(QNetworkProxy)
 #endif
-  MO_ADD_PROPERTY_RO(QGraphicsItem, bool,                             isPanel);
-  MO_ADD_PROPERTY   (QGraphicsItem, bool,                             isSelected,                setSelected);
-  MO_ADD_PROPERTY_RO(QGraphicsItem, bool,                             isUnderMouse);
-  MO_ADD_PROPERTY   (QGraphicsItem, bool,                             isVisible,                 setVisible);
-  MO_ADD_PROPERTY_RO(QGraphicsItem, bool,                             isWidget);
-  MO_ADD_PROPERTY_RO(QGraphicsItem, bool,                             isWindow);
-  MO_ADD_PROPERTY   (QGraphicsItem, qreal,                            opacity,                   setOpacity);
-  MO_ADD_PROPERTY_RO(QGraphicsItem, QPainterPath,                     opaqueArea);
-  MO_ADD_PROPERTY_RO(QGraphicsItem, QGraphicsItem*,                   panel);
-  MO_ADD_PROPERTY   (QGraphicsItem, QGraphicsItem::PanelModality,     panelModality,             setPanelModality);
-  MO_ADD_PROPERTY_RO(QGraphicsItem, QGraphicsItem*,                   parentItem);
-  MO_ADD_PROPERTY_RO(QGraphicsItem, QGraphicsObject*,                 parentObject);
-  MO_ADD_PROPERTY_RO(QGraphicsItem, QGraphicsWidget*,                 parentWidget);
-  MO_ADD_PROPERTY_CR(QGraphicsItem, QPointF,                          pos,                       setPos);
-  MO_ADD_PROPERTY   (QGraphicsItem, qreal,                            rotation,                  setRotation);
-  MO_ADD_PROPERTY   (QGraphicsItem, qreal,                            scale,                     setScale);
-  MO_ADD_PROPERTY_RO(QGraphicsItem, QRectF,                           sceneBoundingRect);
-  MO_ADD_PROPERTY_RO(QGraphicsItem, QPointF,                          scenePos);
-  MO_ADD_PROPERTY_RO(QGraphicsItem, QTransform,                       sceneTransform);
-  MO_ADD_PROPERTY_RO(QGraphicsItem, QPainterPath,                     shape);
-  MO_ADD_PROPERTY_CR(QGraphicsItem, QString,                          toolTip,                   setToolTip);
-  MO_ADD_PROPERTY_RO(QGraphicsItem, QGraphicsItem*,                   topLevelItem);
-  MO_ADD_PROPERTY_RO(QGraphicsItem, QGraphicsWidget*,                 topLevelWidget);
-  MO_ADD_PROPERTY_RO(QGraphicsItem, QTransform,                       transform/*,                 setTransform*/); // TODO: support setTransform
-  MO_ADD_PROPERTY_CR(QGraphicsItem, QPointF,                          transformOriginPoint,      setTransformOriginPoint);
-  MO_ADD_PROPERTY_RO(QGraphicsItem, int,                              type);
-  MO_ADD_PROPERTY_RO(QGraphicsItem, QGraphicsWidget*,                 window);
-  MO_ADD_PROPERTY   (QGraphicsItem, qreal,                            x,                         setX);
-  MO_ADD_PROPERTY   (QGraphicsItem, qreal,                            y,                         setY);
-  MO_ADD_PROPERTY   (QGraphicsItem, qreal,                            zValue,                    setZValue);
+#endif
 
-  MO_ADD_METAOBJECT1(QAbstractGraphicsShapeItem, QGraphicsItem);
-  MO_ADD_PROPERTY_CR(QAbstractGraphicsShapeItem, QBrush, brush, setBrush);
-  MO_ADD_PROPERTY_CR(QAbstractGraphicsShapeItem, QPen,   pen,   setPen);
+void MetaObjectRepository::initIOTypes()
+{
+  MetaObject *mo = 0;
+  MO_ADD_METAOBJECT1(QIODevice, QObject);
+  MO_ADD_PROPERTY_RO(QIODevice, QIODevice::OpenMode, openMode);
+  MO_ADD_PROPERTY   (QIODevice, bool, isTextModeEnabled, setTextModeEnabled);
+  MO_ADD_PROPERTY_RO(QIODevice, bool, isOpen);
+  MO_ADD_PROPERTY_RO(QIODevice, bool, isReadable);
+  MO_ADD_PROPERTY_RO(QIODevice, bool, isWritable);
+  MO_ADD_PROPERTY_RO(QIODevice, bool, isSequential);
+  MO_ADD_PROPERTY_RO(QIODevice, qint64, pos);
+  MO_ADD_PROPERTY_RO(QIODevice, qint64, size);
+  MO_ADD_PROPERTY_RO(QIODevice, bool, atEnd);
+  MO_ADD_PROPERTY_RO(QIODevice, qint64, bytesAvailable);
+  MO_ADD_PROPERTY_RO(QIODevice, qint64, bytesToWrite);
+  MO_ADD_PROPERTY_RO(QIODevice, bool, canReadLine);
+  MO_ADD_PROPERTY_RO(QIODevice, QString, errorString);
 
-  MO_ADD_METAOBJECT1(QGraphicsEllipseItem, QAbstractGraphicsShapeItem);
-  MO_ADD_PROPERTY_CR(QGraphicsEllipseItem, QRectF, rect,    setRect);
-  MO_ADD_PROPERTY   (QGraphicsEllipseItem, int, spanAngle,  setSpanAngle);
-  MO_ADD_PROPERTY   (QGraphicsEllipseItem, int, startAngle, setStartAngle);
+  // FIXME: QIODevice::readAll() would be nice to have
 
-  MO_ADD_METAOBJECT1(QGraphicsPathItem, QAbstractGraphicsShapeItem);
-  MO_ADD_PROPERTY_CR(QGraphicsPathItem, QPainterPath, path, setPath);
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+  MO_ADD_METAOBJECT1(QFileDevice, QIODevice);
+  MO_ADD_PROPERTY_RO(QFileDevice, QFileDevice::FileError, error);
+  MO_ADD_PROPERTY_RO(QFileDevice, QString, fileName);
+  MO_ADD_PROPERTY_RO(QFileDevice, int, handle);
+  MO_ADD_PROPERTY_RO(QFileDevice, QFileDevice::Permissions, permissions);
 
-  MO_ADD_METAOBJECT1(QGraphicsPolygonItem, QAbstractGraphicsShapeItem);
-  MO_ADD_PROPERTY   (QGraphicsPolygonItem, Qt::FillRule, fillRule, setFillRule);
-  MO_ADD_PROPERTY_CR(QGraphicsPolygonItem, QPolygonF, polygon, setPolygon);
+  MO_ADD_METAOBJECT1(QFile, QFileDevice);
+  MO_ADD_PROPERTY_RO(QFile, bool, exists);
+  MO_ADD_PROPERTY_RO(QFile, QString, symLinkTarget);
 
-  MO_ADD_METAOBJECT1(QGraphicsSimpleTextItem, QAbstractGraphicsShapeItem);
-  MO_ADD_PROPERTY_CR(QGraphicsSimpleTextItem, QFont, font, setFont);
-  MO_ADD_PROPERTY_CR(QGraphicsSimpleTextItem, QString, text, setText);
+#if QT_VERSION >= QT_VERSION_CHECK(5, 1, 0)
+  MO_ADD_METAOBJECT1(QSaveFile, QFileDevice);
+#endif
+#endif
+}
 
-  MO_ADD_METAOBJECT1(QGraphicsRectItem, QAbstractGraphicsShapeItem);
-  MO_ADD_PROPERTY_CR(QGraphicsRectItem, QRectF, rect, setRect);
 
-  MO_ADD_METAOBJECT1(QGraphicsLineItem, QGraphicsItem);
-  MO_ADD_PROPERTY_CR(QGraphicsLineItem, QLineF, line, setLine);
-  MO_ADD_PROPERTY_CR(QGraphicsLineItem, QPen, pen, setPen);
+void MetaObjectRepository::initNetworkTypes()
+{
+  MetaObject *mo = 0;
+  MO_ADD_METAOBJECT1(QAbstractSocket, QIODevice);
+  MO_ADD_PROPERTY_RO(QAbstractSocket, bool, isValid);
+  MO_ADD_PROPERTY_RO(QAbstractSocket, quint16, localPort);
+  MO_ADD_PROPERTY_RO(QAbstractSocket, QHostAddress, localAddress);
+  MO_ADD_PROPERTY_RO(QAbstractSocket, quint16, peerPort);
+  MO_ADD_PROPERTY_RO(QAbstractSocket, QHostAddress, peerAddress);
+  MO_ADD_PROPERTY_RO(QAbstractSocket, QString, peerName);
+  MO_ADD_PROPERTY   (QAbstractSocket, qint64, readBufferSize, setReadBufferSize);
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+  MO_ADD_PROPERTY   (QAbstractSocket, QAbstractSocket::PauseModes, pauseMode, setPauseMode);
+  MO_ADD_PROPERTY_RO(QAbstractSocket, qintptr, socketDescriptor);
+#else // !Qt5
+  MO_ADD_PROPERTY_RO(QAbstractSocket, int, socketDescriptor);
+#endif
+  MO_ADD_PROPERTY_RO(QAbstractSocket, QAbstractSocket::SocketType, socketType);
+  MO_ADD_PROPERTY_RO(QAbstractSocket, QAbstractSocket::SocketState, state);
+  MO_ADD_PROPERTY_RO(QAbstractSocket, QAbstractSocket::SocketError, error);
+#ifndef QT_NO_NETWORKPROXY
+  MO_ADD_PROPERTY_RO(QAbstractSocket, QNetworkProxy, proxy);
+#endif
 
-  MO_ADD_METAOBJECT1(QGraphicsPixmapItem, QGraphicsItem);
-  MO_ADD_PROPERTY_CR(QGraphicsPixmapItem, QPointF, offset, setOffset);
-  MO_ADD_PROPERTY_CR(QGraphicsPixmapItem, QPixmap, pixmap, setPixmap);
-  MO_ADD_PROPERTY   (QGraphicsPixmapItem, QGraphicsPixmapItem::ShapeMode, shapeMode, setShapeMode);
-  MO_ADD_PROPERTY   (QGraphicsPixmapItem, Qt::TransformationMode, transformationMode, setTransformationMode);
+  // FIXME: QAbstractSocket::setSocketOption() would be nice to have
+  // FIXME: QQAbstractSocket::socketOption() would be nice to have
 
-  // no extra properties, but we need the inheritance connection for anything above to work
-  MO_ADD_METAOBJECT2(QGraphicsObject, QGraphicsItem, QObject);
+  MO_ADD_METAOBJECT1(QTcpServer, QObject);
+  MO_ADD_PROPERTY_RO(QTcpServer, bool, isListening);
+  MO_ADD_PROPERTY   (QTcpServer, int, maxPendingConnections, setMaxPendingConnections);
+  MO_ADD_PROPERTY_RO(QTcpServer, quint16, serverPort);
+  MO_ADD_PROPERTY_RO(QTcpServer, QHostAddress, serverAddress);
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+  MO_ADD_PROPERTY_RO(QTcpServer, qintptr, socketDescriptor);
+#else // !QT5
+  MO_ADD_PROPERTY_RO(QTcpServer, int, socketDescriptor);
+#endif
+  MO_ADD_PROPERTY_RO(QTcpServer, bool, hasPendingConnections);
+  MO_ADD_PROPERTY_RO(QTcpServer, QAbstractSocket::SocketError, serverError);
+  MO_ADD_PROPERTY_RO(QTcpServer, QString, errorString);
+#ifndef QT_NO_NETWORKPROXY
+  MO_ADD_PROPERTY_RO(QTcpServer, QNetworkProxy, proxy);
+#endif
 
-  MO_ADD_METAOBJECT0(QGraphicsLayoutItem);
-  MO_ADD_PROPERTY_RO(QGraphicsLayoutItem, QRectF, contentsRect);
-  MO_ADD_PROPERTY_RO(QGraphicsLayoutItem, bool, isLayout);
-  MO_ADD_PROPERTY_RO(QGraphicsLayoutItem, bool, ownedByLayout);
+  MO_ADD_METAOBJECT1(QSocketNotifier, QObject);
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+  MO_ADD_PROPERTY_RO(QSocketNotifier, qintptr, socket);
+#else // !Qt5
+  MO_ADD_PROPERTY_RO(QSocketNotifier, int, socket);
+#endif
+  MO_ADD_PROPERTY_RO(QSocketNotifier, QSocketNotifier::Type, type);
+  MO_ADD_PROPERTY   (QSocketNotifier, bool, isEnabled, setEnabled);
+}
 
-  MO_ADD_METAOBJECT2(QGraphicsWidget, QGraphicsObject, QGraphicsLayoutItem);
-  MO_ADD_PROPERTY_RO(QGraphicsWidget, QRectF, windowFrameGeometry);
-  MO_ADD_PROPERTY_RO(QGraphicsWidget, QRectF, windowFrameRect);
+void MetaObjectRepository::initGuiTypes()
+{
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+  MetaObject *mo = 0;
+  MO_ADD_METAOBJECT0(QSurface);
+  MO_ADD_PROPERTY_RO(QSurface, QSurfaceFormat, format);
+  MO_ADD_PROPERTY_RO(QSurface, QSize, size);
+  MO_ADD_PROPERTY_RO(QSurface, QSurface::SurfaceClass, surfaceClass);
+  MO_ADD_PROPERTY_RO(QSurface, QSurface::SurfaceType, surfaceType);
 
-  MO_ADD_METAOBJECT1(QGraphicsProxyWidget, QGraphicsWidget);
-  MO_ADD_PROPERTY_RO(QGraphicsProxyWidget, QWidget*, widget);
+  MO_ADD_METAOBJECT2(QWindow, QObject, QSurface);
+  MO_ADD_PROPERTY_CR(QWindow, QSize, baseSize, setBaseSize);
+#ifndef QT_NO_CURSOR
+  MO_ADD_PROPERTY_CR(QWindow, QCursor, cursor, setCursor);
+#endif
+  MO_ADD_PROPERTY_RO(QWindow, qreal, devicePixelRatio);
+  MO_ADD_PROPERTY_CR(QWindow, QString, filePath, setFilePath);
+  MO_ADD_PROPERTY_RO(QWindow, QObject*, focusObject);
+  MO_ADD_PROPERTY_RO(QWindow, QRect, frameGeometry);
+  MO_ADD_PROPERTY_RO(QWindow, QMargins, frameMargins);
+  MO_ADD_PROPERTY_CR(QWindow, QPoint, framePosition, setFramePosition);
+  MO_ADD_PROPERTY_CR(QWindow, QRect, geometry, setGeometry);
+  MO_ADD_PROPERTY_CR(QWindow, QIcon, icon, setIcon);
+  MO_ADD_PROPERTY_RO(QWindow, bool, isExposed);
+  MO_ADD_PROPERTY_RO(QWindow, bool, isTopLevel);
+#if QT_VERSION >= QT_VERSION_CHECK(5, 1, 0)
+  MO_ADD_PROPERTY_CR(QWindow, QRegion, mask, setMask);
+#endif
+  MO_ADD_PROPERTY_CR(QWindow, QPoint, position, setPosition);
+  MO_ADD_PROPERTY_RO(QWindow, QSurfaceFormat, requestedFormat);
+  MO_ADD_PROPERTY_RO(QWindow, QScreen*, screen);
+  MO_ADD_PROPERTY_CR(QWindow, QSize, sizeIncrement, setSizeIncrement);
+  MO_ADD_PROPERTY   (QWindow, Qt::WindowState, windowState, setWindowState);
+  MO_ADD_PROPERTY_RO(QWindow, QWindow*, transientParent);
+  MO_ADD_PROPERTY_RO(QWindow, Qt::WindowType, type);
+#endif
+}
+
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+Q_DECLARE_METATYPE(QOpenGLShader::ShaderType)
+#endif
+
+void MetaObjectRepository::initOpenGLTypes()
+{
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+  MetaObject *mo = 0;
+  MO_ADD_METAOBJECT1(QOpenGLShader, QObject);
+  MO_ADD_PROPERTY_RO(QOpenGLShader, bool, isCompiled);
+  MO_ADD_PROPERTY_RO(QOpenGLShader, QString, log);
+  MO_ADD_PROPERTY_RO(QOpenGLShader, uint, shaderId);
+  MO_ADD_PROPERTY_RO(QOpenGLShader, QOpenGLShader::ShaderType, shaderType);
+  MO_ADD_PROPERTY_RO(QOpenGLShader, QByteArray, sourceCode);
+
+  MO_ADD_METAOBJECT1(QOpenGLShaderProgram, QObject);
+  MO_ADD_PROPERTY_RO(QOpenGLShaderProgram, bool, isLinked);
+  MO_ADD_PROPERTY_RO(QOpenGLShaderProgram, QString, log);
+#if QT_VERSION >= QT_VERSION_CHECK(5, 1, 0)
+  MO_ADD_PROPERTY_RO(QOpenGLShaderProgram, int, maxGeometryOutputVertices);
+  MO_ADD_PROPERTY   (QOpenGLShaderProgram, int, patchVertexCount, setPatchVertexCount);
+#endif
+  MO_ADD_PROPERTY_RO(QOpenGLShaderProgram, uint, programId);
+
+  MO_ADD_METAOBJECT1(QOpenGLContext, QObject);
+  MO_ADD_PROPERTY_RO(QOpenGLContext, uint, defaultFramebufferObject);
+  MO_ADD_PROPERTY_RO(QOpenGLContext, QSet<QByteArray>, extensions);
+  MO_ADD_PROPERTY_RO(QOpenGLContext, QSurfaceFormat, format);
+  MO_ADD_PROPERTY_RO(QOpenGLContext, bool, isValid);
+  MO_ADD_PROPERTY_RO(QOpenGLContext, QScreen*, screen);
+  MO_ADD_PROPERTY_RO(QOpenGLContext, QOpenGLContext*, shareContext);
+  MO_ADD_PROPERTY_RO(QOpenGLContext, QOpenGLContextGroup*, shareGroup);
+//   MO_ADD_PROPERTY_RO(QOpenGLContext, QSurface*, surface);
+#endif
 }
 
 MetaObjectRepository *MetaObjectRepository::instance()
 {
+  if (!s_instance()->m_initialized)
+    s_instance()->initBuiltInTypes();
   return s_instance();
 }
 

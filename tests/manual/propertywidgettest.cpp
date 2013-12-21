@@ -21,7 +21,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "core/propertywidget.h"
+#include "ui/propertywidget.h"
 
 #include <QApplication>
 #include <QTreeView>
@@ -35,7 +35,7 @@ int main(int argc, char **argv)
 
   PropertyWidget widget;
   //widget.setMetaObject((new QTreeView())->metaObject());
-  widget.setObject(new QTreeView());
+  //widget.setObject(new QTreeView());
   //widget.setObject(new QGraphicsRectItem, "QGraphicsRectItem");
   widget.show();
 

@@ -23,15 +23,15 @@
 
 #include "messagehandler.h"
 #include "messagemodel.h"
-#include "ui_messagehandler.h"
 
+#include "backtrace.h"
+
+#include <common/objectbroker.h>
+#include <common/endpoint.h>
+
+#include <QCoreApplication>
 #include <QDebug>
-#include <QDialogButtonBox>
-#include <QLabel>
-#include <QListWidget>
-#include <QMessageBox>
 #include <QMutex>
-#include <QSortFilterProxyModel>
 #include <QThread>
 
 static QTextStream cerr(stdout);
@@ -48,7 +48,7 @@ void handleMessage(QtMsgType type, const char *msg)
   ///WARNING: do not trigger *any* kind of debug output here
   ///         this would trigger an infinite loop and hence crash!
 
-  MessageModel::Message message;
+  DebugMessage message;
   message.type = type;
   message.message = QString::fromLocal8Bit(msg);
   message.time = QTime::currentTime();
@@ -70,53 +70,23 @@ void handleMessage(QtMsgType type, const char *msg)
     }
   }
 
-  if (type == QtFatalMsg && qgetenv("GAMMARAY_GDB") != "1" && qgetenv("GAMMARAY_UNITTEST") != "1" &&
-      QThread::currentThread() == QApplication::instance()->thread()) {
-    foreach (QWidget *w, qApp->topLevelWidgets()) {
-      w->setEnabled(false);
+  if (!message.backtrace.isEmpty() && (qgetenv("GAMMARAY_UNITTEST") == "1" || type == QtFatalMsg)) {
+    if (type == QtFatalMsg) {
+      cerr << "QFatal in " << qPrintable(qApp->applicationName()) << " (" << qPrintable(qApp->applicationFilePath()) << ')' << endl;
     }
-    QDialog dlg;
-    dlg.setWindowTitle(QObject::tr("QFatal in %1").
-                       arg(qApp->applicationName().isEmpty() ?
-                           qApp->applicationFilePath() :
-                           qApp->applicationName()));
-    QGridLayout *layout = new QGridLayout;
-    QLabel *iconLabel = new QLabel;
-    QIcon icon = dlg.style()->standardIcon(QStyle::SP_MessageBoxCritical, 0, &dlg);
-    int iconSize = dlg.style()->pixelMetric(QStyle::PM_MessageBoxIconSize, 0, &dlg);
-    iconLabel->setPixmap(icon.pixmap(iconSize, iconSize));
-    iconLabel->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-    layout->addWidget(iconLabel, 0, 0);
-    QLabel *errorLabel = new QLabel;
-    errorLabel->setTextFormat(Qt::PlainText);
-    errorLabel->setWordWrap(true);
-    errorLabel->setText(message.message);
-    layout->addWidget(errorLabel, 0, 1);
-    if (!message.backtrace.isEmpty()) {
-      QListWidget *backtrace = new QListWidget;
-      foreach (const QString &frame, message.backtrace) {
-        backtrace->addItem(frame);
-      }
-      layout->addWidget(backtrace, 1, 0, 1, 2);
-    }
-    QDialogButtonBox *buttons = new QDialogButtonBox;
-    buttons->addButton(QDialogButtonBox::Close);
-    QObject::connect(buttons, SIGNAL(accepted()),
-                     &dlg, SLOT(accept()));
-    QObject::connect(buttons, SIGNAL(rejected()),
-                     &dlg, SLOT(reject()));
-    layout->addWidget(buttons, 2, 0, 1, 2);
-    dlg.setLayout(layout);
-    dlg.adjustSize();
-    dlg.exec();
-  } else if (!message.backtrace.isEmpty() &&
-             (qgetenv("GAMMARAY_UNITTEST") == "1" || type == QtFatalMsg)) {
     cerr << "START BACKTRACE:" << endl;
     int i = 0;
     foreach (const QString &frame, message.backtrace) {
       cerr << (++i) << "\t" << frame << endl;
     }
     cerr << "END BACKTRACE" << endl;
+  }
+
+  if (type == QtFatalMsg && qgetenv("GAMMARAY_GDB") != "1" && qgetenv("GAMMARAY_UNITTEST") != "1") {
+    // Enforce handling on the GUI thread and block until we are done.
+    QMetaObject::invokeMethod(static_cast<QObject*>(s_model)->parent(), "handleFatalMessage",
+                              qApp->thread() ==  QThread::currentThread() ? Qt::DirectConnection : Qt::BlockingQueuedConnection,
+                              Q_ARG(GammaRay::DebugMessage, message));
   }
 
   // reset msg handler so the app still works as usual
@@ -126,7 +96,8 @@ void handleMessage(QtMsgType type, const char *msg)
   s_handlerDisabled = true;
   qInstallMsgHandler(s_handler);
 #if (QT_VERSION >= QT_VERSION_CHECK(5,0,0))
-  qt_message_output(type, QMessageLogContext(), msg);
+  static QMessageLogContext context;
+  qt_message_output(type, context, msg);
 #else
   qt_message_output(type, msg);
 #endif
@@ -137,39 +108,19 @@ void handleMessage(QtMsgType type, const char *msg)
   if (s_model) {
     // add directly from foreground thread, delay from background thread
     QMetaObject::invokeMethod(s_model, "addMessage", Qt::AutoConnection,
-                              Q_ARG(MessageModel::Message, message));
+                              Q_ARG(GammaRay::DebugMessage, message));
   }
 }
 
-MessageHandler::MessageHandler(ProbeInterface * /*probe*/, QWidget *parent)
-  : QWidget(parent),
-    ui(new Ui::MessageHandler),
-    m_messageModel(0),
-    m_messageProxy(new QSortFilterProxyModel(this))
+MessageHandler::MessageHandler(ProbeInterface *probe, QObject *parent)
+  : MessageHandlerInterface(parent),
+  m_messageModel(new MessageModel(this))
 {
-  ui->setupUi(this);
 
-  ui->messageSearchLine->setProxy(m_messageProxy);
-  ui->messageView->setModel(m_messageProxy);
-  ui->messageView->setIndentation(0);
-  ui->messageView->setSortingEnabled(true);
-
-  ///FIXME: implement this
-  ui->backtraceView->hide();
-}
-
-void MessageHandler::setModel(MessageModel *model)
-{
-  m_messageModel = model;
-  m_messageProxy->setSourceModel(m_messageModel);
-}
-
-MessageHandlerFactory::MessageHandlerFactory(QObject *parent)
-  : QObject(parent),
-    m_messageModel(new MessageModel(this))
-{
   Q_ASSERT(s_model == 0);
   s_model = m_messageModel;
+
+  probe->registerModel("com.kdab.GammaRay.MessageModel", m_messageModel);
 
   // install handler directly, catches most cases,
   // i.e. user has no special handler or the handler
@@ -180,7 +131,20 @@ MessageHandlerFactory::MessageHandlerFactory(QObject *parent)
   QMetaObject::invokeMethod(this, "ensureHandlerInstalled", Qt::QueuedConnection);
 }
 
-void MessageHandlerFactory::ensureHandlerInstalled()
+MessageHandler::~MessageHandler()
+{
+  QMutexLocker lock(&s_mutex);
+
+  s_model = 0;
+  QtMsgHandler oldHandler = qInstallMsgHandler(s_handler);
+  if (oldHandler != handleMessage) {
+    // ups, the app installed it's own handler after ours...
+    qInstallMsgHandler(oldHandler);
+  }
+  s_handler = 0;
+}
+
+void MessageHandler::ensureHandlerInstalled()
 {
   QMutexLocker lock(&s_mutex);
 
@@ -195,28 +159,18 @@ void MessageHandlerFactory::ensureHandlerInstalled()
   }
 }
 
-MessageHandlerFactory::~MessageHandlerFactory()
+void MessageHandler::handleFatalMessage(const DebugMessage &message)
 {
-  QMutexLocker lock(&s_mutex);
-
-  s_model = 0;
-  QtMsgHandler oldHandler = qInstallMsgHandler(s_handler);
-  if (oldHandler != handleMessage) {
-    // ups, the app installed it's own handler after ours...
-    qInstallMsgHandler(oldHandler);
+  const QString app = qApp->applicationName().isEmpty()
+                      ? qApp->applicationFilePath()
+                      : qApp->applicationName();
+  emit fatalMessageReceived(app, message.message, message.time, message.backtrace);
+  if (Endpoint::isConnected()) {
+    Endpoint::instance()->waitForMessagesWritten();
   }
-  s_handler = 0;
 }
 
-QWidget *MessageHandlerFactory::createWidget(ProbeInterface *probe, QWidget *parentWidget)
+MessageHandlerFactory::MessageHandlerFactory(QObject* parent): QObject(parent)
 {
-  QWidget *widget =
-    StandardToolFactory<QObject, MessageHandler >::createWidget(probe, parentWidget);
-
-  MessageHandler *handler = qobject_cast<MessageHandler*>(widget);
-  Q_ASSERT(handler);
-  handler->setModel(m_messageModel);
-  return widget;
 }
 
-#include "messagehandler.moc"

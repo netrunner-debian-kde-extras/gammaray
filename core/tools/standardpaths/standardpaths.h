@@ -24,25 +24,16 @@
 #ifndef GAMMARAY_STANDARDPATHS_H
 #define GAMMARAY_STANDARDPATHS_H
 
-#include "include/toolfactory.h"
-
-#include <QWidget>
+#include <core/toolfactory.h>
 
 namespace GammaRay {
 
-namespace Ui {
-  class StandardPaths;
-}
-
-class StandardPaths : public QWidget
+class StandardPaths : public QObject
 {
   Q_OBJECT
   public:
-    explicit StandardPaths(ProbeInterface *probe, QWidget *parent = 0);
+    explicit StandardPaths(ProbeInterface *probe, QObject *parent = 0);
     ~StandardPaths();
-
-  private:
-    QScopedPointer<Ui::StandardPaths> ui;
 };
 
 class StandardPathsFactory : public QObject, public StandardToolFactory<QObject, StandardPaths>

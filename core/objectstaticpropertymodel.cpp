@@ -22,8 +22,8 @@
 */
 
 #include "objectstaticpropertymodel.h"
-
-#include "include/util.h"
+#include "varianthandler.h"
+#include "util.h"
 
 #include <QMetaProperty>
 
@@ -58,7 +58,7 @@ QVariant ObjectStaticPropertyModel::data(const QModelIndex &index, int role) con
       if (!enumStr.isEmpty()) {
         return enumStr;
       }
-      return Util::variantToString(value);
+      return VariantHandler::displayString(value);
     } else if (index.column() == 2) {
       return prop.typeName();
     } else if (index.column() == 3) {
@@ -70,7 +70,7 @@ QVariant ObjectStaticPropertyModel::data(const QModelIndex &index, int role) con
     }
   } else if (role == Qt::DecorationRole) {
     if (index.column() == 1) {
-      return Util::decorationForVariant(prop.read(m_obj.data()));
+      return VariantHandler::decoration(prop.read(m_obj.data()));
     }
   } else if (role == Qt::EditRole) {
     if (index.column() == 1) {
@@ -141,4 +141,3 @@ Qt::ItemFlags ObjectStaticPropertyModel::flags(const QModelIndex &index) const
   return flags;
 }
 
-#include "objectstaticpropertymodel.moc"

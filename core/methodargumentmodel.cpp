@@ -22,34 +22,8 @@
 */
 
 #include "methodargumentmodel.h"
-#include <QtCore/qsharedpointer.h>
 
 using namespace GammaRay;
-
-// TODO: this should be implicitly shared to avoid m_data double deletion
-SafeArgument::SafeArgument() : m_data(0)
-{
-}
-
-SafeArgument::SafeArgument(const QVariant &v) : m_value(v), m_name(v.typeName()), m_data(0)
-{
-}
-
-SafeArgument::~SafeArgument()
-{
-  if (m_data) {
-    QMetaType::destroy(m_value.type(), m_data);
-  }
-}
-
-SafeArgument::operator QGenericArgument() const
-{
-  if (m_value.isValid()) {
-    m_data = QMetaType::construct(m_value.type(), m_value.constData());
-    return QGenericArgument(m_name.data(), m_data);
-  }
-  return QGenericArgument();
-}
 
 MethodArgumentModel::MethodArgumentModel(QObject *parent) : QAbstractTableModel(parent)
 {
@@ -118,6 +92,7 @@ bool MethodArgumentModel::setData(const QModelIndex &index, const QVariant &valu
 {
   if (index.row() >= 0 && index.row() < m_arguments.size() && role == Qt::EditRole) {
     m_arguments[index.row()] = value;
+    emit dataChanged(index, index);
     return true;
   }
   return QAbstractItemModel::setData(index, value, role);
@@ -147,13 +122,12 @@ Qt::ItemFlags MethodArgumentModel::flags(const QModelIndex &index) const
   return flags;
 }
 
-QVector<SafeArgument> MethodArgumentModel::arguments() const
+QVector<MethodArgument> MethodArgumentModel::arguments() const
 {
-  QVector<SafeArgument> args(10);
+  QVector<MethodArgument> args(10);
   for (int i = 0; i < rowCount(); ++i) {
-    args[i] = SafeArgument(m_arguments.at(i));
+    args[i] = MethodArgument(m_arguments.at(i));
   }
   return args;
 }
 
-#include "methodargumentmodel.moc"
