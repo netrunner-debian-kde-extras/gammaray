@@ -1,2 +1,2 @@
 usr/include
-usr/lib/libgammaray_probe.so
+usr/lib/libgammaray*qt4*.so
