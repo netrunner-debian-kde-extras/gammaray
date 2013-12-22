@@ -8,6 +8,7 @@ gammaray (1.9.95-1) UNRELEASED; urgency=low
     - find-widget-export-actions-when-attaching.patch
     - gammaray-probe-versioned-soname.patch.
   * Use xz for orig tarball compression.
+  * Bump Standards-Version to 3.9.5.
 
  -- Jakub Adam <jakub.adam@ktknet.cz>  Sat, 21 Dec 2013 09:25:42 +0100
 
