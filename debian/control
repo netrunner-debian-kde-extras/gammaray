@@ -6,6 +6,11 @@ Uploaders: Jakub Adam <jakub.adam@ktknet.cz>
 Build-Depends: debhelper (>= 9),
                cmake,
                kdelibs5-dev,
+               qtbase5-private-dev,
+               qtscript5-dev,
+               qttools5-dev,
+               libqt5svg5-dev,
+               libqt5webkit5-dev,
                libqt4-dev,
                libqt4-private-dev,
                libqtwebkit-dev,
@@ -24,7 +29,8 @@ Architecture: any
 Pre-Depends: ${misc:Pre-Depends}
 Depends: ${shlibs:Depends},
          ${misc:Depends}
-Recommends: gdb
+Recommends: gammaray-probe-qt4 | gammaray-probe-qt5,
+            gdb
 Description: Tool for examining the internals of Qt application
  GammaRay is a tool for examining the internals of a Qt application and
  to some extent also manipulate it. GammaRay uses injection methods to
@@ -32,6 +38,27 @@ Description: Tool for examining the internals of Qt application
  of interesting information. It provides easy ways of navigating through
  the complex internal structures you find in some Qt frameworks, such as
  QGraphicsView, model/view, QTextDocument, state machines and more.
+
+Package: gammaray-probe-qt5
+Architecture: any
+Pre-Depends: ${misc:Pre-Depends}
+Depends: gammaray (= ${binary:Version}),
+         ${shlibs:Depends},
+         ${misc:Depends}
+Description: TODO
+
+Package: gammaray-probe-qt4
+Architecture: any
+Pre-Depends: ${misc:Pre-Depends}
+Depends: gammaray (= ${binary:Version}),
+         ${shlibs:Depends},
+         ${misc:Depends}
+Description: GammaRay support for inspecting Qt4 applications
+ This package contains GammaRay probe libraries that have to be loaded
+ into the application being inspected in order to allow GammaRay to
+ examine its internals. The gammaray package already includes the probe
+ binaries compiled for Qt5. Install this package if you want to use
+ GammaRay with Qt4 applications.
 
 Package: gammaray-plugin-objectvisualizer
 Architecture: any

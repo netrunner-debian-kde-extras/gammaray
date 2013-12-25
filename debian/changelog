@@ -9,6 +9,7 @@ gammaray (1.9.95-1) UNRELEASED; urgency=low
     - gammaray-probe-versioned-soname.patch.
   * Use xz for orig tarball compression.
   * Bump Standards-Version to 3.9.5.
+  * Enable build of Qt5 GUI and Qt5 + Qt4 probe libraries.
 
  -- Jakub Adam <jakub.adam@ktknet.cz>  Sat, 21 Dec 2013 09:25:42 +0100
 

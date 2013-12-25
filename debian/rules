@@ -1,6 +1,6 @@
 #!/usr/bin/make -f
 
-.PHONY: override_dh_auto_configure override_dh_auto_test override_dh_auto_install override_dh_installdocs override_dh_strip override_dh_clean
+.PHONY: override_dh_auto_configure override_dh_auto_build override_dh_auto_test override_dh_auto_install override_dh_installdocs override_dh_strip override_dh_clean
 
 %:
 	dh $@ --parallel
@@ -11,13 +11,19 @@ override_dh_auto_configure:
 		mv 3rdparty/qt/private 3rdparty/qt/private.dont.use; \
 	fi
 
-	dh_auto_configure
+	dh_auto_configure -B obj-qt5
+	dh_auto_configure -B obj-qt4 -- -DGAMMARAY_ENFORCE_QT4_BUILD=ON -DGAMMARAY_PROBE_ONLY_BUILD=ON
+
+override_dh_auto_build:
+	dh_auto_build -B obj-qt5 -O--parallel
+	dh_auto_build -B obj-qt4 -O--parallel
 
 override_dh_auto_test:
 	xvfb-run dh_auto_test
 
 override_dh_auto_install:
-	dh_auto_install
+	dh_auto_install -B obj-qt5
+	dh_auto_install -B obj-qt4
 	rm -f debian/tmp/usr/share/doc/gammaray/License.txt
 
 override_dh_installdocs:
