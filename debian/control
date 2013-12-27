@@ -15,7 +15,6 @@ Build-Depends: debhelper (>= 9),
                libqt4-private-dev,
                libqtwebkit-dev,
                libgraphviz-dev,
-               libvtk5-qt4-dev (>= 5.10.0),
                gdb,
                xauth,
                xvfb
@@ -60,18 +59,18 @@ Description: GammaRay support for inspecting Qt4 applications
  binaries compiled for Qt5. Install this package if you want to use
  GammaRay with Qt4 applications.
 
-Package: gammaray-plugin-objectvisualizer
-Architecture: any
-Depends: gammaray (= ${binary:Version}),
-         ${shlibs:Depends},
-         ${misc:Depends}
-Description: QObject hierarchy visualization plugin for GammaRay
- This plugin can visualize parent-child relationships of QObjects in a
- form of planar or 3D acyclic graph. Multiple graph layout algorihtms
- are available.
- .
- Also, for use with 3D glasses, various types of stereoscopic rendering
- are supported.
+#Package: gammaray-plugin-objectvisualizer
+#Architecture: any
+#Depends: gammaray (= ${binary:Version}),
+#         ${shlibs:Depends},
+#         ${misc:Depends}
+#Description: QObject hierarchy visualization plugin for GammaRay
+# This plugin can visualize parent-child relationships of QObjects in a
+# form of planar or 3D acyclic graph. Multiple graph layout algorihtms
+# are available.
+# .
+# Also, for use with 3D glasses, various types of stereoscopic rendering
+# are supported.
 
 Package: gammaray-plugin-kjobtracker
 Architecture: any
