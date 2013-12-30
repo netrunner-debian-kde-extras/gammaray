@@ -2,6 +2,8 @@
 
 .PHONY: override_dh_auto_configure override_dh_auto_build override_dh_auto_test override_dh_auto_install override_dh_installdocs override_dh_strip override_dh_clean
 
+export DEB_LDFLAGS_MAINT_APPEND=-Wl,--as-needed
+
 %:
 	dh $@ --parallel
 
