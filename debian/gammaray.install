@@ -1,7 +1,7 @@
 usr/bin
-usr/lib/gammaray/libexec
-usr/lib/gammaray/*/qt5*/*_ui.desktop
-usr/lib/gammaray/*/qt5*/*_ui_plugin.so
-usr/lib/qt5/plugins/*
+usr/lib/*/gammaray/libexec
+usr/lib/*/gammaray/*/qt5*/*_ui.desktop
+usr/lib/*/gammaray/*/qt5*/*_ui_plugin.so
+usr/lib/*/qt5/plugins/*
 usr/share
 
