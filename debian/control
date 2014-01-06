@@ -28,7 +28,7 @@ Architecture: any
 Pre-Depends: ${misc:Pre-Depends}
 Depends: ${shlibs:Depends},
          ${misc:Depends}
-Recommends: gammaray-probe-qt4 | gammaray-probe-qt5,
+Recommends: gammaray-probe-qt4,
             gdb
 Description: Tool for examining the internals of Qt application
  GammaRay is a tool for examining the internals of a Qt application and
@@ -37,14 +37,6 @@ Description: Tool for examining the internals of Qt application
  of interesting information. It provides easy ways of navigating through
  the complex internal structures you find in some Qt frameworks, such as
  QGraphicsView, model/view, QTextDocument, state machines and more.
-
-Package: gammaray-probe-qt5
-Architecture: any
-Pre-Depends: ${misc:Pre-Depends}
-Depends: gammaray (= ${binary:Version}),
-         ${shlibs:Depends},
-         ${misc:Depends}
-Description: TODO
 
 Package: gammaray-probe-qt4
 Architecture: any
