@@ -14,14 +14,14 @@ Copyright: 2007, David Faure <faure@kde.org>
 License: LGPL-2+
 
 Files: 3rdparty/qt/*
-       launcher/processlist.h
-       launcher/processlist_win.cpp
-       launcher/processlist_unix.cpp
+       launcher/ui/processlist.h
+       launcher/ui/processlist_win.cpp
+       launcher/ui/processlist_unix.cpp
 Copyright: 2011, Nokia Corporation and/or its subsidiary(-ies)
 License: LGPL-2.1
 
 Files: cmake/GammaRayMacros.cmake
-Copyright: 2011, Volker Krause <volker.krause@kdab.com>
+Copyright: 2011-2013 Klarälvdalens Datakonsult AB, a KDAB Group company <info@kdab.com>
 License: BSD-3-clause
 
 Files: cmake/ECMQt4To5Porting.cmake
@@ -30,6 +30,8 @@ License: BSD-3-clause
 
 Files: cmake/FindGraphviz.cmake
 Copyright: 2009, Adrien Bustany <madcat@mymadcat.com>
+           2013, Kevin Funk <kevin.funk@kdab.com>
+           2012-2013, Klarälvdalens Datakonsult AB, a KDAB Group company <info@kdab.com>
 License: GPL-3+
 
 Files: cmake/MacroLogFeature.cmake
@@ -38,9 +40,9 @@ Copyright: 2006, Alexander Neundorf <neundorf@kde.org>
            2009, Sebastian Trueg <trueg@kde.org>
 License: BSD-3-clause
 
-Files: core/palettemodel.cpp
+Files: core/ui/palettemodel.cpp
 Copyright: 2010, Ariya Hidayat <ariya.hidayat@gmail.com>
-           2012, Klarälvdalens Datakonsult AB, a KDAB Group company <info@kdab.com>
+           2012-2013, Klarälvdalens Datakonsult AB, a KDAB Group company <info@kdab.com>
 License: GPL-2+
 
 Files: core/tools/messagehandler/StackWalker.cpp
@@ -50,17 +52,23 @@ License: BSD-2-clause
 
 Files: core/tools/modelinspector/modeltest.cpp
        core/tools/modelinspector/modeltest.h
+       tests/modeltest.cpp
+       tests/modeltest.h
 Copyright: 2007 Trolltech ASA
 License: GPL-2
 
 Files: core/tools/messagehandler/backtrace_unix.cpp
 Copyright: 2002 Holger Freyther (freyther@kde.org)
-           2010-2011, Klarälvdalens Datakonsult AB, a KDAB Group company
+           2010-2013, Klarälvdalens Datakonsult AB, a KDAB Group company
            1997, Matthias Kalle Dalheimer (kalle@kde.org)
-License: GPL-2+ or LGPL-2+
+License: LGPL-2+
 
 Files: debian/*
-Copyright: 2012-2013, Debian KDE Extras Team <pkg-kde-extras@lists.alioth.debian.org>
+Copyright: 2012-2014, Debian KDE Extras Team <pkg-kde-extras@lists.alioth.debian.org>
+License: GPL-2+
+
+Files: launcher/injector/interactiveprocess.*
+Copyright: 2006, Bradley T. Hughes
 License: GPL-2+
 
 License: GPL-2
