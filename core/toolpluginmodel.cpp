@@ -2,7 +2,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2012-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2012-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Kevin Funk <kevin.funk@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -62,7 +62,7 @@ QVariant ToolPluginModel::data(const QModelIndex& index, int role) const
     case 1:
       return factory->name();
     case 2:
-      return factory->supportedTypes();
+      return factory->supportedTypes().join(", ");
     }
   }
   return QVariant();

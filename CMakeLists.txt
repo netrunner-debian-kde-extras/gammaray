@@ -14,7 +14,7 @@ if(WIN32)
   cmake_minimum_required(VERSION 2.8.11)
   cmake_policy(SET CMP0020 NEW)
 else()
-  cmake_minimum_required(VERSION 2.8.6)
+  cmake_minimum_required(VERSION 2.8.9)
 endif()
 
 if(NOT Prog_NAME)
@@ -23,14 +23,18 @@ endif()
 
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/ ${CMAKE_MODULE_PATH})
 set(CMAKE_AUTOMOC ON)
+set(CMAKE_INCLUDE_CURRENT_DIR ON)
+if(POLICY CMP0022)
+  cmake_policy(SET CMP0022 OLD) # until we require 2.8.12
+endif()
 
 set(GAMMARAY_VERSION_MAJOR "1")
 set(GAMMARAY_VERSION_MINOR "9")
-set(GAMMARAY_VERSION_PATCH "95")
+set(GAMMARAY_VERSION_PATCH "96")
 set(GAMMARAY_VERSION "${GAMMARAY_VERSION_MAJOR}.${GAMMARAY_VERSION_MINOR}.${GAMMARAY_VERSION_PATCH}")
 set(GAMMARAY_VERSION_STRING "${GAMMARAY_VERSION}")
 set(GAMMARAY_SOVERSION "2.0.0")
-set(GAMMARAY_PLUGIN_VERSION "${GAMMARAY_VERSION_MAJOR}.${GAMMARAY_VERSION_MINOR}")
+set(GAMMARAY_PLUGIN_VERSION "2.0")
 
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
@@ -83,44 +87,40 @@ if(NOT GAMMARAY_ENFORCE_QT4_BUILD)
 endif()
 
 if(Qt5Core_FOUND)
-  find_package(Qt5Gui REQUIRED)
-  find_package(Qt5Test REQUIRED)
-  find_package(Qt5Network REQUIRED)
-
-  find_package(Qt5Concurrent QUIET)
-  find_package(Qt5Widgets QUIET)
-  find_package(Qt5PrintSupport QUIET)
-  find_package(Qt5Svg QUIET)
-  find_package(Qt5Script QUIET)
-  find_package(Qt5ScriptTools QUIET)
-  find_package(Qt5Location QUIET) # workaround for 5.1 webkit that tries to find a qtlocation with a matching version if none (with any version) has been found before...
+  find_package(Qt5 NO_MODULE REQUIRED COMPONENTS Gui Network)
+  find_package(Qt5 NO_MODULE QUIET COMPONENTS
+    Concurrent
+    Test
+    Widgets
+    PrintSupport
+    Svg
+    Script
+    ScriptTools
+    Location # workaround for 5.1 webkit that tries to find a qtlocation with a matching version if none (with any version) has been found before...
+    Designer
+  )
   find_package(Qt5WebKitWidgets 5.0.2 QUIET) # 5.0.[01] has a code generation bug in uic that fails to generate proper code for webkitwidget classes
-  find_package(Qt5Designer QUIET)
 
   include("cmake/ECMQt4To5Porting.cmake")
-  include_directories(${QT_INCLUDES}) # TODO: Port away from this.
+  # only needed for Qt <= 5.1 and/or some older CMake versions (exact combination unknown unfortunately)
+  include_directories(${QT_INCLUDES})
 
   set(HAVE_QT_CONCURRENT ${Qt5Concurrent_FOUND})
   set(HAVE_QT_WIDGETS ${Qt5Widgets_FOUND})
   set(HAVE_QT_SVG ${Qt5Svg_FOUND})
   set(HAVE_QT_DESIGNER ${Qt5Designer_FOUND})
   set(HAVE_QT_PRINTSUPPORT ${Qt5PrintSupport_FOUND})
-
-  set(QT_QTWEBKIT_FOUND ${Qt5WebKitWidgets_FOUND}) # backward compat with Qt4 webkit code
+  set(HAVE_QT_WEBKIT1 ${Qt5WebKitWidgets_FOUND})
 
   if(Qt5_POSITION_INDEPENDENT_CODE AND NOT WIN32)
-    if(CMAKE_VERSION VERSION_LESS 2.8.9) # TODO remove once we increase the cmake requirement
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
-    else()
-      set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-    endif()
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
   endif()
 
 # Qt4
 else()
   set(QT_USE_IMPORTED_TARGETS true)
-  find_package(Qt4 ${QT_MIN_VERSION} REQUIRED QtCore QtGui QtTest QtNetwork)
-  find_package(Qt4 ${QT_MIN_VERSION} QUIET COMPONENTS QtScript QtScriptTools QtWebKit QtDesigner QtSvg)
+  find_package(Qt4 ${QT_MIN_VERSION} REQUIRED QtCore QtGui QtNetwork)
+  find_package(Qt4 ${QT_MIN_VERSION} QUIET COMPONENTS QtScript QtScriptTools QtWebKit QtDesigner QtSvg QtTest)
 
   include(${QT_USE_FILE})
   set(HAVE_QT_CONCURRENT true)
@@ -130,6 +130,7 @@ else()
     set(HAVE_QT_DESIGNER true)
   endif()
   set(HAVE_QT_PRINTSUPPORT true)
+  set(HAVE_QT_WEBKIT1 ${QT_QTWEBKIT_FOUND})
 endif()
 
 # TODO: Remove me once fixed in ECM module
@@ -156,19 +157,25 @@ set(BIN_INSTALL_DIR "bin")
 set(LIB_SUFFIX "" CACHE STRING "Define suffix of directory name (32/64)")
 set(LIB_INSTALL_DIR "lib${LIB_SUFFIX}")
 set(INCLUDE_INSTALL_DIR "include/gammaray")
+set(CMAKECONFIG_INSTALL_DIR ${LIB_INSTALL_DIR}/cmake/GammaRay)
 if(WIN32)
   set(PLUGIN_INSTALL_DIR "plugins")
-else()
-  set(PLUGIN_INSTALL_DIR "${LIB_INSTALL_DIR}/gammaray")
-endif()
-if(WIN32)
   set(LIBEXEC_INSTALL_DIR "${BIN_INSTALL_DIR}")
 else()
+  set(PLUGIN_INSTALL_DIR "${LIB_INSTALL_DIR}/gammaray")
   set(LIBEXEC_INSTALL_DIR "${LIB_INSTALL_DIR}/gammaray/libexec")
 endif()
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/${BIN_INSTALL_DIR})
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/${LIB_INSTALL_DIR})
+
+# set RPATH only when installing to a non-default location
+list(FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/${LIB_INSTALL_DIR}" _isSystemPlatformLibDir)
+list(FIND CMAKE_C_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/${LIB_INSTALL_DIR}" _isSystemCLibDir)
+list(FIND CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/${LIB_INSTALL_DIR}" _isSystemCxxLibDir)
+if(${_isSystemPlatformLibDir} EQUAL -1 AND ${_isSystemCLibDir} EQUAL -1 AND ${_isSystemCxxLibDir} EQUAL -1)
+  set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${LIB_INSTALL_DIR}")
+endif()
 
 set(
   INSTALL_TARGETS_DEFAULT_ARGS
@@ -177,9 +184,10 @@ set(
   ARCHIVE DESTINATION ${LIB_INSTALL_DIR} COMPONENT Devel
 )
 
-file(RELATIVE_PATH GAMMARAY_RELATIVE_PROBE_PATH "${CMAKE_INSTALL_PREFIX}/${BIN_INSTALL_DIR}" "${CMAKE_INSTALL_PREFIX}/${PLUGIN_INSTALL_DIR}")
-file(RELATIVE_PATH GAMMARAY_RELATIVE_PROBE_TO_PLUGIN_PATH "${CMAKE_INSTALL_PREFIX}/${PLUGIN_INSTALL_DIR}/${GAMMARAY_PLUGIN_VERSION}/${GAMMARAY_PROBE_ABI}" "${CMAKE_INSTALL_PREFIX}/${PLUGIN_INSTALL_DIR}/${GAMMARAY_PLUGIN_VERSION}/${GAMMARAY_PROBE_ABI}")
-file(RELATIVE_PATH GAMMARAY_RELATIVE_BIN_TO_PLUGIN_PATH "${CMAKE_INSTALL_PREFIX}/${BIN_INSTALL_DIR}" "${CMAKE_INSTALL_PREFIX}/${PLUGIN_INSTALL_DIR}")
+# "inverse" install dirs, to find the base location again
+gammaray_inverse_dir(GAMMARAY_INVERSE_BIN_DIR "${BIN_INSTALL_DIR}")
+gammaray_inverse_dir(GAMMARAY_INVERSE_PROBE_DIR "${PLUGIN_INSTALL_DIR}/${GAMMARAY_PLUGIN_VERSION}/GAMMARAY_PROBE_ABI_DUMMY")
+gammaray_inverse_dir(GAMMARAY_INVERSE_LIBEXEC_DIR "${LIBEXEC_INSTALL_DIR}")
 
 macro_log_feature(
   HAVE_QT_CONCURRENT
@@ -212,7 +220,7 @@ macro_log_feature(
 )
 
 macro_log_feature(
-  QT_QTWEBKIT_FOUND
+  HAVE_QT_WEBKIT1
   "WebKit in Qt"
   "A Qt-based web browser engine"
   "included with Qt"
@@ -331,13 +339,6 @@ endif()
 include(CheckIncludeFiles)
 check_include_files(stdint.h HAVE_STDINT_H)
 
-# strip off sysroot for cross-compilation
-if(CMAKE_FIND_ROOT_PATH)
-  string(REPLACE "${CMAKE_FIND_ROOT_PATH}" "" GAMMARAY_LOCAL_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
-else()
-  set(GAMMARAY_LOCAL_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
-endif()
-
 include(GammaRayProbeABI) # this needs to be run after we know what exactly we are building
 
 configure_file(
@@ -348,7 +349,7 @@ configure_file(
 if(CMAKE_COMPILER_IS_GNUCXX OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
   check_cxx_compiler_flag(-Wunused-but-set-variable HAVE_GCC_UNUSED_BUT_SET)
   check_cxx_compiler_flag(-Wlogical-op HAVE_GCC_LOGICAL_OP)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated -Wextra -Woverloaded-virtual -Winit-self -Wmissing-include-dirs -Wunused -Wno-div-by-zero -Wundef -Wpointer-arith -Wcast-qual -Wcast-align -Wmissing-noreturn -Werror=return-type")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated -Wextra -Woverloaded-virtual -Winit-self -Wmissing-include-dirs -Wunused -Wno-div-by-zero -Wundef -Wpointer-arith -Wcast-qual -Wmissing-noreturn -Werror=return-type")
   if(HAVE_GCC_UNUSED_BUT_SET)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wunused-but-set-variable")
   endif()
@@ -373,36 +374,52 @@ if(CMAKE_SYSTEM_NAME MATCHES Linux OR CMAKE_SYSTEM_NAME STREQUAL GNU)
   endif()
 endif()
 
-set(GRAPHVIZ_MIN_VERSION "2.20")
-find_package(Graphviz)
-macro_log_feature(
-  GRAPHVIZ_FOUND
-  "Graphviz"
-  "Graph visualization software"
-  "http://www.graphviz.org/"
-  FALSE
-  ${GRAPHVIZ_MIN_VERSION}
-  "Needed for the state machine visualizer plugin"
-)
+if(NOT CMAKE_DISABLE_FIND_PACKAGE_GRAPHVIZ)
+  set(GRAPHVIZ_MIN_VERSION "2.20")
+  find_package(Graphviz)
+  macro_log_feature(
+    GRAPHVIZ_FOUND
+    "Graphviz"
+    "Graph visualization software"
+    "http://www.graphviz.org/"
+    FALSE
+    ${GRAPHVIZ_MIN_VERSION}
+    "Needed for the state machine visualizer plugin"
+  )
+else()
+  set(GRAPHVIZ_FOUND False)
+endif()
+set(HAVE_GRAPHVIZ ${GRAPHVIZ_FOUND})
 if(GRAPHVIZ_FOUND)
   add_definitions(-DGRAPHVIZ_MAJOR_VERSION=${GRAPHVIZ_MAJOR_VERSION} -DGRAPHVIZ_MINOR_VERSION=${GRAPHVIZ_MINOR_VERSION})
 endif()
-set(HAVE_GRAPHVIZ ${GRAPHVIZ_FOUND})
 
-#VTK discovery works a lot better if you give CMake a hint using the VTK_DIR variable
-find_path(VTK_DIR VTKConfig.cmake
-  /usr/lib64/vtk /usr/lib/vtk /usr/local/lib64/vtk /usr/local/lib/vtk
-)
-find_package(VTK)
-macro_log_feature(
-  VTK_FOUND
-  "VTK"
-  "Visualization Toolkit"
-  "http://www.vtk.org"
-  FALSE
-  ""
-  "Needed for the object visualization plugin"
-)
+if(NOT CMAKE_DISABLE_FIND_PACKAGE_VTK)
+  #VTK discovery works a lot better if you give CMake a hint using the VTK_DIR variable
+  find_path(VTK_DIR VTKConfig.cmake
+    /usr/lib64/vtk /usr/lib/vtk /usr/local/lib64/vtk /usr/local/lib/vtk
+  )
+  find_package(VTK)
+  set(VTK_MESSAGE "Needed for the object visualizer plugin")
+  if(VTK_FOUND)
+    find_path(VTK_QT_INCLUDE_DIR NAMES QVTKWidget.h HINTS ${VTK_INCLUDE_DIRS})
+    if(NOT VTK_QT_INCLUDE_DIR)
+      set(VTK_FOUND FALSE)
+      set(VTK_MESSAGE "Looks like VTK was not built with Qt (QVTKWidget is missing). Object visualizer plugin will not be built")
+    endif()
+  endif()
+  macro_log_feature(
+    VTK_FOUND
+    "VTK"
+    "Visualization Toolkit"
+    "http://www.vtk.org"
+    FALSE
+    ""
+    ${VTK_MESSAGE}
+  )
+else()
+  set(VTK_FOUND False)
+endif()
 set(HAVE_VTK ${VTK_FOUND})
 
 if(UNIX AND NOT APPLE AND NOT GAMMARAY_PROBE_ONLY_BUILD)
@@ -482,8 +499,15 @@ configure_file(
   ${CMAKE_CURRENT_BINARY_DIR}/config-gammaray.h
 )
 
+include_directories(
+  ${CMAKE_SOURCE_DIR}
+  ${CMAKE_SOURCE_DIR}/3rdparty
+  ${CMAKE_BINARY_DIR}
+)
+
 include(ExternalProject)
 
+add_subdirectory(cmake)
 add_subdirectory(common)
 add_subdirectory(core)
 add_subdirectory(hooking)
@@ -497,7 +521,9 @@ if(Qt5Widgets_FOUND OR QT_QTGUI_FOUND)
     add_subdirectory(client)
   endif()
 endif()
-add_subdirectory(tests)
+if(Qt5Test_FOUND OR QT_QTTEST_FOUND)
+  add_subdirectory(tests)
+endif()
 add_subdirectory(plugins)
 
 find_package(Doxygen)
@@ -511,8 +537,8 @@ macro_log_feature(
   "Needed to build the optional API documention"
 )
 if(DOXYGEN_FOUND)
-  file(GLOB _dox_deps include/*.dox images/*.html)
-  gammaray_all_installed_headers(_all_hdrs common core ui)
+  file(GLOB _dox_deps docs/*.dox docs/*.html)
+  gammaray_all_installed_headers(_all_hdrs)
   list(APPEND _all_hdrs ${_dox_deps})
   gammaray_join_list(DOXYGEN_INPUT " " ${_all_hdrs})
 
@@ -535,3 +561,34 @@ if(DOXYGEN_FOUND)
 endif()
 
 macro_display_feature_log()
+if(CMAKE_DISABLE_FIND_PACKAGE_VTK)
+  message(STATUS "Skipped VTK discovery due to the CMAKE_DISABLE_FIND_PACKAGE_VTK option. Object visualizer plugin will not be built")
+endif()
+if(CMAKE_DISABLE_FIND_PACKAGE_GRAPHVIZ)
+  message(STATUS "Skipped Graphviz discovery due to the CMAKE_DISABLE_FIND_PACKAGE_GRAPHVIZ option. State machine visualizer plugin will not be built")
+endif()
+
+
+#
+# CMake package config file generation
+#
+include(CMakePackageConfigHelpers)
+configure_package_config_file(${CMAKE_CURRENT_SOURCE_DIR}/GammaRayConfig.cmake.in
+                              ${CMAKE_CURRENT_BINARY_DIR}/GammaRayConfig.cmake
+                              INSTALL_DESTINATION ${CMAKECONFIG_INSTALL_DIR}
+                              PATH_VARS INCLUDE_INSTALL_DIR)
+write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/GammaRayConfigVersion.cmake
+                                 VERSION ${GAMMARAY_VERSION}
+                                 COMPATIBILITY SameMajorVersion)
+install(FILES
+  ${CMAKE_CURRENT_BINARY_DIR}/GammaRayConfig.cmake
+  ${CMAKE_CURRENT_BINARY_DIR}/GammaRayConfigVersion.cmake
+  DESTINATION ${CMAKECONFIG_INSTALL_DIR}
+)
+
+install(
+  EXPORT GammaRayTargets
+  DESTINATION "${CMAKECONFIG_INSTALL_DIR}"
+  FILE GammaRayTarget.cmake
+#     NAMESPACE GammaRay::
+)

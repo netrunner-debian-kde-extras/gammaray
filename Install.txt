@@ -1,5 +1,4 @@
 GammaRay uses the CMake buildsystem.
-You must have CMake version 2.8 or higher.
 
 Please see the comments at the top of CMakeLists.txt for
 the available configuration options you can pass to cmake.
@@ -12,8 +11,11 @@ You can change this location by passing the option
 To build a debug version pass -DCMAKE_BUILD_TYPE=Debug to cmake.
 
 To build GammaRay you will need:
- - CMake 2.8
+ - CMake 2.8.9 (or 2.8.11 on Windows)
  - Qt 4.7 or higher
+
+Optional FOSS packages (eg. VTK, Graphviz, etc) provide extra functionality.
+See the "Optional Dependencies" section below for more details.
 
 Building on Unix with gcc or clang:
 % mkdir build
@@ -28,7 +30,6 @@ Building on Windows with Microsoft Visual Studio:
 % cmake -G "NMake Makefiles" ..
 % nmake
 % nmake install
-
 
 Building on Windows with mingw:
 % mkdir build
@@ -45,6 +46,20 @@ in your execute comes from this build version.
 For example, if your Qt build is in /data/Qt/4.8 then:
  % export PATH=/data/Qt/4.8/bin:$PATH # on Linux using bash
 
+
+== Optional Dependencies ==
+GammaRay relies on optional (FOSS) dependencies to help provide some of its
+functionality.  For example, you'll need VTK (http://www.vtk.org) to build
+the object visualizer and Graphviz (http://www.graphviz.org) for the state
+machine visualizer.
+
+When you run cmake it will inform you about these missing dependencies.
+
+You can also force CMake to ignore any or all of the optional dependencies
+by passing the option -DCMAKE_DISABLE_FIND_PACKAGE_<PACKAGE>=True.
+For instance:
+# tell cmake to ignore Graphiz and VTK
+cmake -DCMAKE_DISABLE_FIND_PACKAGE_GRAPHVIZ=True -DCMAKE_DISABLE_FIND_PACKAGE_VTK=True
 
 
 == Warning! ==

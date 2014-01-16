@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -21,15 +21,15 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "config-gammaray.h"
-
 #include "probefinder.h"
+
+#include <common/paths.h>
 
 #include <qglobal.h>
 #include <QCoreApplication>
 #include <QDebug>
 #include <QDir>
-#include <QFile>
+#include <QFileInfo>
 #include <QString>
 #include <QStringBuilder>
 
@@ -40,35 +40,25 @@ namespace ProbeFinder {
 QString findProbe(const QString &baseName, const QString &probeAbi)
 {
   const QString probePath =
-    QCoreApplication::applicationDirPath() %
-    QDir::separator() %
-    QLatin1Literal(GAMMARAY_RELATIVE_PROBE_PATH) %
-    QDir::separator() %
-    QLatin1Literal(GAMMARAY_PLUGIN_VERSION) %
-    QDir::separator() %
-    probeAbi %
+    Paths::probePath(probeAbi) %
     QDir::separator() %
     baseName %
     fileExtension();
 
-  if (!QFile::exists(probePath)) {
+  const QFileInfo fi(probePath);
+  const QString canonicalPath = fi.canonicalFilePath();
+  if (!fi.isFile() || !fi.isReadable() || canonicalPath.isEmpty()) {
     qWarning() << "Cannot locate probe" << probePath;
     qWarning() << "This is likely a setup problem, due to an incomplete or partially moved installation.";
     return QString();
   }
 
-  return probePath;
+  return canonicalPath;
 }
 
 QStringList listProbeABIs()
 {
-  const QString path =
-    QCoreApplication::applicationDirPath() %
-    QDir::separator() %
-    QLatin1Literal(GAMMARAY_RELATIVE_PROBE_PATH) %
-    QDir::separator() %
-    QLatin1Literal(GAMMARAY_PLUGIN_VERSION);
-  const QDir dir(path);
+  const QDir dir(Paths::probePath(QString()));
   return dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
 }
 

@@ -30,26 +30,20 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #=============================================================================
 
-# The automoc_qt4 macro is superceded by CMAKE_AUTOMOC from CMake 2.8.6
-# A Qt 5 version is not provided by CMake or Qt.
-
-include(MacroAddFileDependencies)
-
 # Portability helpers.
 
 set(QT_QTGUI_LIBRARIES
   ${Qt5Gui_LIBRARIES}
   ${Qt5Widgets_LIBRARIES}
-  ${Qt5PrintSupport_LIBRARIES}
-  ${Qt5Svg_LIBRARIES}
 )
 
 set(QT_INCLUDES
-    ${Qt5Gui_INCLUDE_DIRS}
-    ${Qt5Widgets_INCLUDE_DIRS}
-    ${Qt5PrintSupport_INCLUDE_DIRS}
-    ${Qt5Svg_INCLUDE_DIRS}
+  ${Qt5Gui_INCLUDE_DIRS}
+  ${Qt5Widgets_INCLUDE_DIRS}
+  ${Qt5PrintSupport_INCLUDE_DIRS}
+  ${Qt5Svg_INCLUDE_DIRS}
 )
+
 set(QT_QTGUI_LIBRARY ${QT_QTGUI_LIBRARIES})
 
 set(_qt_modules
@@ -68,6 +62,7 @@ set(_qt_modules
   WebKitWidgets
   Sql
   OpenGL
+  Svg
 )
 
 foreach(_module ${_qt_modules})
@@ -78,9 +73,6 @@ foreach(_module ${_qt_modules})
     set(QT_QT${_module_upper}_FOUND ${Qt5${_module}_FOUND})
 endforeach()
 
-list(APPEND QT_QTCORE_LIBRARIES ${Qt5Concurrent_LIBRARIES})
-list(APPEND QT_QTCORE_LIBRARY ${Qt5Concurrent_LIBRARIES})
-
 set(QT_QTDECLARATIVE_LIBRARIES ${Qt5Quick1_LIBRARIES})
 set(QT_QTDECLARATIVE_LIBRARY ${Qt5Quick1_LIBRARIES})
 
@@ -90,10 +82,6 @@ endmacro()
 
 macro(qt4_wrap_cpp)
   qt5_wrap_cpp(${ARGN})
-endmacro()
-
-macro(qt4_generate_moc)
-  qt5_generate_moc(${ARGN})
 endmacro()
 
 macro(qt4_add_dbus_adaptor)

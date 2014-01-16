@@ -1,14 +1,6 @@
 #
 # Shared code between in-process and out-of-process UI
 #
-include_directories(
-  ${CMAKE_CURRENT_SOURCE_DIR}
-  ${CMAKE_CURRENT_BINARY_DIR}
-  ${CMAKE_SOURCE_DIR}
-  ${CMAKE_BINARY_DIR}
-  ${CMAKE_SOURCE_DIR}/3rdparty
-)
-
 set(gammaray_ui_srcs
   ${CMAKE_SOURCE_DIR}/3rdparty/kde/krecursivefilterproxymodel.cpp
   ${CMAKE_SOURCE_DIR}/3rdparty/kde/kfilterproxysearchline.cpp
@@ -63,7 +55,12 @@ target_link_libraries(gammaray_ui
   gammaray_common_internal
 )
 
-install(TARGETS gammaray_ui ${INSTALL_TARGETS_DEFAULT_ARGS})
+target_link_libraries(gammaray_ui LINK_INTERFACE_LIBRARIES
+  gammaray_common
+  ${QT_QTGUI_LIBRARIES}
+)
+
+install(TARGETS gammaray_ui EXPORT GammaRayTargets ${INSTALL_TARGETS_DEFAULT_ARGS})
 
 set(gammaray_ui_internal_srcs
   sidepane.cpp

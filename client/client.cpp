@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2013-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -51,14 +51,19 @@ bool Client::isRemoteClient() const
   return true;
 }
 
+QString Client::serverAddress() const
+{
+  return m_hostName;
+}
+
 void Client::connectToHost(const QString &hostName, quint16 port)
 {
-  qDebug() << Q_FUNC_INFO << hostName << ':' << port;
   QTcpSocket *sock = new QTcpSocket(this);
   connect(sock, SIGNAL(connected()), SLOT(socketConnected()));
   connect(sock, SIGNAL(error(QAbstractSocket::SocketError)), SLOT(socketError()));
   sock->connectToHost(hostName, port);
   m_initState = 0;
+  m_hostName = hostName;
 }
 
 void Client::socketConnected()

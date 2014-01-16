@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -24,9 +24,11 @@
 #include "webinspector.h"
 #include "webviewmodel.h"
 
+#include <common/endpoint.h>
 #include <core/objecttypefilterproxymodel.h>
 #include <core/probeinterface.h>
 #include <core/singlecolumnobjectproxymodel.h>
+#include <core/probesettings.h>
 
 #include <QtPlugin>
 
@@ -41,7 +43,8 @@ WebInspector::WebInspector(ProbeInterface *probe, QObject *parent)
 
   connect(probe->probe(), SIGNAL(objectCreated(QObject*)), SLOT(objectAdded(QObject*)));
 
-  qputenv("QTWEBKIT_INSPECTOR_SERVER", "0.0.0.0:11733"); // TODO set based on Server address/port
+  const QString serverAddress = ProbeSettings::value("TCPServer", QLatin1String("0.0.0.0")).toString();
+  qputenv("QTWEBKIT_INSPECTOR_SERVER", serverAddress.toLocal8Bit() + ':' + QByteArray::number(Endpoint::defaultPort() + 1));
 }
 
 void WebInspector::objectAdded(QObject* obj)
@@ -64,6 +67,36 @@ void WebInspector::objectAdded(QObject* obj)
   if (!prefs)
     return;
   prefs->setProperty("developerExtrasEnabled", true);
+}
+
+
+WebInspectorFactory::WebInspectorFactory(QObject* parent): QObject(parent)
+{
+}
+
+QString WebInspectorFactory::id() const
+{
+  return WebInspector::staticMetaObject.className();
+}
+
+void WebInspectorFactory::init(ProbeInterface* probe)
+{
+  new WebInspector(probe, probe->probe());
+}
+
+QStringList WebInspectorFactory::supportedTypes() const
+{
+  QStringList types;
+#ifdef HAVE_QT_WEBKIT1
+  types.push_back(QWebPage::staticMetaObject.className();
+#endif
+  types.push_back("QQuickWebView");
+  return types;
+}
+
+QString WebInspectorFactory::name() const
+{
+  return tr("Web Pages");
 }
 
 #if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)

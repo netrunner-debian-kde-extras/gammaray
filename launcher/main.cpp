@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -29,6 +29,8 @@
 #include "launcher.h"
 #include "probefinder.h"
 
+#include <common/paths.h>
+
 #ifdef HAVE_QT_WIDGETS
 #include <QApplication>
 #else
@@ -36,6 +38,7 @@
 #endif
 
 #include <QDebug>
+#include <QDir>
 #include <QStringList>
 
 using namespace GammaRay;
@@ -46,7 +49,7 @@ QTextStream err(stderr);
 static void usage(const char *argv0)
 {
   out << "Usage: " << argv0
-      << " [--injector <injector>] [--pid <pid> | <application> <args>]" << endl;
+      << " [options] [--pid <pid> | <application> <args> | --connect <host>[:<port>]]" << endl;
   out << "" << endl;
   out << "Inspect runtime internals of a Qt-application, such as:" << endl;
   out << "  QObject tree, properties, signal/slots, widgets, models," << endl;
@@ -54,18 +57,19 @@ static void usage(const char *argv0)
   out << "  state machines, meta types, fonts, codecs, text documents" << endl;
   out << "" << endl;
   out << "Options:" << endl;
-  out << " -i, --injector <injector>\tset injection type, possible values:" << endl;
-  out << "                          \t" << InjectorFactory::availableInjectors().join(", ")
+  out << " -i, --injector <injector>  \tset injection type, possible values:" << endl;
+  out << "                            \t" << InjectorFactory::availableInjectors().join(", ")
       << endl;
-  out << " -p, --pid <pid>          \tattach to running Qt application" << endl;
-  out << "     --inprocess          \tuse in-process UI" << endl;
-  out << "     --inject-only        \tonly inject the probe, don't show the UI" << endl;
-  out << "     --listen <address>   \tspecify the address the server should listen on [default: 0.0.0.0]" << endl;
-  out << "     --no-listen          \tdisables remote access entirely (implies --inprocess)" << endl;
-  out << "     --list-probes        \tlist all installed probes" << endl;
-  out << "     --probe <abi>        \tspecify which probe to use" << endl;
-  out << " -h, --help               \tprint program help and exit" << endl;
-  out << " -v, --version            \tprint program version and exit" << endl;
+  out << " -p, --pid <pid>            \tattach to running Qt application" << endl;
+  out << "     --inprocess            \tuse in-process UI" << endl;
+  out << "     --inject-only          \tonly inject the probe, don't show the UI" << endl;
+  out << "     --listen <address>     \tspecify the address the server should listen on [default: 0.0.0.0]" << endl;
+  out << "     --no-listen            \tdisables remote access entirely (implies --inprocess)" << endl;
+  out << "     --list-probes          \tlist all installed probes" << endl;
+  out << "     --probe <abi>          \tspecify which probe to use" << endl;
+  out << "     --connect <host>[:port]\tconnect to an already injected target" << endl;
+  out << " -h, --help                 \tprint program help and exit" << endl;
+  out << " -v, --version              \tprint program version and exit" << endl;
 #ifdef HAVE_QT_WIDGETS
   out << endl
       << "When run without any options, " << argv0 << " will present a list of running\n"
@@ -102,6 +106,7 @@ int main(int argc, char **argv)
 #else
   QCoreApplication app(argc, argv);
 #endif
+  Paths::setRelativeRootPath(GAMMARAY_INVERSE_BIN_DIR);
 
   QStringList builtInArgs = QStringList() << QLatin1String("-style")
                                           << QLatin1String("-stylesheet")
@@ -124,7 +129,7 @@ int main(int argc, char **argv)
     }
     if (arg == QLatin1String("-v") || arg == QLatin1String("--version")) {
       out << PROGRAM_NAME << " version " << GAMMARAY_VERSION_STRING << endl;
-      out << "Copyright (C) 2010-2013 Klaralvdalens Datakonsult AB, "
+      out << "Copyright (C) 2010-2014 Klaralvdalens Datakonsult AB, "
           << "a KDAB Group company, info@kdab.com" << endl;
       return 0;
     }
@@ -153,6 +158,19 @@ int main(int argc, char **argv)
         return 1;
       }
       options.setProbeABI(abi);
+    }
+    if ( arg == QLatin1String("--connect") && !args.isEmpty()) {
+      QString host = args.takeFirst();
+      quint16 port = 0;
+      const int pos = host.lastIndexOf(":");
+      if (pos > 0) {
+        port = host.mid(pos + 1).toUShort();
+        host = host.left(pos);
+      }
+      ClientLauncher client;
+      client.launch(host, port);
+      client.waitForFinished();
+      return 0;
     }
 
     // debug/test options

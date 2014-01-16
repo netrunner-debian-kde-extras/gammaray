@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2013-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -21,8 +21,9 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "config-gammaray.h"
 #include "launcherfinder.h"
+
+#include <common/paths.h>
 
 #include <QCoreApplication>
 #include <QDebug>
@@ -46,18 +47,14 @@ QString LauncherFinder::findLauncher(LauncherFinder::Type type)
 
   QStringList appPaths; //a list of all the paths we have searched
 
-  QString appPath =
-    QCoreApplication::applicationDirPath() + QDir::separator() + fileName;
+  QString appPath = Paths::binPath() + QDir::separator() + fileName;
   QFileInfo fi(appPath);
   if (fi.isExecutable()) {
     return fi.absoluteFilePath();
   }
   appPaths.append(appPath);
 
-  appPath =
-    QLatin1String(GAMMARAY_LOCAL_INSTALL_PREFIX) +
-    QDir::separator() + QLatin1String(GAMMARAY_LIBEXEC_INSTALL_DIR) + \
-    QDir::separator() + fileName;
+  appPath = Paths::libexecPath() + QDir::separator() + fileName;
   if(!appPaths.contains(appPath)) {
     fi.setFile(appPath);
     if (fi.isExecutable()) {

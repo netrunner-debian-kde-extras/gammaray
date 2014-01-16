@@ -1,6 +1,6 @@
 # GammaRay-specific CMake macros that don't make sense outside of the GammaRay source tree.
 
-#  Copyright (c) 2013 Klarälvdalens Datakonsult AB, a KDAB Group company <info@kdab.com>
+#  Copyright (c) 2013-2014 Klarälvdalens Datakonsult AB, a KDAB Group company <info@kdab.com>
 
 # Author: Volker Krause <volker.krause@kdab.com>
 #
@@ -12,11 +12,16 @@ macro(gammaray_install_headers)
     install(FILES ${ARGN} DESTINATION ${INCLUDE_INSTALL_DIR}/${_dir})
   endif()
   set_directory_properties(PROPERTIES GAMMARAY_INSTALLED_HEADERS "${ARGN}")
+
+  get_property(_include_dirs GLOBAL PROPERTY GAMMARAY_HEADER_DIRS)
+  list(APPEND _include_dirs "${_dir}")
+  set_property(GLOBAL PROPERTY GAMMARAY_HEADER_DIRS "${_include_dirs}")
 endmacro()
 
 macro(gammaray_all_installed_headers _var)
   set(${_var} "")
-  foreach(_dir ${ARGN})
+  get_property(_include_dirs GLOBAL PROPERTY GAMMARAY_HEADER_DIRS)
+  foreach(_dir ${_include_dirs})
     get_directory_property(_hdrs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${_dir} GAMMARAY_INSTALLED_HEADERS)
     foreach(_hdr ${_hdrs})
       list(APPEND ${_var} "${CMAKE_CURRENT_SOURCE_DIR}/${_dir}/${_hdr}")
@@ -29,4 +34,8 @@ macro(gammaray_join_list _var _sep)
   foreach(_element ${ARGN})
     set(${_var} "${${_var}}${_sep}${_element}")
   endforeach()
+endmacro()
+
+macro(gammaray_inverse_dir _var _prefix)
+  file(RELATIVE_PATH ${_var} "${CMAKE_INSTALL_PREFIX}/${_prefix}" "${CMAKE_INSTALL_PREFIX}")
 endmacro()

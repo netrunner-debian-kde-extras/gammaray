@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -39,6 +39,18 @@ class ObjectDynamicPropertyModel : public ObjectPropertyModel
     Qt::ItemFlags flags(const QModelIndex &index) const;
     int columnCount(const QModelIndex &parent = QModelIndex()) const;
     int rowCount(const QModelIndex &parent = QModelIndex()) const;
+
+    bool eventFilter(QObject *receiver, QEvent *event);
+
+protected:
+    void monitorObject(QObject *obj);
+    void unmonitorObject(QObject *obj);
+
+private slots:
+    void updatePropertyCount();
+
+private:
+    int m_propertyCount;
 };
 
 }

@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2012-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2012-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -32,7 +32,7 @@
 namespace GammaRay {
 
 /**
- * Model showing the content of a QPalette.
+ * @brief Model showing the content of a QPalette.
  */
 class GAMMARAY_UI_EXPORT PaletteModel : public QAbstractTableModel
 {
@@ -44,6 +44,7 @@ class GAMMARAY_UI_EXPORT PaletteModel : public QAbstractTableModel
     void setPalette(const QPalette &palette);
     void setEditable(bool editable);
 
+    ///@cond override
     virtual QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const;
 
     virtual int columnCount(const QModelIndex &parent = QModelIndex()) const;
@@ -56,6 +57,7 @@ class GAMMARAY_UI_EXPORT PaletteModel : public QAbstractTableModel
     virtual Qt::ItemFlags flags(const QModelIndex &index) const;
 
     virtual bool setData(const QModelIndex &index, const QVariant &value, int role = Qt::EditRole);
+    ///@endcond
 
   private:
     QPalette m_palette;

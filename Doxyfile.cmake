@@ -88,7 +88,9 @@ FILE_PATTERNS          = *.cpp \
                          *.hpp \
                          *.dox
 RECURSIVE              = YES
-EXCLUDE                = 
+EXCLUDE                = @CMAKE_SOURCE_DIR@/common/gammaray_common_export.h \
+                         @CMAKE_SOURCE_DIR@/core/gammaray_core_export.h \
+			 @CMAKE_SOURCE_DIR@/ui/gammaray_ui_export.h
 EXCLUDE_SYMLINKS       = NO
 EXCLUDE_PATTERNS       = */.svn/* \
                          */.git/* \
@@ -104,7 +106,7 @@ EXCLUDE_PATTERNS       = */.svn/* \
 EXAMPLE_PATH           = 
 EXAMPLE_PATTERNS       = *
 EXAMPLE_RECURSIVE      = NO
-IMAGE_PATH             = @CMAKE_SOURCE_DIR@/images
+IMAGE_PATH             = @CMAKE_SOURCE_DIR@/docs
 INPUT_FILTER           = 
 FILTER_PATTERNS        = 
 FILTER_SOURCE_FILES    = NO
@@ -132,7 +134,7 @@ GENERATE_HTML          = YES
 HTML_OUTPUT            = html
 HTML_FILE_EXTENSION    = .html
 HTML_HEADER            =
-HTML_FOOTER            = @CMAKE_SOURCE_DIR@/images/footer.html
+HTML_FOOTER            = @CMAKE_SOURCE_DIR@/docs/footer.html
 HTML_STYLESHEET        =
 HTML_ALIGN_MEMBERS     = YES
 GENERATE_HTMLHELP      = NO

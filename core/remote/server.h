@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2013-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -24,18 +24,21 @@
 #ifndef GAMMARAY_SERVER_H
 #define GAMMARAY_SERVER_H
 
+#include "../gammaray_core_export.h"
+
 #include <common/endpoint.h>
 #include <common/objectbroker.h>
 
 class QTcpServer;
 class QUdpSocket;
 class QTimer;
-class QSignalSpy;
 
 namespace GammaRay {
 
+class MultiSignalMapper;
+
 /** Server side connection endpoint. */
-class Server : public Endpoint
+class GAMMARAY_CORE_EXPORT Server : public Endpoint
 {
   Q_OBJECT
   public:
@@ -49,10 +52,17 @@ class Server : public Endpoint
 
     /** Register a new object with name @p objectName as a destination for messages.
      *  New messages to that object are passed to the slot @p messageHandlerName on @p receiver.
-     *  If the object is unused on the client side it might be useful to disable sending out signals or
-     *  other expensive operations, when this state changes the slot @p monitorNotifier is called.
      */
-    Protocol::ObjectAddress registerObject(const QString &objectName, QObject* receiver, const char* messageHandlerName, const char* monitorNotifier = 0);
+    Protocol::ObjectAddress registerObject(const QString &objectName, QObject* receiver, const char* messageHandlerName);
+
+    /**
+     * Register a callback slot @p monitorNotifier on object @p receiver that is called if the usage
+     * of an object with address @p address changes on the client side.
+     *
+     * This is useful for example to disable expensive operations like sending large amounts of
+     * data if nobody is interested anyway.
+     */
+    void registerMonitorNotifier(Protocol::ObjectAddress address, QObject *receiver, const char* monitorNotifier);
 
     /** Singleton accessor. */
     static Server* instance();
@@ -63,6 +73,7 @@ class Server : public Endpoint
     virtual void invokeObject(const QString &objectName, const char *method, const QVariantList &args = QVariantList()) const;
 
     bool isRemoteClient() const;
+    QString serverAddress() const;
     quint16 port() const;
   protected:
     void messageReceived(const Message& msg);
@@ -76,7 +87,7 @@ class Server : public Endpoint
     /**
      * Forward the signal that triggered the call to this slot to the remote client if connected.
      */
-    void forwardSignal() const;
+    void forwardSignal(QObject* sender, int signalIndex, const QVector<QVariant> &args);
 
   private:
     QTcpServer *m_tcpServer;
@@ -87,8 +98,7 @@ class Server : public Endpoint
     QTimer* m_broadcastTimer;
     QUdpSocket* m_broadcastSocket;
 
-    // maps registered objects to a map of signal index to signal spy
-    QHash<QObject*, QHash<int, QSignalSpy*> > m_signalForwards;
+    MultiSignalMapper* m_signalMapper;
 };
 
 }

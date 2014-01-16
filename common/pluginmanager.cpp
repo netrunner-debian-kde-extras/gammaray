@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Kevin Funk <kevin.funk@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -22,8 +22,7 @@
 */
 
 #include "pluginmanager.h"
-
-#include "config-gammaray.h"
+#include "paths.h"
 
 #include <QCoreApplication>
 #include <QStringList>
@@ -40,10 +39,8 @@
 using namespace GammaRay;
 using namespace std;
 
-PluginManagerBase::PluginManagerBase(const QString &pluginPath, QObject *parent) : m_parent(parent)
+PluginManagerBase::PluginManagerBase(QObject *parent) : m_parent(parent)
 {
-  QCoreApplication::addLibraryPath(pluginPath);
-  QCoreApplication::addLibraryPath(QLatin1String(GAMMARAY_LOCAL_INSTALL_PREFIX) + QDir::separator() + QLatin1String(GAMMARAY_PLUGIN_INSTALL_DIR));
 }
 
 PluginManagerBase::~PluginManagerBase()
@@ -53,10 +50,7 @@ PluginManagerBase::~PluginManagerBase()
 QStringList PluginManagerBase::pluginPaths() const
 {
   QStringList pluginPaths;
-  foreach (const QString &libraryPath, QCoreApplication::libraryPaths()) {
-    pluginPaths << libraryPath + QDir::separator() + GAMMARAY_PLUGIN_VERSION + QDir::separator() + GAMMARAY_PROBE_ABI;
-  }
-
+  pluginPaths.push_back(Paths::currentProbePath());
   return pluginPaths;
 }
 

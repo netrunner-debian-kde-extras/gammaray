@@ -1,10 +1,3 @@
-include_directories(
-  ${CMAKE_SOURCE_DIR}
-  ${CMAKE_SOURCE_DIR}/3rdparty
-  ${CMAKE_BINARY_DIR}
-  ${CMAKE_CURRENT_BINARY_DIR}
-)
-
 set(gammaray_client_srcs
   main.cpp
   client.cpp
@@ -31,5 +24,9 @@ target_link_libraries(gammaray-client
 if(QNXNTO)
   target_link_libraries(gammaray-client cpp)
 endif()
+
+set_target_properties(gammaray-client PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/${LIBEXEC_INSTALL_DIR}"
+)
 
 install(TARGETS gammaray-client DESTINATION ${LIBEXEC_INSTALL_DIR})

@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2013-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Milian Wolff <milian.wolff@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -35,7 +35,7 @@ class QTreeView;
 namespace GammaRay {
 
 /**
- * A utility helper to configure views for remote content.
+ * @brief A utility helper to configure views for remote content.
  *
  * When @p expandNewContent is set to true, the tree view will stay expanded
  * when new content is added to the model.
@@ -43,7 +43,7 @@ namespace GammaRay {
  * When @p selectNewContent is set to true, the tree view will select new content,
  * if no selection is already present.
  *
- * NOTE: The tree view's model and selectionModel must be set beforehand and not
+ * @note The tree view's model and selectionModel must be set beforehand and not
  * be changed afterwards!
  */
 class GAMMARAY_UI_EXPORT DeferredTreeViewConfiguration : public QObject

@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2011-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2011-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -32,7 +32,7 @@
 
 namespace GammaRay {
 
-/** Compile-time introspection adaptor for non-QObject classes. */
+/** @brief Compile-time introspection adaptor for non-QObject classes. */
 class GAMMARAY_CORE_EXPORT MetaObject
 {
   public:
@@ -80,7 +80,7 @@ class GAMMARAY_CORE_EXPORT MetaObject
     QString m_className;
 };
 
-/** Template implementation of MetaObject. */
+/** @brief Template implementation of MetaObject. */
 template <typename T, typename Base1 = void, typename Base2 = void, typename Base3 = void>
 class MetaObjectImpl : public MetaObject
 {

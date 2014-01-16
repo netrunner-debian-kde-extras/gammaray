@@ -1,11 +1,3 @@
-include_directories(
-  ${CMAKE_SOURCE_DIR}
-  ${CMAKE_SOURCE_DIR}/3rdparty
-  ${CMAKE_CURRENT_SOURCE_DIR}
-  ${CMAKE_BINARY_DIR}
-  ${CMAKE_CURRENT_BINARY_DIR}
-)
-
 set(gammaray_srcs
   ${CMAKE_SOURCE_DIR}/3rdparty/qt/resourcemodel.cpp
 
@@ -106,7 +98,7 @@ set_target_properties(gammaray_core PROPERTIES
 )
 
 if(Qt5Core_FOUND)
-  target_link_libraries(gammaray_core Qt5::Gui Qt5::Test)
+  target_link_libraries(gammaray_core Qt5::Gui)
 else()
   target_link_libraries(gammaray_core
     ${QT_QTCORE_LIBRARIES}
@@ -115,12 +107,11 @@ else()
   )
 endif()
 
-if(NOT WIN32 AND NOT QNXNTO)
-  target_link_libraries(gammaray_core dl)
-endif()
-install(TARGETS gammaray_core ${INSTALL_TARGETS_DEFAULT_ARGS})
+target_link_libraries(gammaray_core LINK_INTERFACE_LIBRARIES gammaray_common ${QT_QTCORE_LIBRARIES})
+install(TARGETS gammaray_core EXPORT GammaRayTargets ${INSTALL_TARGETS_DEFAULT_ARGS})
 
 gammaray_install_headers(
+  gammaray_core_export.h
   metaobject.h
   metaobjectrepository.h
   objectmodelbase.h

@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2013-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -36,7 +36,8 @@ namespace GammaRay {
 
 class Message;
 
-/** Network protocol endpoint.
+/** @brief Network protocol endpoint.
+ *
  *  Contains:
  *  - object address <-> object name mapping
  *  - message handler registration and message dispatching
@@ -99,6 +100,12 @@ public:
    * Returns true for remote clients and false for the in-probe server endpoint.
    */
   virtual bool isRemoteClient() const = 0;
+
+  /**
+   * Returns the address of the server, in case you need to connect to a different service there
+   * (such as the web inspector server).
+   */
+  virtual QString serverAddress() const = 0;
 
 signals:
   /** Emitted when we lost the connection to the other endpoint. */

@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2013-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -33,7 +33,7 @@ class QAbstractItemModel;
 
 namespace GammaRay {
 
-/** Retrieve/expose objects independent of whether using in-process or out-of-process UI. */
+/** @brief Retrieve/expose objects independent of whether using in-process or out-of-process UI. */
 namespace ObjectBroker {
 
   /** Register a newly created QObject under the given name. */

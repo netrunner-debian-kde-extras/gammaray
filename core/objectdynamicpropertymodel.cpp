@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -22,12 +22,16 @@
 */
 
 #include "objectdynamicpropertymodel.h"
+#include "varianthandler.h"
+
+#include <QEvent>
 
 using namespace GammaRay;
 
 ObjectDynamicPropertyModel::ObjectDynamicPropertyModel(QObject *parent)
   : ObjectPropertyModel(parent)
 {
+  connect(this, SIGNAL(modelReset()), SLOT(updatePropertyCount()));
 }
 
 QVariant ObjectDynamicPropertyModel::data(const QModelIndex &index, int role) const
@@ -48,7 +52,7 @@ QVariant ObjectDynamicPropertyModel::data(const QModelIndex &index, int role) co
     if (index.column() == 0) {
       return QString::fromUtf8(propName);
     } else if (index.column() == 1) {
-      return propValue;
+      return role == Qt::EditRole ? propValue : VariantHandler::displayString(propValue);
     } else if (index.column() == 2) {
       return propValue.typeName();
     }
@@ -71,6 +75,7 @@ bool ObjectDynamicPropertyModel::setData(const QModelIndex &index, const QVarian
   if (role == Qt::EditRole) {
     const QByteArray propName = propNames.at(index.row());
     m_obj.data()->setProperty(propName, value);
+    emit dataChanged(index, index);
     return true;
   }
 
@@ -104,3 +109,32 @@ int ObjectDynamicPropertyModel::rowCount(const QModelIndex &parent) const
   return m_obj.data()->dynamicPropertyNames().size();
 }
 
+void ObjectDynamicPropertyModel::monitorObject(QObject* obj)
+{
+  obj->installEventFilter(this);
+}
+
+void ObjectDynamicPropertyModel::unmonitorObject(QObject* obj)
+{
+  obj->removeEventFilter(this);
+}
+
+bool ObjectDynamicPropertyModel::eventFilter(QObject* receiver, QEvent* event)
+{
+  if (receiver == m_obj && event->type() == QEvent::DynamicPropertyChange) {
+    const int newPropertyCount = m_obj->dynamicPropertyNames().size();
+    if (newPropertyCount != m_propertyCount) {
+      // FIXME: this can be done more efficiently...
+      reset();
+    } else {
+      // FIXME: send dataChanged for the affected cell only
+      updateAll();
+    }
+  }
+  return ObjectPropertyModel::eventFilter(receiver, event);
+}
+
+void ObjectDynamicPropertyModel::updatePropertyCount()
+{
+  m_propertyCount = rowCount();
+}

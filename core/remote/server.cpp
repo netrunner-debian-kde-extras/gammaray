@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2013-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -24,6 +24,7 @@
 #include "server.h"
 #include "probe.h"
 #include "probesettings.h"
+#include "multisignalmapper.h"
 
 #include <common/protocol.h>
 #include <common/message.h>
@@ -34,7 +35,6 @@
 #include <QTimer>
 #include <QMetaMethod>
 #include <QNetworkInterface>
-#include <QSignalSpy>
 
 #include <iostream>
 
@@ -46,7 +46,8 @@ Server::Server(QObject *parent) :
   m_tcpServer(new QTcpServer(this)),
   m_nextAddress(endpointAddress()),
   m_broadcastTimer(new QTimer(this)),
-  m_broadcastSocket(new QUdpSocket(this))
+  m_broadcastSocket(new QUdpSocket(this)),
+  m_signalMapper(new MultiSignalMapper(this))
 {
   if (!ProbeSettings::value("RemoteAccessEnabled", true).toBool())
     return;
@@ -71,6 +72,9 @@ Server::Server(QObject *parent) :
     connect(m_broadcastTimer, SIGNAL(timeout()), SLOT(broadcast()));
     connect(this, SIGNAL(disconnected()), m_broadcastTimer, SLOT(start()));
   }
+
+  connect(m_signalMapper, SIGNAL(signalEmitted(QObject*,int,QVector<QVariant>)),
+          this, SLOT(forwardSignal(QObject*,int,QVector<QVariant>)));
 }
 
 Server::~Server()
@@ -86,6 +90,11 @@ Server* Server::instance()
 bool Server::isRemoteClient() const
 {
   return false;
+}
+
+QString Server::serverAddress() const
+{
+  return QHostAddress(QHostAddress::LocalHost).toString();
 }
 
 void Server::newConnection()
@@ -132,7 +141,7 @@ void Server::messageReceived(const Message& msg)
         const QHash<Protocol::ObjectAddress, QPair<QObject*, QByteArray> >::const_iterator it = m_monitorNotifiers.constFind(addr);
         if (it == m_monitorNotifiers.constEnd())
           break;
-        cout << Q_FUNC_INFO << " un/monitor " << addr;
+        //cout << Q_FUNC_INFO << " un/monitor " << (int)addr << endl;
         QMetaObject::invokeMethod(it.value().first, it.value().second, Q_ARG(bool, msg.type() == Protocol::ObjectMonitored));
         break;
       }
@@ -165,55 +174,45 @@ Protocol::ObjectAddress Server::registerObject(const QString &name, QObject *obj
   }
 
   const QMetaObject *meta = object->metaObject();
-
-  QHash<int, QSignalSpy*>& signalForwards = m_signalForwards[object];
   for(int i = 0; i < meta->methodCount(); ++i) {
-    QMetaMethod method = meta->method(i);
+    const QMetaMethod method = meta->method(i);
     if (method.methodType() == QMetaMethod::Signal) {
-      #if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
-        QByteArray signature = method.signature();
-      #else
-        QByteArray signature = method.methodSignature();
-      #endif
-
-      // simulate SIGNAL() macro by prepending magic number.
-      signature.prepend(QSIGNAL_CODE);
-      QSignalSpy *spy = new QSignalSpy(object, signature);
-      spy->setParent(object);
-      signalForwards[i] = spy;
-      connect(object, signature, this, SLOT(forwardSignal()));
+      m_signalMapper->connectToSignal(object, method);
     }
   }
 
   return address;
 }
 
-void Server::forwardSignal() const
+void Server::forwardSignal(QObject* sender, int signalIndex, const QVector< QVariant >& args)
 {
-  Q_ASSERT(sender());
-  QSignalSpy *spy = m_signalForwards.value(sender()).value(senderSignalIndex());
-  Q_ASSERT(spy->count() == 1);
-
-  if (!isConnected()) {
-    spy->clear();
+  if (!isConnected())
     return;
-  }
 
-  QByteArray name = spy->signal();
+  Q_ASSERT(sender);
+  Q_ASSERT(signalIndex >= 0);
+  const QMetaMethod signal = sender->metaObject()->method(signalIndex);
+  Q_ASSERT(signal.methodType() == QMetaMethod::Signal);
+
+#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
+  QByteArray name = signal.signature();
+#else
+  QByteArray name = signal.methodSignature();
+#endif
   // get the name of the function to invoke, excluding the parens and function arguments.
   name = name.mid(0, name.indexOf('('));
-  QVariantList args = spy->takeFirst();
-  Endpoint::invokeObject(sender()->objectName(), name, args);
+
+  QVariantList v;
+  foreach(const QVariant &arg, args)
+    v.push_back(arg);
+  Endpoint::invokeObject(sender->objectName(), name, v);
 }
 
-Protocol::ObjectAddress Server::registerObject(const QString& objectName, QObject* receiver, const char* messageHandlerName, const char* monitorNotifier)
+Protocol::ObjectAddress Server::registerObject(const QString& objectName, QObject* receiver, const char* messageHandlerName)
 {
   registerObjectInternal(objectName, ++m_nextAddress);
   Q_ASSERT(m_nextAddress);
   registerMessageHandlerInternal(m_nextAddress, receiver, messageHandlerName);
-
-  if (monitorNotifier)
-    m_monitorNotifiers.insert(m_nextAddress, qMakePair<QObject*, QByteArray>(receiver, monitorNotifier));
 
   if (isConnected()) {
     Message msg(endpointAddress(), Protocol::ObjectAdded);
@@ -222,6 +221,15 @@ Protocol::ObjectAddress Server::registerObject(const QString& objectName, QObjec
   }
 
   return m_nextAddress;
+}
+
+void Server::registerMonitorNotifier(Protocol::ObjectAddress address, QObject* receiver, const char* monitorNotifier)
+{
+  Q_ASSERT(address != Protocol::InvalidObjectAddress);
+  Q_ASSERT(receiver);
+  Q_ASSERT(monitorNotifier);
+
+  m_monitorNotifiers.insert(address, qMakePair<QObject*, QByteArray>(receiver, monitorNotifier));
 }
 
 void Server::handlerDestroyed(Protocol::ObjectAddress objectAddress, const QString& objectName)
@@ -238,8 +246,7 @@ void Server::handlerDestroyed(Protocol::ObjectAddress objectAddress, const QStri
 
 void Server::objectDestroyed(Protocol::ObjectAddress /*objectAddress*/, const QString &objectName, QObject *object)
 {
-  m_signalForwards.remove(object);
-
+  Q_UNUSED(object);
   unregisterObjectInternal(objectName);
 
   if (isConnected()) {

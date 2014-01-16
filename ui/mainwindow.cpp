@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -75,7 +75,7 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent), ui(new Ui::MainWin
     QGuiPlatformPlugin defaultGuiPlatform;
     defaultStyle = QStyleFactory::create(defaultGuiPlatform.styleName());
 #else
-    foreach (const QString &styleName, QGuiApplicationPrivate::platform_theme->defaultThemeHint(QPlatformTheme::StyleNames).toStringList()) {
+    foreach (const QString &styleName, QGuiApplicationPrivate::platform_theme->themeHint(QPlatformTheme::StyleNames).toStringList()) {
       if ((defaultStyle = QStyleFactory::create(styleName))) {
         break;
       }
@@ -127,6 +127,11 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent), ui(new Ui::MainWin
   connect(ui->toolSelector->model(), SIGNAL(rowsInserted(QModelIndex,int,int)), this, SLOT(selectInitialTool()));
   connect(ui->toolSelector->model(), SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(selectInitialTool()));
 
+#ifdef Q_OS_MAC
+  ui->groupBox->setFlat(true);
+  ui->horizontalLayout->setContentsMargins(0, 0, 0, 0);
+#endif
+
   // get some sane size on startup
   resize(1024, 768);
 }
@@ -142,7 +147,7 @@ void MainWindow::about()
   dialog.setTitle(tr("<b>%1 %2</b><p>%3").arg(progName).arg(progVersion).arg(progDesc));
   dialog.setText(
     trUtf8("<qt>"
-           "<p>Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, "
+           "<p>Copyright (C) 2010-2014 Klarälvdalens Datakonsult AB, "
            "a KDAB Group company, <a href=\"mailto:info@kdab.com\">info@kdab.com</a></p>"
            "<p><u>Authors:</u><br>"
            "Allen Winter &lt;allen.winter@kdab.com&gt;<br>"
@@ -225,7 +230,13 @@ void MainWindow::toolSelected()
   Q_ASSERT(toolWidget);
   if (ui->toolStack->indexOf(toolWidget) < 0) { // newly created
     if (toolWidget->layout()) {
+#ifndef Q_OS_MAC
       toolWidget->layout()->setContentsMargins(11, 0, 0, 0);
+#else
+      QMargins margins = toolWidget->layout()->contentsMargins();
+      margins.setLeft(0);
+      toolWidget->layout()->setContentsMargins(margins);
+#endif
     }
     ui->toolStack->addWidget(toolWidget);
   }

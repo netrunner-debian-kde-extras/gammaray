@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2013-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -30,22 +30,22 @@
 
 namespace GammaRay {
 
-/** Variant conversion functions, extendable by plugins. */
+/** @brief Variant conversion functions, extendable by plugins. */
 namespace VariantHandler
 {
-  /** @internal */
+  ///@cond internal
   template <typename RetT> struct Converter
   {
     virtual RetT operator() (const QVariant &v) = 0;
   };
 
-  /** @internal */
   template <typename RetT, typename InputT, typename FuncT> struct ConverterImpl : public Converter<RetT>
   {
     explicit inline ConverterImpl(FuncT converter) : f(converter) {}
     /*override*/ inline RetT operator() (const QVariant &v) { return f(v.value<InputT>()); }
     FuncT f;
   };
+  ///@endcond
 
   /**
    * Returns a human readable string version of the QVariant value.

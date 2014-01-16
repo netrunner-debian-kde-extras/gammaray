@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2012-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2012-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -24,6 +24,8 @@
 #ifndef GAMMARAY_KJOBTRACKERWIDGET_H
 #define GAMMARAY_KJOBTRACKERWIDGET_H
 
+#include <ui/tooluifactory.h>
+
 #include <QWidget>
 
 namespace GammaRay {
@@ -41,6 +43,13 @@ class KJobTrackerWidget : public QWidget
 
   private:
     QScopedPointer<Ui::KJobTrackerWidget> ui;
+};
+
+class KJobTrackerUiFactory : public QObject, public StandardToolUiFactory<KJobTrackerWidget>
+{
+  Q_OBJECT
+  Q_INTERFACES(GammaRay::ToolUiFactory)
+  Q_PLUGIN_METADATA(IID "com.kdab.gammaray.KJobTrackerUi")
 };
 
 }

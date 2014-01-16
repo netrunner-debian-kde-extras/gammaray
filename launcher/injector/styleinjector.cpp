@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -26,6 +26,8 @@
 #include "styleinjector.h"
 #include "interactiveprocess.h"
 
+#include <common/paths.h>
+
 #include <QCoreApplication>
 #include <QDebug>
 #include <QDir>
@@ -39,10 +41,7 @@
 
 using namespace GammaRay;
 
-StyleInjector::StyleInjector() :
-  mExitCode(-1),
-  mProcessError(QProcess::UnknownError),
-  mExitStatus(QProcess::NormalExit)
+StyleInjector::StyleInjector() : ProcessInjector()
 {
 }
 
@@ -57,50 +56,19 @@ bool StyleInjector::launch(const QStringList &programAndArgs,
   if (!qtPluginPath.isEmpty()) {
     qtPluginPath.append(":");
   }
-  qtPluginPath.append(GAMMARAY_PLUGIN_INSTALL_DIR);
+  qtPluginPath.append(Paths::currentProbePath());
   env.insert("QT_PLUGIN_PATH", qtPluginPath);
 
-  InteractiveProcess proc;
-  proc.setProcessEnvironment(env);
-  proc.setProcessChannelMode(QProcess::ForwardedChannels);
-
   QStringList args = programAndArgs;
-
-  if (env.value("GAMMARAY_GDB").toInt()) {
-    QStringList newArgs;
-    newArgs << "gdb" << "--eval-command" << "run" << "--args";
-    newArgs += args;
-    args = newArgs;
-  } else if (env.value("GAMMARAY_MEMCHECK").toInt()) {
-    QStringList newArgs;
-    newArgs << "valgrind" << "--tool=memcheck" << "--track-origins=yes" << "--num-callers=25";
-    newArgs += args;
-    args = newArgs;
-  } else if (env.value("GAMMARAY_HELGRIND").toInt()) {
-    QStringList newArgs;
-    newArgs << "valgrind" << "--tool=helgrind";
-    newArgs += args;
-    args = newArgs;
-  }
-
-  const QString program = args.takeFirst();
   args << QLatin1String("-style") << QLatin1String("gammaray-injector");
-  proc.start(program, args);
-  proc.waitForFinished(-1);
 
-  mExitCode = proc.exitCode();
-  mProcessError = proc.error();
-  mExitStatus = proc.exitStatus();
-  mErrorString = proc.errorString();
-
-  return mExitCode == EXIT_SUCCESS && mExitStatus == QProcess::NormalExit;
+  return launchProcess(args, env);
 }
 
 bool StyleInjector::selfTest()
 {
 #ifdef HAVE_QT_WIDGETS
-  // TODO: be a bit more clever in finding the plugin location (also when actually using it above)
-  QCoreApplication::addLibraryPath(QLatin1String(GAMMARAY_LOCAL_INSTALL_PREFIX) + QDir::separator() + QLatin1String(GAMMARAY_PLUGIN_INSTALL_DIR));
+  QCoreApplication::addLibraryPath(Paths::currentProbePath());
   if (!QStyleFactory::keys().contains(QLatin1String("gammaray-injector"))) {
     mErrorString = QObject::tr("Injector style plugin is not found in the Qt style "
                                "plug-in search path or cannot be loaded");
@@ -112,24 +80,4 @@ bool StyleInjector::selfTest()
   mErrorString = QObject::tr("GammaRay was compiled without QtWidget support, style injector is not available.");
   return false;
 #endif
-}
-
-int StyleInjector::exitCode()
-{
-  return mExitCode;
-}
-
-QProcess::ProcessError StyleInjector::processError()
-{
-  return mProcessError;
-}
-
-QProcess::ExitStatus StyleInjector::exitStatus()
-{
-  return mExitStatus;
-}
-
-QString StyleInjector::errorString()
-{
-  return mErrorString;
 }
