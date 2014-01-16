@@ -1,4 +1,4 @@
-gammaray (1.9.95-1) UNRELEASED; urgency=low
+gammaray (1.9.96-1) UNRELEASED; urgency=low
 
   * New upstream release.
   * Refreshed d/patches/use-empty-rpath.patch.
@@ -11,7 +11,7 @@ gammaray (1.9.95-1) UNRELEASED; urgency=low
   * Bump Standards-Version to 3.9.5.
   * Enable build of Qt5 GUI and Qt5 + Qt4 probe libraries.
 
- -- Jakub Adam <jakub.adam@ktknet.cz>  Sat, 21 Dec 2013 09:25:42 +0100
+ -- Jakub Adam <jakub.adam@ktknet.cz>  Thu, 16 Jan 2014 17:49:41 +0100
 
 gammaray (1.3.0-1) experimental; urgency=low
 
