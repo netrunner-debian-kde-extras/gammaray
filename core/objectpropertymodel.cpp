@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -39,12 +39,14 @@ ObjectPropertyModel::ObjectPropertyModel(QObject *parent)
 void ObjectPropertyModel::setObject(QObject *object)
 {
   if (m_obj) {
+    unmonitorObject(m_obj.data());
     disconnect(m_obj.data(), 0, this, SLOT(updateAll()));
     disconnect(m_obj.data(), 0, this, SLOT(slotReset()));
   }
   m_obj = object;
   if (object) {
     connect(object, SIGNAL(destroyed(QObject*)), SLOT(slotReset()));
+    monitorObject(object);
     for (int i = 0; i < object->metaObject()->propertyCount(); ++i) {
       const QMetaProperty prop = object->metaObject()->property(i);
       if (prop.hasNotifySignal()) {

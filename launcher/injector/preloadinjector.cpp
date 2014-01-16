@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -35,10 +35,7 @@
 
 using namespace GammaRay;
 
-PreloadInjector::PreloadInjector() :
-  mExitCode(-1),
-  mProcessError(QProcess::UnknownError),
-  mExitStatus(QProcess::NormalExit)
+PreloadInjector::PreloadInjector() : ProcessInjector()
 {
 }
 
@@ -66,72 +63,7 @@ bool PreloadInjector::launch(const QStringList &programAndArgs,
   }
 #endif
 
-  InteractiveProcess proc;
-  proc.setProcessEnvironment(env);
-  proc.setProcessChannelMode(QProcess::ForwardedChannels);
-
-  QStringList args = programAndArgs;
-
-  if (env.value("GAMMARAY_GDB").toInt()) {
-    QStringList newArgs;
-    newArgs << "gdb";
-#ifndef Q_OS_MAC
-    newArgs << "--eval-command" << "run";
-#endif
-    newArgs << "--args";
-    newArgs += args;
-    args = newArgs;
-  } else if (env.value("GAMMARAY_MEMCHECK").toInt()) {
-    QStringList newArgs;
-    newArgs << "valgrind"
-            << "--tool=memcheck"
-            << "--track-origins=yes"
-            << "--num-callers=25"
-            << "--leak-check=full";
-    newArgs += args;
-    args = newArgs;
-  } else if (env.value("GAMMARAY_HELGRIND").toInt()) {
-    QStringList newArgs;
-    newArgs << "valgrind" << "--tool=helgrind";
-    newArgs += args;
-    args = newArgs;
-  }
-
-  const QString program = args.takeFirst();
-  proc.start(program, args);
-  proc.waitForFinished(-1);
-
-  mExitCode = proc.exitCode();
-  mProcessError = proc.error();
-  mExitStatus = proc.exitStatus();
-  mErrorString = proc.errorString();
-
-  if (mProcessError == QProcess::FailedToStart) {
-    mErrorString.prepend(QString("Could not start '%1': ").arg(program));
-  }
-
-  return mExitCode == EXIT_SUCCESS && mExitStatus == QProcess::NormalExit
-          && mProcessError == QProcess::UnknownError;
-}
-
-int PreloadInjector::exitCode()
-{
-  return mExitCode;
-}
-
-QProcess::ProcessError PreloadInjector::processError()
-{
-  return mProcessError;
-}
-
-QProcess::ExitStatus PreloadInjector::exitStatus()
-{
-  return mExitStatus;
-}
-
-QString PreloadInjector::errorString()
-{
-  return mErrorString;
+  return launchProcess(programAndArgs, env);
 }
 
 #endif

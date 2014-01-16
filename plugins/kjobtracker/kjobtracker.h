@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2012-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2012-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -24,7 +24,6 @@
 #ifndef GAMMARAY_KJOBTRACKER_H
 #define GAMMARAY_KJOBTRACKER_H
 
-#include "kjobtrackerwidget.h"
 #include <core/toolfactory.h>
 
 #include <KJob>
@@ -45,10 +44,10 @@ class KJobTracker : public QObject
     KJobModel *m_jobModel;
 };
 
-class KJobTrackerFactory : public QObject, public StandardToolFactory2<KJob, KJobTracker, KJobTrackerWidget>
+class KJobTrackerFactory : public QObject, public StandardToolFactory<KJob, KJobTracker>
 {
   Q_OBJECT
-  Q_INTERFACES(GammaRay::ToolFactory GammaRay::ToolUiFactory)
+  Q_INTERFACES(GammaRay::ToolFactory)
 
   public:
     explicit KJobTrackerFactory(QObject *parent = 0) : QObject(parent)

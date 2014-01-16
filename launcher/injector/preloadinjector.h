@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -24,14 +24,14 @@
 #ifndef GAMMARAY_PRELOADINJECTOR_H
 #define GAMMARAY_PRELOADINJECTOR_H
 
-#include "abstractinjector.h"
+#include "processinjector.h"
 #include <qglobal.h>
 
 #ifndef Q_OS_WIN
 
 namespace GammaRay {
 
-class PreloadInjector : public AbstractInjector
+class PreloadInjector : public ProcessInjector
 {
   public:
     PreloadInjector();
@@ -40,16 +40,6 @@ class PreloadInjector : public AbstractInjector
     }
     virtual bool launch(const QStringList &programAndArgs,
                        const QString &probeDll, const QString &probeFunc);
-    virtual int exitCode();
-    virtual QProcess::ExitStatus exitStatus();
-    virtual QProcess::ProcessError processError();
-    virtual QString errorString();
-
-  private:
-    int mExitCode;
-    QProcess::ProcessError mProcessError;
-    QProcess::ExitStatus mExitStatus;
-    QString mErrorString;
 };
 
 }

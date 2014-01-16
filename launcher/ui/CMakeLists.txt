@@ -1,8 +1,3 @@
-include_directories(
-  ${CMAKE_CURRENT_SOURCE_DIR}
-  ${CMAKE_CURRENT_BINARY_DIR}
-)
-
 set(gammaray_launcher_ui_srcs
   main.cpp
   promolabel.cpp
@@ -35,6 +30,7 @@ add_executable(gammaray-launcher WIN32 ${gammaray_launcher_ui_srcs})
 
 target_link_libraries(gammaray-launcher
   ${QT_QTCORE_LIBRARIES}
+  ${QT_QTCONCURRENT_LIBRARIES}
   ${QT_QTGUI_LIBRARIES}
   gammaray_common_internal
   gammaray_ui
@@ -48,6 +44,10 @@ endif()
 if(UNIX AND NOT APPLE AND NOT QNXNTO)
   target_link_libraries(gammaray-launcher dl) # for preload check
 endif()
+
+set_target_properties(gammaray-launcher PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/${LIBEXEC_INSTALL_DIR}"
+)
 
 install(TARGETS gammaray-launcher DESTINATION ${LIBEXEC_INSTALL_DIR})
 

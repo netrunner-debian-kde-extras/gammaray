@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -24,47 +24,75 @@
 #include "multisignalmapper.h"
 
 #include <QDebug>
-#include <QMetaEnum>
+#include <QMetaMethod>
 #include <QMetaObject>
-#include <QSignalMapper>
+#include <QVariant>
+
+namespace GammaRay {
+
+class MultiSignalMapperPrivate : public QObject
+{
+  public:
+    explicit MultiSignalMapperPrivate(MultiSignalMapper* parent) : QObject(parent), q(parent) {}
+    ~MultiSignalMapperPrivate() {}
+
+    int qt_metacall(QMetaObject::Call call, int methodId, void** args)
+    {
+      methodId = QObject::qt_metacall(call, methodId, args);
+      if (methodId < 0)
+        return methodId;
+
+      if (call == QMetaObject::InvokeMetaMethod) {
+        if (methodId == 0) {
+          Q_ASSERT(sender());
+          Q_ASSERT(senderSignalIndex() != -1);
+          const QVector<QVariant> v = convertArguments(sender(), senderSignalIndex(), args);
+          emit q->signalEmitted(sender(), senderSignalIndex(), v);
+        }
+        --methodId; // our method offset is 1
+      }
+      return methodId;
+    }
+
+    QVector<QVariant> convertArguments(QObject *sender, int signalIndex, void** args)
+    {
+      Q_ASSERT(sender);
+      Q_ASSERT(signalIndex >= 0);
+
+      const QMetaMethod signal = sender->metaObject()->method(signalIndex);
+      Q_ASSERT(signal.methodType() == QMetaMethod::Signal);
+
+      QVector<QVariant> v;
+      const QList<QByteArray> paramTypes = signal.parameterTypes();
+      for (int i = 0; i < paramTypes.size(); ++i) {
+        int type = QMetaType::type(paramTypes[i]);
+        if (type == QMetaType::Void) {
+          qWarning() << Q_FUNC_INFO << "unknown metatype for signal argument type" << paramTypes[i];
+          continue;
+        }
+        v.push_back(QVariant(type, args[i + 1]));
+      }
+
+      return v;
+    }
+
+  private:
+    MultiSignalMapper* q;
+};
+
+}
 
 using namespace GammaRay;
 
-MultiSignalMapper::MultiSignalMapper(QObject *parent) : QObject(parent)
+MultiSignalMapper::MultiSignalMapper(QObject *parent) : QObject(parent), d(new MultiSignalMapperPrivate(this))
 {
 }
 
 MultiSignalMapper::~MultiSignalMapper()
 {
-  qDeleteAll(m_mappers);
-  m_mappers.clear();
 }
 
 void MultiSignalMapper::connectToSignal(QObject *sender, const QMetaMethod &signal)
 {
-  if (m_mappers.size() <= signal.methodIndex()) {
-    m_mappers.resize(signal.methodIndex() + 1);
-  }
-
-  QSignalMapper *mapper = m_mappers.at(signal.methodIndex());
-  if (!mapper) {
-    mapper = new QSignalMapper(this);
-    connect(mapper, SIGNAL(mapped(QObject*)), SLOT(slotMapped(QObject*)));
-    m_mappers[signal.methodIndex()] = mapper;
-  }
-
-  mapper->setMapping(sender, sender);
-  connect(sender, QByteArray::number(QSIGNAL_CODE) +
-#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
-          signal.signature(),
-#else
-          signal.methodSignature(),
-#endif
-          mapper, SLOT(map()), Qt::UniqueConnection);
+  QMetaObject::connect(sender, signal.methodIndex(), d, QObject::metaObject()->methodCount(), Qt::AutoConnection | Qt::UniqueConnection, 0);
 }
-
-void MultiSignalMapper::slotMapped(QObject *object)
-{
-  emit signalEmitted(object, m_mappers.indexOf(static_cast<QSignalMapper*>(sender())));
-}
-

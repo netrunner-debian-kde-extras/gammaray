@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2013-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -43,7 +43,8 @@ RemoteModelServer::RemoteModelServer(const QString &objectName, QObject *parent)
   m_monitored(false)
 {
   setObjectName(objectName);
-  m_myAddress = Server::instance()->registerObject(objectName, this, "newRequest", "modelMonitored");
+  m_myAddress = Server::instance()->registerObject(objectName, this, "newRequest");
+  Server::instance()->registerMonitorNotifier(m_myAddress, this, "modelMonitored");
   m_dummyBuffer->open(QIODevice::WriteOnly);
   connect(Server::instance(), SIGNAL(disconnected()), this, SLOT(modelMonitored()));
 }
@@ -201,7 +202,6 @@ bool RemoteModelServer::canSerialize(const QVariant& value) const
 
 void RemoteModelServer::modelMonitored(bool monitored)
 {
-  cout << Q_FUNC_INFO << ' ' << monitored << ' ' << static_cast<quint64>(m_myAddress) << endl;
   if (m_monitored == monitored)
     return;
   m_monitored = monitored;

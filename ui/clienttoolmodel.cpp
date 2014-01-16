@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2013-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -21,7 +21,6 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "config-gammaray.h"
 #include "clienttoolmodel.h"
 
 #include <ui/tools/connectioninspector/connectioninspectorwidget.h>
@@ -82,8 +81,7 @@ ClientToolModel::ClientToolModel(QObject* parent) : QSortFilterProxyModel(parent
   insertFactory(new StandardPathsFactory);
   insertFactory(new TextDocumentInspectorFactory);
 
-  const QString pluginPath = QCoreApplication::applicationDirPath() + QDir::separator() + QLatin1String(GAMMARAY_RELATIVE_BIN_TO_PLUGIN_PATH);
-  PluginManager<ToolUiFactory, ProxyToolUiFactory> pm(pluginPath);
+  PluginManager<ToolUiFactory, ProxyToolUiFactory> pm;
   foreach(ToolUiFactory* factory, pm.plugins())
     insertFactory(factory);
 }

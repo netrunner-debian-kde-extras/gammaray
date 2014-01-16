@@ -1,12 +1,3 @@
-# Enable RPATH, make gammaray_probe find gammaray_core (same directory)
-set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${LIB_INSTALL_DIR}")
-
-include_directories(
-  ${CMAKE_SOURCE_DIR}
-  ${CMAKE_BINARY_DIR} # config-gammaray.h
-  ${CMAKE_CURRENT_BINARY_DIR}
-)
-
 set(gammaray_probe_srcs
   probecreator.cpp
   hooks.cpp
@@ -23,9 +14,21 @@ if(WIN32 OR APPLE)
 endif()
 
 # probe lib
-add_library(gammaray_probe SHARED ${gammaray_probe_srcs})
+if(APPLE) # DYLD_INSERT_LIBRARIES only works with real shared libraries, not modules
+  add_library(gammaray_probe SHARED ${gammaray_probe_srcs})
+else()
+  add_library(gammaray_probe MODULE ${gammaray_probe_srcs})
+endif()
 target_link_libraries(gammaray_probe
   gammaray_core
 )
-set_target_properties(gammaray_probe PROPERTIES PREFIX "")
+
+if(NOT WIN32 AND NOT QNXNTO)
+  target_link_libraries(gammaray_probe dl)
+endif()
+
+set_target_properties(gammaray_probe PROPERTIES
+  PREFIX ""
+  LIBRARY_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/${PLUGIN_INSTALL_DIR}/${GAMMARAY_PLUGIN_VERSION}/${GAMMARAY_PROBE_ABI}"
+)
 install(TARGETS gammaray_probe DESTINATION ${PLUGIN_INSTALL_DIR}/${GAMMARAY_PLUGIN_VERSION}/${GAMMARAY_PROBE_ABI}/)

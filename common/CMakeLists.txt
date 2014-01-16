@@ -1,15 +1,6 @@
 #
 # Shared non-UI code between probe and client
 #
-
-include_directories(
-  ${CMAKE_CURRENT_SOURCE_DIR}
-  ${CMAKE_CURRENT_BINARY_DIR}
-  ${CMAKE_SOURCE_DIR}
-  ${CMAKE_BINARY_DIR}
-  ${CMAKE_SOURCE_DIR}/3rdparty/
-)
-
 set(gammaray_common_srcs
   ${CMAKE_SOURCE_DIR}/3rdparty/kde/klinkitemselectionmodel.cpp
   ${CMAKE_SOURCE_DIR}/3rdparty/kde/kmodelindexproxymapper.cpp
@@ -19,6 +10,7 @@ set(gammaray_common_srcs
   protocol.cpp
   message.cpp
   endpoint.cpp
+  paths.cpp
 )
 
 add_library(gammaray_common SHARED ${gammaray_common_srcs})
@@ -39,7 +31,7 @@ else()
   )
 endif()
 
-install(TARGETS gammaray_common ${INSTALL_TARGETS_DEFAULT_ARGS})
+install(TARGETS gammaray_common EXPORT GammaRayTargets ${INSTALL_TARGETS_DEFAULT_ARGS})
 
 set(gammaray_common_internal_srcs
   pluginmanager.cpp
@@ -72,6 +64,7 @@ endif()
 gammaray_install_headers(
   gammaray_common_export.h
   endpoint.h
+  enums.h
   metatypedeclarations.h
   modelroles.h
   objectbroker.h

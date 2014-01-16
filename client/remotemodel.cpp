@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2013-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -269,6 +269,7 @@ void RemoteModel::newMessage(const GammaRay::Message& msg)
       if (node == m_root)
         break;
 
+      Q_ASSERT(node);
       Q_ASSERT(beginIndex.last().first <= endIndex.last().first);
       Q_ASSERT(beginIndex.last().second <= endIndex.last().second);
 
@@ -473,7 +474,6 @@ void RemoteModel::requestHeaderData(Qt::Orientation orientation, int section) co
 
 void RemoteModel::clear()
 {
-  qDebug() << Q_FUNC_INFO;
   beginResetModel();
 
   Message msg(m_myAddress, Protocol::ModelSyncBarrier);

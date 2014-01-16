@@ -1,9 +1,3 @@
-include_directories(
-  ${CMAKE_BINARY_DIR}
-  ${CMAKE_CURRENT_BINARY_DIR}
-  ${CMAKE_CURRENT_SOURCE_DIR}
-)
-
 set(gammaray_widgetinspector_plugin_srcs
   widgetinspector.cpp
   widgetinspectorinterface.cpp
@@ -46,6 +40,10 @@ add_library(gammaray_widget_export_actions SHARED
   uiextractor.cpp
 )
 
+set_target_properties(gammaray_widget_export_actions PROPERTIES
+  LIBRARY_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/${PLUGIN_INSTALL_DIR}/${GAMMARAY_PLUGIN_VERSION}/${GAMMARAY_PROBE_ABI}"
+)
+
 set(EXTRA_LIBS)
 if(HAVE_QT_DESIGNER)
   list(APPEND EXTRA_LIBS ${QT_QTDESIGNER_LIBRARIES})
@@ -55,6 +53,7 @@ target_link_libraries(gammaray_widget_export_actions
   ${QT_QTCORE_LIBRARIES}
   ${QT_QTGUI_LIBRARIES}
   ${QT_QTSVG_LIBRARIES}
+  ${Qt5PrintSupport_LIBRARIES}
 
   ${EXTRA_LIBS}
 )

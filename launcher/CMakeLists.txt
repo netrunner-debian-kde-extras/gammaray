@@ -2,16 +2,12 @@ add_subdirectory(injector)
 
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}
-  ${CMAKE_CURRENT_BINARY_DIR}
-
-  ${CMAKE_BINARY_DIR}
-  ${CMAKE_SOURCE_DIR}
-  ${CMAKE_SOURCE_DIR}/3rdparty
 )
 
 # shared launcher code
 set(gammaray_launcher_shared_srcs
   injector/abstractinjector.cpp
+  injector/processinjector.cpp
   injector/injectorfactory.cpp
   injector/preloadinjector.cpp
   injector/styleinjector.cpp
@@ -28,7 +24,10 @@ if(NOT WIN32)
   list(APPEND gammaray_launcher_shared_srcs injector/gdbinjector.cpp)
 endif()
 add_library(gammaray_launcher_shared STATIC ${gammaray_launcher_shared_srcs})
-target_link_libraries(gammaray_launcher_shared ${QT_QTCORE_LIBRARIES})
+target_link_libraries(gammaray_launcher_shared ${QT_QTCORE_LIBRARIES} gammaray_common)
+if(HAVE_QT_WIDGETS)
+  target_link_libraries(gammaray_launcher_shared ${QT_QTGUI_LIBRARIES})
+endif()
 
 # command line launcher
 set(gammaray_runner_srcs
@@ -38,11 +37,7 @@ set(gammaray_runner_srcs
 
 add_executable(gammaray ${gammaray_runner_srcs})
 
-target_link_libraries(gammaray ${QT_QTCORE_LIBRARIES} gammaray_launcher_shared gammaray_common)
-if(HAVE_QT_WIDGETS)
-  # needed for style inspector
-  target_link_libraries(gammaray ${QT_QTGUI_LIBRARIES})
-endif()
+target_link_libraries(gammaray gammaray_launcher_shared)
 
 if(QNXNTO)
   target_link_libraries(gammaray cpp)

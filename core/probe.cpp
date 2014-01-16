@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
   Author: Stephen Kelly <stephen.kelly@kdab.com>
 
@@ -43,6 +43,7 @@
 
 #include <common/objectbroker.h>
 #include <common/streamoperators.h>
+#include <common/paths.h>
 
 #if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
 #include <QApplication>
@@ -303,14 +304,6 @@ void Probe::startupHookReceived()
 
 void Probe::delayedInit()
 {
-  if (qgetenv("GAMMARAY_UNSET_PRELOAD") == "1") {
-    qputenv("LD_PRELOAD", "");
-  }
-  if (qgetenv("GAMMARAY_UNSET_DYLD") == "1") {
-    qputenv("DYLD_INSERT_LIBRARIES", "");
-    qputenv("DYLD_FORCE_FLAT_NAMESPACE", "");
-  }
-
   QCoreApplication::instance()->installEventFilter(this);
 
   QString appName = qApp->applicationName();
@@ -328,31 +321,38 @@ void Probe::delayedInit()
   }
   Server::instance()->setLabel(appName);
 
-  if (ProbeSettings::value("InProcessUi", false).toBool() && canShowWidgets()) {
-    IF_DEBUG(cout << "creating GammaRay::MainWindow" << endl;)
-    s_listener()->filterThread = QThread::currentThread();
+  if (ProbeSettings::value("InProcessUi", false).toBool())
+    showInProcessUi();
+}
 
-    QString path = ProbeSettings::value("ProbePath").toString();
-    if (!path.isEmpty())
-      path += QDir::separator();
-    path += "gammaray_inprocessui";
-    QLibrary lib;
-    lib.setFileName(path);
-    if (!lib.load()) {
-      std::cerr << "Failed to load in-process UI module: " << qPrintable(lib.errorString()) << std::endl;
-    } else {
-      void(*factory)() = reinterpret_cast<void(*)()>(lib.resolve("gammaray_create_inprocess_mainwindow"));
-      if (!factory)
-        std::cerr << Q_FUNC_INFO << ' ' << qPrintable(lib.errorString()) << endl;
-      else
-        factory();
-    }
-
-    s_listener()->filterThread = 0;
-    IF_DEBUG(cout << "creation done" << endl;)
-  } else {
+void Probe::showInProcessUi()
+{
+  if (!canShowWidgets()) {
     cerr << "Unable to show in-process UI in a non-QWidget based application." << endl;
+    return;
   }
+
+  IF_DEBUG(cout << "creating GammaRay::MainWindow" << endl;)
+  s_listener()->filterThread = QThread::currentThread();
+
+  QString path = Paths::currentProbePath();
+  if (!path.isEmpty())
+    path += QDir::separator();
+  path += "gammaray_inprocessui";
+  QLibrary lib;
+  lib.setFileName(path);
+  if (!lib.load()) {
+    std::cerr << "Failed to load in-process UI module: " << qPrintable(lib.errorString()) << std::endl;
+  } else {
+    void(*factory)() = reinterpret_cast<void(*)()>(lib.resolve("gammaray_create_inprocess_mainwindow"));
+    if (!factory)
+      std::cerr << Q_FUNC_INFO << ' ' << qPrintable(lib.errorString()) << endl;
+    else
+      factory();
+  }
+
+  s_listener()->filterThread = 0;
+  IF_DEBUG(cout << "creation done" << endl;)
 }
 
 bool Probe::filterObject(QObject *obj) const
@@ -685,7 +685,9 @@ bool Probe::eventFilter(QObject *receiver, QEvent *event)
 
   // we have no preloading hooks, so recover all objects we see
   if (!hasReliableObjectTracking() && event->type() != QEvent::ChildAdded &&
-      event->type() != QEvent::ChildRemoved && !filterObject(receiver)) {
+      event->type() != QEvent::ChildRemoved && // already handled above
+      event->type() != QEvent::Destroy && event->type() != QEvent::WinIdChange  && // unsafe since emitted from dtors
+      !filterObject(receiver)) {
     QWriteLocker lock(s_lock());
     const bool tracked = m_validObjects.contains(receiver);
     if (!tracked) {

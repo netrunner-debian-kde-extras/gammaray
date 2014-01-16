@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -27,6 +27,7 @@
 
 #include <common/objectmodel.h>
 #include <common/objectbroker.h>
+#include <common/endpoint.h>
 
 using namespace GammaRay;
 
@@ -58,7 +59,11 @@ void WebInspectorWidget::webPageSelected(int index)
   }
 
   else if (ui->webPageComboBox->itemData(index, WebViewModel::WebKitVersionRole).toInt() == 2) {
-    ui->webView->setUrl(QUrl("http://localhost:11733")); // TODO determine correctly
+    QUrl url;
+    url.setScheme("http");
+    url.setHost(Endpoint::instance()->serverAddress());
+    url.setPort(Endpoint::defaultPort() + 1);
+    ui->webView->setUrl(url);
     ui->stack->setCurrentWidget(ui->wk2Page);
   }
 
@@ -67,3 +72,7 @@ void WebInspectorWidget::webPageSelected(int index)
     ui->stack->setCurrentWidget(ui->wk1RemotePage);
   }
 }
+
+#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
+Q_EXPORT_PLUGIN(WebInspectorUiFactory)
+#endif

@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -21,11 +21,13 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "config-gammaray.h"
 #include "toolmodel.h"
 
 #include "toolfactory.h"
 #include "proxytoolfactory.h"
+#include "probe.h"
+#include "readorwritelocker.h"
+#include "probesettings.h"
 
 #include "tools/connectioninspector/connectioninspector.h"
 #include "tools/localeinspector/localeinspector.h"
@@ -42,9 +44,6 @@
 #endif
 
 #include <common/pluginmanager.h>
-#include "probe.h"
-#include "readorwritelocker.h"
-#include "probesettings.h"
 
 #include <QCoreApplication>
 #include <QDebug>
@@ -73,8 +72,7 @@ ToolModel::ToolModel(QObject *parent): QAbstractListModel(parent)
   m_tools.push_back(new MimeTypesFactory(this));
 #endif
 
-  const QString pluginPath = ProbeSettings::value("ProbePath").toString() + QDir::separator() + QLatin1String(GAMMARAY_RELATIVE_PROBE_TO_PLUGIN_PATH);
-  m_pluginManager.reset(new ToolPluginManager(pluginPath, this));
+  m_pluginManager.reset(new ToolPluginManager(this));
   Q_FOREACH (ToolFactory *factory, m_pluginManager->plugins()) {
     m_tools.push_back(factory);
   }

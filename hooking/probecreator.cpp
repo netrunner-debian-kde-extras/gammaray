@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2012-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2012-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Kevin Funk <kevin.funk@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -22,7 +22,9 @@
 */
 
 #include "probecreator.h"
-#include "core/probe.h"
+
+#include <common/endpoint.h>
+#include <core/probe.h>
 
 #include <QCoreApplication>
 #include <QMetaObject>
@@ -44,6 +46,19 @@ ProbeCreator::ProbeCreator(Type type)
   moveToThread(QCoreApplication::instance()->thread());
   // delay to foreground thread
   QMetaObject::invokeMethod(this, "createProbe", Qt::QueuedConnection);
+
+  // don't propagate the probe to child processes
+  if (qgetenv("GAMMARAY_UNSET_PRELOAD") == "1") {
+    qputenv("LD_PRELOAD", "");
+  }
+  if (qgetenv("GAMMARAY_UNSET_DYLD") == "1") {
+    qputenv("DYLD_INSERT_LIBRARIES", "");
+    qputenv("DYLD_FORCE_FLAT_NAMESPACE", "");
+  }
+
+  // HACK the webinspector plugin does this as well, but if the web view is created
+  // too early the env var from there isn't going to reach the web process
+  qputenv("QTWEBKIT_INSPECTOR_SERVER", "0.0.0.0:" + QByteArray::number(Endpoint::defaultPort() + 1));
 }
 
 void ProbeCreator::createProbe()

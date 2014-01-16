@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2013 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -41,11 +41,18 @@ class ObjectPropertyModel : public QAbstractTableModel
     QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
 
   protected:
+    /** Reimplement to set up watching property change notifications. */
+    // TODO make these pure virtual once property signal handling is moved to the static property model
+    virtual void monitorObject(QObject* obj) { Q_UNUSED(obj); };
+    virtual void unmonitorObject(QObject* obj) { Q_UNUSED(obj); };
+
     QPointer<QObject> m_obj;
+
+  protected slots:
+    void updateAll();
 
   private slots:
     void slotReset() { reset(); }
-    void updateAll();
     void doEmitChanged();
 
   private:
