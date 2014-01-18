@@ -12,6 +12,7 @@ usr/lib/gammaray/*/qt5*/gammaray_selectionmodelinspector*
 usr/lib/gammaray/*/qt5*/gammaray_statemachineviewer*
 usr/lib/gammaray/*/qt5*/gammaray_styleinspector*
 usr/lib/gammaray/*/qt5*/gammaray_timertop*
+usr/lib/gammaray/*/qt5*/gammaray_webinspector*
 usr/lib/gammaray/*/qt5*/gammaray_widgetinspector*
 usr/lib/gammaray/*/qt5*/libgammaray_widget_export_actions.so
 usr/lib/gammaray/*/qt5*/styles/*
