@@ -1,10 +1,8 @@
 /*
-  sharedmemorylocker.h
-
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2013-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -21,32 +19,23 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <QSharedMemory>
+import QtQuick 2.0
 
-namespace GammaRay
-{
+Rectangle {
+  color: "lightsteelblue"
+  width: 640
+  height: 480
+  focus: true
 
-#ifndef QT_NO_SHAREDMEMORY
-/** RAII helper class for locking QSharedMemory.
- * @todo this should be upstream
- */
-class SharedMemoryLocker
-{
-public:
-  explicit inline SharedMemoryLocker(QSharedMemory *shm) : m_shm(shm)
-  {
-    Q_ASSERT(shm);
-    shm->lock();
+  Text {
+    id: label
+    anchors.centerIn: parent
+    text: "press a key"
   }
 
-  inline ~SharedMemoryLocker()
-  {
-    m_shm->unlock();
-  }
+  // always works
+  Keys.onLeftPressed: { label.text = "left pressed"; }
 
-private:
-  QSharedMemory *m_shm;
-};
-#endif
-
+  // breaks with signal spy callbacks installed
+  Keys.onPressed: { label.text = "key pressed"; console.log("xxx"); }
 }

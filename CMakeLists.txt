@@ -28,9 +28,9 @@ if(POLICY CMP0022)
   cmake_policy(SET CMP0022 OLD) # until we require 2.8.12
 endif()
 
-set(GAMMARAY_VERSION_MAJOR "1")
-set(GAMMARAY_VERSION_MINOR "9")
-set(GAMMARAY_VERSION_PATCH "96")
+set(GAMMARAY_VERSION_MAJOR "2")
+set(GAMMARAY_VERSION_MINOR "0")
+set(GAMMARAY_VERSION_PATCH "0")
 set(GAMMARAY_VERSION "${GAMMARAY_VERSION_MAJOR}.${GAMMARAY_VERSION_MINOR}.${GAMMARAY_VERSION_PATCH}")
 set(GAMMARAY_VERSION_STRING "${GAMMARAY_VERSION}")
 set(GAMMARAY_SOVERSION "2.0.0")
@@ -87,19 +87,19 @@ if(NOT GAMMARAY_ENFORCE_QT4_BUILD)
 endif()
 
 if(Qt5Core_FOUND)
-  find_package(Qt5 NO_MODULE REQUIRED COMPONENTS Gui Network)
-  find_package(Qt5 NO_MODULE QUIET COMPONENTS
-    Concurrent
-    Test
-    Widgets
-    PrintSupport
-    Svg
-    Script
-    ScriptTools
-    Location # workaround for 5.1 webkit that tries to find a qtlocation with a matching version if none (with any version) has been found before...
-    Designer
-  )
-  find_package(Qt5WebKitWidgets 5.0.2 QUIET) # 5.0.[01] has a code generation bug in uic that fails to generate proper code for webkitwidget classes
+  # Qt5 COMPONENT x y z only works with Qt >= 5.1 ...
+  find_package(Qt5Gui NO_MODULE REQUIRED)
+  find_package(Qt5Network NO_MODULE REQUIRED)
+  find_package(Qt5Concurrent NO_MODULE)
+  find_package(Qt5Test NO_MODULE)
+  find_package(Qt5Widgets NO_MODULE)
+  find_package(Qt5PrintSupport NO_MODULE)
+  find_package(Qt5Svg NO_MODULE)
+  find_package(Qt5Script NO_MODULE)
+  find_package(Qt5ScriptTools NO_MODULE)
+  find_package(Qt5Location NO_MODULE) # workaround for 5.1 webkit that tries to find a qtlocation with a matching version if none (with any version) has been found before...
+  find_package(Qt5Designer NO_MODULE)
+  find_package(Qt5WebKitWidgets 5.0.2 NO_MODULE) # 5.0.[01] has a code generation bug in uic that fails to generate proper code for webkitwidget classes
 
   include("cmake/ECMQt4To5Porting.cmake")
   # only needed for Qt <= 5.1 and/or some older CMake versions (exact combination unknown unfortunately)
@@ -298,12 +298,18 @@ macro_log_feature(
   "You must have a build version of Qt available. Make sure the qmake found first in your execute comes from this build version."
 )
 
-if(WIN32 OR APPLE)
-  set(BUILD_TIMER_PLUGIN TRUE)
+if(Qt5Core_FOUND AND Qt5Core_VERSION VERSION_LESS 5.2.2)
+  # https://codereview.qt-project.org/75530
+  message(STATUS "Disabling timer profiler plug-in due to a bug in Qt5 <= 5.2.1.")
+  set(BUILD_TIMER_PLUGIN FALSE)
 else()
-  check_library_exists(rt clock_gettime "" HAVE_CLOCK_GETTIME)
-  macro_log_feature(HAVE_CLOCK_GETTIME "librt" "High resolution clock for the timer profiler plugin." "part of glibc" FALSE)
-  set(BUILD_TIMER_PLUGIN ${HAVE_CLOCK_GETTIME})
+  if(WIN32 OR APPLE)
+    set(BUILD_TIMER_PLUGIN TRUE)
+  else()
+    check_library_exists(rt clock_gettime "" HAVE_CLOCK_GETTIME)
+    macro_log_feature(HAVE_CLOCK_GETTIME "librt" "High resolution clock for the timer profiler plugin." "part of glibc" FALSE)
+    set(BUILD_TIMER_PLUGIN ${HAVE_CLOCK_GETTIME})
+  endif()
 endif()
 
 if(WIN32)
@@ -521,7 +527,7 @@ if(Qt5Widgets_FOUND OR QT_QTGUI_FOUND)
     add_subdirectory(client)
   endif()
 endif()
-if(Qt5Test_FOUND OR QT_QTTEST_FOUND)
+if((Qt5Test_FOUND OR QT_QTTEST_FOUND) AND NOT CMAKE_CROSSCOMPILING)
   add_subdirectory(tests)
 endif()
 add_subdirectory(plugins)
