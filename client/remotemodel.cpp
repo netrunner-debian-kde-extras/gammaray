@@ -70,6 +70,8 @@ QModelIndex RemoteModel::index(int row, int column, const QModelIndex &parent) c
 
   Node *parentNode = nodeForIndex(parent);
   Q_ASSERT(parentNode->children.size() >= parentNode->rowCount);
+  if (parentNode->rowCount == -1)
+    requestRowColumnCount(parent); // trying to traverse into a branch we haven't loaded yet
   if (parentNode->rowCount <= row || parentNode->columnCount <= column)
     return QModelIndex();
   return createIndex(row, column, parentNode->children.at(row));
@@ -124,16 +126,18 @@ QVariant RemoteModel::data(const QModelIndex &index, int role) const
   Node* node = nodeForIndex(index);
   Q_ASSERT(node);
 
+  if (node->loading.contains(index.column())) { // still waiting for data
+    if (role == Qt::DisplayRole)
+      return tr("Loading...");
+    return QVariant();
+  }
+
   if (!node->data.contains(index.column())) {
     requestDataAndFlags(index);
   }
 
   // note .value returns good defaults otherwise
   return node->data.value(index.column()).value(role);
-  if (node->data.contains(index.column())) {
-    if (node->data.value(index.column()).contains(role))
-      return node->data.value(index.column()).value(role);
-  }
 }
 
 bool RemoteModel::setData(const QModelIndex& index, const QVariant& value, int role)
@@ -152,7 +156,12 @@ Qt::ItemFlags RemoteModel::flags(const QModelIndex& index) const
   Node* node = nodeForIndex(index);
   Q_ASSERT(node);
 
-  return node->flags.value(index.column());
+  const QHash<int, Qt::ItemFlags>::const_iterator it = node->flags.constFind(index.column());
+  if (it == node->flags.constEnd()) {
+    // default flags if we don't know better, otherwise we can't select into non-expanded branches
+    return Qt::ItemIsSelectable | Qt::ItemIsEnabled;
+  }
+  return it.value();
 }
 
 QVariant RemoteModel::headerData(int section, Qt::Orientation orientation, int role) const
@@ -195,14 +204,11 @@ void RemoteModel::newMessage(const GammaRay::Message& msg)
         // was created). Anyhow, since the data is equal we can/should ignore it anyways.
         break;
       }
-      // Note that the rowCount might be "-1" which would mean we didn't request the row/col count
-      // explicitly. Yet the data is valid and we can use it nonetheless.
-      // This happens in some (thankfully harmless) raceconditions, e.g. when we request row/col count
-      // then first get messages from the server that a row was deleted and that another was created
-      // at the same model index. Then later he'll answer the initial row/col count request and
-      // we handle it here. Since the initial Node was deleted and a new one created for that index,
-      // it's rowCount will be -1 but the response data is actually useful and we store it.
-      Q_ASSERT(node->rowCount <= -1 && node->columnCount == -1);
+
+      if (node->rowCount == -1)
+        break; // we didn't ask for this, probably outdated response for a moved node
+
+      Q_ASSERT(node->rowCount < -1 && node->columnCount == -1);
 
       const QModelIndex qmi = modelIndexForNode(node, 0);
 
@@ -235,13 +241,15 @@ void RemoteModel::newMessage(const GammaRay::Message& msg)
       Protocol::ModelIndex index;
       msg.payload() >> index;
       Node *node = nodeForIndex(index);
-      Q_ASSERT(node);
+      if (!node || !node->loading.contains(index.last().second))
+        break; // we didn't ask for this, probably outdated response for a moved cell
       typedef QHash<int, QVariant> ItemData;
       ItemData itemData;
       qint32 flags;
       msg.payload() >> itemData >> flags;
       node->data[index.last().second] = itemData;
       node->flags[index.last().second] = static_cast<Qt::ItemFlags>(flags);
+      node->loading.remove(index.last().second);
       const QModelIndex qmi = modelIndexForNode(node, index.last().second);
       emit dataChanged(qmi, qmi);
       break;
@@ -266,10 +274,9 @@ void RemoteModel::newMessage(const GammaRay::Message& msg)
       Protocol::ModelIndex beginIndex, endIndex;
       msg.payload() >> beginIndex >> endIndex;
       Node *node = nodeForIndex(beginIndex);
-      if (node == m_root)
+      if (!node || node == m_root)
         break;
 
-      Q_ASSERT(node);
       Q_ASSERT(beginIndex.last().first <= endIndex.last().first);
       Q_ASSERT(beginIndex.last().second <= endIndex.last().second);
 
@@ -313,29 +320,7 @@ void RemoteModel::newMessage(const GammaRay::Message& msg)
       Node *parentNode = nodeForIndex(parentIndex);
       if (!parentNode || parentNode->rowCount < 0)
         return; // we don't know the parent yet, so we don't care about changes to it either
-      Q_ASSERT(parentNode->rowCount == parentNode->children.size());
-
-      const QModelIndex qmiParent = modelIndexForNode(parentNode, 0);
-      beginInsertRows(qmiParent, first, last);
-
-      // allocate rows in the right spot
-      if (first == parentNode->children.size())
-        parentNode->children.resize(parentNode->children.size() + 1 + last - first);
-      else
-        parentNode->children.insert(first, last - first + 1, 0);
-
-      // create nodes for the new rows
-      for (int i = first; i <= last; ++i) {
-        Node *child = new Node;
-        child->parent = parentNode;
-        parentNode->children[i] = child;
-      }
-
-      // adjust row count
-      parentNode->rowCount += last - first + 1;
-      Q_ASSERT(parentNode->rowCount == parentNode->children.size());
-
-      endInsertRows();
+      doInsertRows(parentNode, first, last);
       break;
     }
 
@@ -349,25 +334,46 @@ void RemoteModel::newMessage(const GammaRay::Message& msg)
       Node *parentNode = nodeForIndex(parentIndex);
       if (!parentNode || parentNode->rowCount < 0)
         return; // we don't know the parent yet, so we don't care about changes to it either
-      Q_ASSERT(parentNode->rowCount == parentNode->children.size());
-
-      const QModelIndex qmiParent = modelIndexForNode(parentNode, 0);
-      beginRemoveRows(qmiParent, first, last);
-
-      // delete nodes
-      for (int i = first; i <= last; ++i)
-        delete parentNode->children.at(i);
-      parentNode->children.remove(first, last - first + 1);
-
-      // adjust row count
-      parentNode->rowCount -= last - first + 1;
-      Q_ASSERT(parentNode->rowCount == parentNode->children.size());
-
-      endRemoveRows();
+      doRemoveRows(parentNode, first, last);
       break;
     }
 
     case Protocol::ModelRowsMoved:
+    {
+      Protocol::ModelIndex sourceParentIndex, destParentIndex;
+      int sourceFirst, sourceLast, destChild;
+      msg.payload() >> sourceParentIndex >> sourceFirst >> sourceLast >> destParentIndex >> destChild;
+      Q_ASSERT(sourceLast >= sourceFirst);
+
+      Node *sourceParent = nodeForIndex(sourceParentIndex);
+      Node *destParent = nodeForIndex(destParentIndex);
+
+      const bool sourceKnown = sourceParent && sourceParent->rowCount >= 0;
+      const bool destKnown = destParent && destParent->rowCount >= 0;
+
+      // case 1: source and destination not locally cached -> nothing to do
+      if (!sourceKnown && !destKnown)
+        break;
+
+      // case 2: only source is locally known -> remove
+      if (sourceKnown && !destKnown) {
+        doRemoveRows(sourceParent, sourceFirst, sourceLast);
+        break;
+      }
+
+      // case 3: only destination is locally known -> added
+      if (!sourceKnown && destKnown) {
+        doInsertRows(destParent, destChild, destChild + sourceLast - sourceFirst);
+        break;
+      }
+
+      // case 4: source and destination are locally known -> move
+      if (sourceKnown && destKnown) {
+        doMoveRows(sourceParent, sourceFirst, sourceLast, destParent, destChild);
+        break;
+      }
+    }
+
     case Protocol::ModelColumnsAdded:
     case Protocol::ModelColumnsMoved:
     case Protocol::ModelColumnsRemoved:
@@ -449,12 +455,9 @@ void RemoteModel::requestDataAndFlags(const QModelIndex& index) const
   Q_ASSERT(node);
   Q_ASSERT(!node->data.contains(index.column()));
   Q_ASSERT(!node->flags.contains(index.column()));
+  Q_ASSERT(!node->loading.contains(index.column()));
 
-  static QHash<int, QVariant> loading;
-  if (loading.isEmpty()) {
-    loading.insert(Qt::DisplayRole, tr("Loading..."));
-  }
-  node->data.insert(index.column(), loading); // mark pending request
+  node->loading.insert(index.column()); // mark pending request
 
   Message msg(m_myAddress, Protocol::ModelContentRequest);
   msg.payload() << Protocol::fromQModelIndex(index);
@@ -504,3 +507,104 @@ bool RemoteModel::checkSyncBarrier(const Message& msg)
   return m_currentSyncBarrier == m_targetSyncBarrier;
 }
 
+void RemoteModel::resetLoadingState(RemoteModel::Node* node, int startRow) const
+{
+  if (node->rowCount < 0) {
+    node->rowCount = -1; // reset row count loading state
+    return;
+  }
+
+  Q_ASSERT(node->children.size() == node->rowCount);
+  for (int row = startRow; row < node->rowCount; ++row) {
+    Node *child = node->children[row];
+    child->loading.clear();
+    resetLoadingState(child, 0);
+  }
+}
+
+void RemoteModel::doInsertRows(RemoteModel::Node* parentNode, int first, int last)
+{
+  Q_ASSERT(parentNode->rowCount == parentNode->children.size());
+
+  const QModelIndex qmiParent = modelIndexForNode(parentNode, 0);
+  beginInsertRows(qmiParent, first, last);
+
+  // allocate rows in the right spot
+  if (first == parentNode->children.size())
+    parentNode->children.resize(parentNode->children.size() + 1 + last - first);
+  else
+    parentNode->children.insert(first, last - first + 1, 0);
+
+  // create nodes for the new rows
+  for (int i = first; i <= last; ++i) {
+    Node *child = new Node;
+    child->parent = parentNode;
+    parentNode->children[i] = child;
+  }
+
+  // adjust row count
+  parentNode->rowCount += last - first + 1;
+  Q_ASSERT(parentNode->rowCount == parentNode->children.size());
+
+  endInsertRows();
+  resetLoadingState(parentNode, last);
+}
+
+void RemoteModel::doRemoveRows(RemoteModel::Node* parentNode, int first, int last)
+{
+  Q_ASSERT(parentNode->rowCount == parentNode->children.size());
+
+  const QModelIndex qmiParent = modelIndexForNode(parentNode, 0);
+  beginRemoveRows(qmiParent, first, last);
+
+  // delete nodes
+  for (int i = first; i <= last; ++i)
+    delete parentNode->children.at(i);
+  parentNode->children.remove(first, last - first + 1);
+
+  // adjust row count
+  parentNode->rowCount -= last - first + 1;
+  Q_ASSERT(parentNode->rowCount == parentNode->children.size());
+
+  endRemoveRows();
+  resetLoadingState(parentNode, first);
+}
+
+void RemoteModel::doMoveRows(RemoteModel::Node* sourceParentNode, int sourceStart, int sourceEnd, RemoteModel::Node* destParentNode, int destStart)
+{
+  Q_ASSERT(sourceParentNode->rowCount == sourceParentNode->children.size());
+  Q_ASSERT(destParentNode->rowCount == destParentNode->children.size());
+
+  const int destEnd = destStart + sourceEnd - sourceStart;
+  const int amount = sourceEnd - sourceStart + 1;
+
+  const QModelIndex qmiSourceParent = modelIndexForNode(sourceParentNode, 0);
+  const QModelIndex qmiDestParent = modelIndexForNode(destParentNode, 0);
+  beginMoveRows(qmiSourceParent, sourceStart, sourceEnd, qmiDestParent, destStart);
+
+  // make room in the destination
+  if (destStart == destParentNode->children.size())
+    destParentNode->children.resize(destParentNode->children.size() + amount);
+  else
+    destParentNode->children.insert(destStart, amount, 0);
+
+  // move nodes
+  for (int i = 0; i < amount; ++i) {
+    Node *node = sourceParentNode->children.at(sourceStart + i);
+    node->parent = destParentNode;
+    destParentNode->children[destStart + i] = node;
+  }
+
+  // shrink source
+  sourceParentNode->children.remove(sourceStart, amount);
+
+  // adjust row count
+  sourceParentNode->rowCount -= amount;
+  destParentNode->rowCount += amount;
+  Q_ASSERT(sourceParentNode->rowCount == sourceParentNode->children.size());
+  Q_ASSERT(destParentNode->rowCount == destParentNode->children.size());
+
+  endMoveRows();
+  resetLoadingState(sourceParentNode, sourceStart);
+  resetLoadingState(destParentNode, destEnd);
+}

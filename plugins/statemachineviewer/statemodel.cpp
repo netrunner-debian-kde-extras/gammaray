@@ -62,6 +62,7 @@ class StateModelPrivate
 
 // private slots:
   void stateConfigurationChanged();
+  void handleMachineDestroyed(QObject*);
 };
 
 }
@@ -79,7 +80,7 @@ QList<QObject*> StateModelPrivate::children(QObject *parent) const
   }
 
   foreach (QObject *o, parent->children()) {
-    if (o->inherits("QState")) {
+    if (o->inherits("QAbstractState")) {
       result.append(o);
     }
   }
@@ -136,6 +137,15 @@ void StateModelPrivate::stateConfigurationChanged()
   m_lastConfiguration = newConfig;
 }
 
+void StateModelPrivate::handleMachineDestroyed(QObject*)
+{
+  Q_Q(StateModel);
+
+  q->beginResetModel();
+  m_stateMachine = 0;
+  q->endResetModel();
+}
+
 StateModel::StateModel(QObject *parent)
   : ObjectModelBase<QAbstractItemModel>(parent), d_ptr(new StateModelPrivate(this))
 {
@@ -157,10 +167,18 @@ void StateModel::setStateMachine(QStateMachine *stateMachine)
     return;
   }
 
+  if (d->m_stateMachine) {
+    disconnect(d->m_stateMachine, SIGNAL(destroyed(QObject*)), this, SLOT(handleMachineDestroyed(QObject*)));
+  }
+
   beginResetModel();
   d->m_stateMachine = stateMachine;
-  d->m_lastConfiguration = stateMachine->configuration();
+  d->m_lastConfiguration = (stateMachine ? stateMachine->configuration() : QSet<QAbstractState*>());
   endResetModel();
+
+  if (d->m_stateMachine) {
+    connect(d->m_stateMachine, SIGNAL(destroyed(QObject*)), this, SLOT(handleMachineDestroyed(QObject*)));
+  }
 
   d->m_stateMachineWatcher->setWatchedStateMachine(stateMachine);
 }
@@ -210,7 +228,7 @@ QVariant StateModel::data(const QModelIndex &index, int role) const
     }
 
     if (index.column() == 0 && role == Qt::CheckStateRole) {
-      QState *s = qobject_cast<QState*>(obj);
+      QAbstractState *s = qobject_cast<QAbstractState*>(obj);
       if (s) {
         return d->m_stateMachine->configuration().contains(s) ? Qt::Checked : Qt::Unchecked;
       }
