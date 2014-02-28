@@ -1,6 +1,7 @@
 gammaray (2.0.1-1) UNRELEASED; urgency=medium
 
   * New upstream release.
+  * Refreshed d/patches/use-empty-rpath.patch.
 
  -- Jakub Adam <jakub.adam@ktknet.cz>  Fri, 28 Feb 2014 20:05:10 +0100
 
