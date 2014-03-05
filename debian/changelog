@@ -1,9 +1,9 @@
-gammaray (2.0.1-1) UNRELEASED; urgency=medium
+gammaray (2.0.1-1) unstable; urgency=medium
 
   * New upstream release.
   * Refreshed d/patches/use-empty-rpath.patch.
 
- -- Jakub Adam <jakub.adam@ktknet.cz>  Fri, 28 Feb 2014 20:05:10 +0100
+ -- Jakub Adam <jakub.adam@ktknet.cz>  Wed, 05 Mar 2014 19:28:40 +0100
 
 gammaray (2.0.0-1) unstable; urgency=low
 
