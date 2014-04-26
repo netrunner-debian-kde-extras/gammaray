@@ -45,7 +45,8 @@ static QWidget *toplevelWidget(QWidget *widget)
 
 OverlayWidget::OverlayWidget()
   : m_currentToplevelWidget(0),
-    m_currentWidget(0)
+    m_currentWidget(0),
+    m_drawLayoutOutlineOnly(true)
 {
   setAttribute(Qt::WA_TransparentForMouseEvents);
   setFocusPolicy(Qt::NoFocus);
@@ -151,6 +152,8 @@ void OverlayWidget::updatePositions()
     QPainterPath innerPath;
     for (int i = 0; i < m_currentWidget->layout()->count(); ++i) {
       QLayoutItem *item = m_currentWidget->layout()->itemAt(i);
+      if (item->widget() && !item->widget()->isVisible())
+        continue;
       const QRect mappedInnerRect =
         QRect(m_currentWidget->mapTo(m_currentToplevelWidget,
                                      item->geometry().topLeft()), item->geometry().size());
