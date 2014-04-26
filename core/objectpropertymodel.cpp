@@ -38,6 +38,10 @@ ObjectPropertyModel::ObjectPropertyModel(QObject *parent)
 
 void ObjectPropertyModel::setObject(QObject *object)
 {
+  if (m_obj == object)
+    return;
+
+  beginResetModel();
   if (m_obj) {
     unmonitorObject(m_obj.data());
     disconnect(m_obj.data(), 0, this, SLOT(updateAll()));
@@ -60,7 +64,7 @@ void ObjectPropertyModel::setObject(QObject *object)
       }
     }
   }
-  reset();
+  endResetModel();
 }
 
 QVariant ObjectPropertyModel::headerData(int section, Qt::Orientation orientation, int role) const
@@ -93,3 +97,7 @@ void ObjectPropertyModel::doEmitChanged()
   emit dataChanged(index(0, 0), index(rowCount() - 1, columnCount() - 1));
 }
 
+void ObjectPropertyModel::slotReset()
+{
+  reset();
+}
