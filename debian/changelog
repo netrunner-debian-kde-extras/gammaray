@@ -1,4 +1,4 @@
-gammaray (2.0.2-1) UNRELEASED; urgency=medium
+gammaray (2.0.2-1) unstable; urgency=medium
 
   [ Jakub Adam ]
   * New upstream release.
@@ -7,7 +7,7 @@ gammaray (2.0.2-1) UNRELEASED; urgency=medium
   [ Felix Geyer ]
   * Make gammaray-dev depend on gammaray-probe-qt4 to fix broken symlinks.
 
- -- Jakub Adam <jakub.adam@ktknet.cz>  Sat, 26 Apr 2014 08:16:36 +0200
+ -- Jakub Adam <jakub.adam@ktknet.cz>  Tue, 06 May 2014 23:01:05 +0200
 
 gammaray (2.0.1-1) unstable; urgency=medium
 
