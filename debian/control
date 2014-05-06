@@ -78,6 +78,7 @@ Package: gammaray-dev
 Architecture: any
 Section: libdevel
 Depends: gammaray (= ${binary:Version}),
+         gammaray-probe-qt4 (= ${binary:Version}),
          ${misc:Depends}
 Description: GammaRay plugin development files
  GammaRay is a tool for examining the internals of a Qt application and

@@ -1,7 +1,11 @@
 gammaray (2.0.2-1) UNRELEASED; urgency=medium
 
+  [ Jakub Adam ]
   * New upstream release.
   * Re-enable tests in Qt5 build.
+
+  [ Felix Geyer ]
+  * Make gammaray-dev depend on gammaray-probe-qt4 to fix broken symlinks.
 
  -- Jakub Adam <jakub.adam@ktknet.cz>  Sat, 26 Apr 2014 08:16:36 +0200
 
