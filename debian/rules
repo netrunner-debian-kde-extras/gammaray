@@ -28,6 +28,10 @@ override_dh_auto_install:
 	dh_auto_install -B obj-qt4
 	rm -f debian/tmp/usr/share/doc/gammaray/License.txt
 
+override_dh_auto_clean:
+	dh_auto_clean -B obj-qt5
+	dh_auto_clean -B obj-qt4
+
 override_dh_installdocs:
 	dh_installdocs --link-doc=gammaray
 
