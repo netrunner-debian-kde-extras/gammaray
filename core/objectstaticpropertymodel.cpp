@@ -24,8 +24,15 @@
 #include "objectstaticpropertymodel.h"
 #include "varianthandler.h"
 #include "util.h"
+#include "probe.h"
+#include "toolmodel.h"
+#include "toolfactory.h"
+#include "metaobjectrepository.h"
+
+#include <common/propertymodel.h>
 
 #include <QMetaProperty>
+#include <QStringList>
 
 using namespace GammaRay;
 
@@ -47,13 +54,13 @@ QVariant ObjectStaticPropertyModel::data(const QModelIndex &index, int role) con
   }
 
   const QMetaProperty prop = m_obj.data()->metaObject()->property(index.row());
+  const QVariant value = prop.read(m_obj.data());
   if (role == Qt::DisplayRole) {
     if (index.column() == 0) {
       return prop.name();
     } else if (index.column() == 1) {
       // QMetaProperty::read sets QVariant::typeName to int for enums,
       // so we need to handle that separately here
-      const QVariant value = prop.read(m_obj.data());
       const QString enumStr = Util::enumToString(value, prop.typeName(), m_obj.data());
       if (!enumStr.isEmpty()) {
         return enumStr;
@@ -70,26 +77,32 @@ QVariant ObjectStaticPropertyModel::data(const QModelIndex &index, int role) con
     }
   } else if (role == Qt::DecorationRole) {
     if (index.column() == 1) {
-      return VariantHandler::decoration(prop.read(m_obj.data()));
+      return VariantHandler::decoration(value);
     }
   } else if (role == Qt::EditRole) {
     if (index.column() == 1) {
-      return prop.read(m_obj.data());
+      return value;
     }
   } else if (role == Qt::ToolTipRole) {
-    const QString toolTip =
-      tr("Constant: %1\nDesignable: %2\nFinal: %3\nResetable: %4\n"
-         "Has notification: %5\nScriptable: %6\nStored: %7\nUser: %8\nWritable: %9").
-      arg(translateBool(prop.isConstant())).
-      arg(translateBool(prop.isDesignable(m_obj.data()))).
-      arg(translateBool(prop.isFinal())).
-      arg(translateBool(prop.isResettable())).
-      arg(translateBool(prop.hasNotifySignal())).
-      arg(translateBool(prop.isScriptable(m_obj.data()))).
-      arg(translateBool(prop.isStored(m_obj.data()))).
-      arg(translateBool(prop.isUser(m_obj.data()))).
-      arg(translateBool(prop.isWritable()));
-    return toolTip;
+    return detailString(prop);
+  } else if (role == PropertyModel::ActionRole) {
+    return (prop.isResettable() ? PropertyModel::Reset : PropertyModel::NoAction)
+         | ((MetaObjectRepository::instance()->metaObject(value.typeName()) && *reinterpret_cast<void* const*>(value.data())) || value.value<QObject*>()
+            ? PropertyModel::NavigateTo
+            : PropertyModel::NoAction);
+  } else if (role == PropertyModel::ValueRole) {
+    return value;
+  } else if (role == PropertyModel::AppropriateToolRole) {
+    ToolModel *toolModel = Probe::instance()->toolModel();
+    ToolFactory *factory;
+    if (value.canConvert<QObject*>())
+      factory = toolModel->data(toolModel->toolForObject(value.value<QObject*>()), ToolModelRole::ToolFactory).value<ToolFactory*>();
+    else
+      factory = toolModel->data(toolModel->toolForObject(*reinterpret_cast<void* const*>(value.data()), value.typeName()), ToolModelRole::ToolFactory).value<ToolFactory*>();
+    if (factory) {
+      return factory->name();
+    }
+    return QVariant();
   }
 
   return QVariant();
@@ -107,14 +120,6 @@ bool ObjectStaticPropertyModel::setData(const QModelIndex &index, const QVariant
     return result;
   }
   return ObjectPropertyModel::setData(index, value, role);
-}
-
-int ObjectStaticPropertyModel::columnCount(const QModelIndex &parent) const
-{
-  if (parent.isValid()) {
-    return 0;
-  }
-  return 4;
 }
 
 int ObjectStaticPropertyModel::rowCount(const QModelIndex &parent) const
@@ -141,3 +146,62 @@ Qt::ItemFlags ObjectStaticPropertyModel::flags(const QModelIndex &index) const
   return flags;
 }
 
+void ObjectStaticPropertyModel::monitorObject(QObject* obj)
+{
+  for (int i = 0; i < obj->metaObject()->propertyCount(); ++i) {
+    const QMetaProperty prop = obj->metaObject()->property(i);
+    if (prop.hasNotifySignal()) {
+      connect(obj, QByteArray("2") +
+#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
+      prop.notifySignal().signature()
+#else
+      prop.notifySignal().methodSignature()
+#endif
+      , this, SLOT(propertyUpdated()));
+      m_notifyToPropertyMap.insert(prop.notifySignalIndex(), i);
+    }
+  }
+}
+
+void ObjectStaticPropertyModel::unmonitorObject(QObject* obj)
+{
+  disconnect(obj, 0, this, SLOT(propertyUpdated()));
+  m_notifyToPropertyMap.clear();
+}
+
+void ObjectStaticPropertyModel::propertyUpdated()
+{
+#if QT_VERSION >= QT_VERSION_CHECK(4, 8, 0)
+  Q_ASSERT(senderSignalIndex() >= 0);
+  const int propertyIndex = m_notifyToPropertyMap.value(senderSignalIndex());
+  emit dataChanged(index(propertyIndex, 1), index(propertyIndex, 1));
+#else
+  emit dataChanged(index(0,1), index(rowCount() - 1, 1));
+#endif
+}
+
+QString ObjectStaticPropertyModel::detailString(const QMetaProperty& prop) const
+{
+  QStringList s;
+  s << tr("Constant: %1").arg(translateBool(prop.isConstant()));
+  s << tr("Designable: %1").arg(translateBool(prop.isDesignable(m_obj.data())));
+  s << tr("Final: %1").arg(translateBool(prop.isFinal()));
+  if (prop.hasNotifySignal()) {
+#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
+    s << tr("Notification: %1").arg(prop.notifySignal().signature());
+#else
+    s << tr("Notification: %1").arg(QString::fromUtf8(prop.notifySignal().methodSignature()));
+#endif
+  } else {
+    s << tr("Notification: no");
+  }
+  s << tr("Resetable: %1").arg(translateBool(prop.isResettable()));
+#if QT_VERSION >= QT_VERSION_CHECK(5, 1, 0)
+  s << tr("Revision: %1").arg(prop.revision());
+#endif
+  s << tr("Scriptable: %1").arg(translateBool(prop.isScriptable(m_obj.data())));
+  s << tr("Stored: %1").arg(translateBool(prop.isStored(m_obj.data())));
+  s << tr("User: %1").arg(translateBool(prop.isUser(m_obj.data())));
+  s << tr("Writable: %1").arg(translateBool(prop.isWritable()));
+  return s.join("\n");
+}

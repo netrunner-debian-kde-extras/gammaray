@@ -25,6 +25,10 @@
 
 #include <QVariant>
 #include <QProcess>
+#include <QFileInfo>
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+#include <QStandardPaths>
+#endif
 
 using namespace GammaRay;
 
@@ -64,6 +68,24 @@ void LaunchOptions::setLaunchArguments(const QStringList& args)
   Q_ASSERT(m_pid <= 0 || m_launchArguments.isEmpty());
 }
 
+QString LaunchOptions::absoluteExecutablePath() const
+{
+  if (m_launchArguments.isEmpty())
+    return QString();
+
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+  QString path = m_launchArguments.first();
+  const QFileInfo fi(path);
+  if (fi.isFile() && fi.isExecutable())
+    return path;
+  path = QStandardPaths::findExecutable(m_launchArguments.first());
+  if (!path.isEmpty())
+    return path;
+#endif
+
+  return m_launchArguments.first();
+}
+
 int LaunchOptions::pid() const
 {
   return m_pid;
@@ -96,12 +118,12 @@ void LaunchOptions::setInjectorType(const QString& injectorType)
   m_injectorType = injectorType;
 }
 
-QString LaunchOptions::probeABI() const
+ProbeABI LaunchOptions::probeABI() const
 {
   return m_probeABI;
 }
 
-void LaunchOptions::setProbeABI(const QString& abi)
+void LaunchOptions::setProbeABI(const ProbeABI& abi)
 {
   m_probeABI = abi;
 }
@@ -149,9 +171,9 @@ bool LaunchOptions::execute(const QString& launcherPath) const
       break;
   }
 
-  if (!m_probeABI.isEmpty()) {
+  if (m_probeABI.isValid()) {
     args.push_back("--probe");
-    args.push_back(m_probeABI);
+    args.push_back(m_probeABI.id());
   }
 
   if (m_probeSettings.contains("TCPServer")) {

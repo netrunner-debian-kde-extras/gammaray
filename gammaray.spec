@@ -1,5 +1,5 @@
 Name:           gammaray
-Version:        2.0.2
+Version:        2.1.0
 Release:        2
 Summary:        An introspection tool for Qt applications
 Source:         %{name}-%{version}.tar.gz
@@ -10,8 +10,8 @@ BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 Vendor:         Klaralvdalens Datakonsult AB (KDAB)
 Packager:       Klaralvdalens Datakonsult AB (KDAB) <info@kdab.com>
 
-%define rel 2.0
-%define sover 2.0.2
+%define rel 2.1
+%define sover 2.1.0
 %define qtver qt4.8
 %define this_arch %(uname -p)
 %if %{this_arch} == "athlon"
@@ -22,7 +22,7 @@ Packager:       Klaralvdalens Datakonsult AB (KDAB) <info@kdab.com>
 %if %{defined suse_version}
 BuildRequires:  libqt4-devel libQtWebKit-devel cmake graphviz-devel update-desktop-files libkde4-devel
 %if 0%{?suse_version} >= 1220
-BuildRequires:  vtk-devel
+BuildRequires:  vtk-devel libxml2-devel
 %endif
 # missing dependency for VTK in openSUSE Factory
 %if 0%{?suse_version} > 1230
@@ -119,6 +119,8 @@ cmake . -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release
 %files
 %defattr(-,root,root)
 %{_prefix}/share/applications/GammaRay.desktop
+%dir %{_prefix}/share/appdata/
+%{_prefix}/share/appdata/GammaRay.appdata.xml
 %{_prefix}/share/icons/hicolor
 %{_prefix}/share/doc/gammaray
 %{_mandir}/man1/gammaray.1.gz
@@ -197,6 +199,10 @@ cmake . -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release
 %{_libdir}/cmake/GammaRay/
 
 %changelog
+* Fri Jun 27 2014 Allen Winter <allen.winter@kdab.com> 2.1.0
+  2.1.0 final
+* Thu Jun 26 2014 Allen Winter <allen.winter@kdab.com> 2.0.98
+  2.1.0 release candidate 1
 * Fri Apr 18 2014 Allen Winter <allen.winter@kdab.com> 2.0.2
   2.0.2 final
 * Fri Feb 28 2014 Allen Winter <allen.winter@kdab.com> 2.0.1

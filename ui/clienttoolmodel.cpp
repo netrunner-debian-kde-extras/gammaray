@@ -62,7 +62,6 @@ MAKE_FACTORY(MetaObjectBrowser, true);
 MAKE_FACTORY(MetaTypeBrowser, true);
 MAKE_FACTORY(MimeTypes, true);
 MAKE_FACTORY(ModelInspector, true);
-MAKE_FACTORY(ObjectInspector, true);
 MAKE_FACTORY(ResourceBrowser, true);
 MAKE_FACTORY(StandardPaths, true);
 MAKE_FACTORY(TextDocumentInspector, false);
@@ -84,6 +83,8 @@ ClientToolModel::ClientToolModel(QObject* parent) : QSortFilterProxyModel(parent
   PluginManager<ToolUiFactory, ProxyToolUiFactory> pm;
   foreach(ToolUiFactory* factory, pm.plugins())
     insertFactory(factory);
+
+  connect(this, SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(updateToolInitialization(QModelIndex,QModelIndex)));
 }
 
 ClientToolModel::~ClientToolModel()
@@ -107,6 +108,10 @@ QVariant ClientToolModel::data(const QModelIndex& index, int role) const
       ToolUiFactory *factory = m_factories.value(toolId);
       if (!factory)
         return QVariant();
+      if (m_inactiveTools.contains(factory)) {
+        factory->initUi();
+        m_inactiveTools.remove(factory);
+      }
       QWidget *widget = factory->createWidget(m_parentWidget);
       m_widgets.insert(toolId, widget);
       return QVariant::fromValue(widget);
@@ -148,9 +153,27 @@ Qt::ItemFlags ClientToolModel::flags(const QModelIndex &index) const
   return ret;
 }
 
+void ClientToolModel::updateToolInitialization(const QModelIndex& topLeft, const QModelIndex& bottomRight)
+{
+  for (int i = topLeft.row(); i <= bottomRight.row(); i++) {
+    QModelIndex index = QSortFilterProxyModel::index(i, 0);
+
+    if (QSortFilterProxyModel::data(index, ToolModelRole::ToolEnabled).toBool()) {
+      const QString toolId = QSortFilterProxyModel::data(index, ToolModelRole::ToolId).toString();
+      ToolUiFactory *factory = m_factories.value(toolId);
+
+      if (factory && (factory->remotingSupported() || !Endpoint::instance()->isRemoteClient()) && m_inactiveTools.contains(factory)) {
+        factory->initUi();
+        m_inactiveTools.remove(factory);
+      }
+    }
+  }
+}
+
 void ClientToolModel::insertFactory(ToolUiFactory* factory)
 {
   m_factories.insert(factory->id(), factory);
+  m_inactiveTools.insert(factory);
 }
 
 

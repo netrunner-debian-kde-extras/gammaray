@@ -1,6 +1,6 @@
 #!/bin/bash
 
-find "$@" -name '*.h' -o -name '*.cpp' | grep -v /3rdparty/ | grep -v /qmldebugcontrol/ | grep -v /StackWalker | grep -v /modeltest | grep -v /processlist | grep -v /interactiveprocess | grep -v /build | while read FILE; do
+find "$@" -name '*.h' -o -name '*.cpp' -o -name '*.qml' | grep -v /3rdparty/ | grep -v /qmldebugcontrol/ | grep -v /StackWalker | grep -v /modeltest | grep -v /processlist | grep -v /interactiveprocess | grep -v /build | while read FILE; do
     if grep -qiE "Copyright \(C\) [0-9, -]{4,} Klar.*lvdalens Datakonsult AB" "$FILE" ; then continue; fi
     thisfile=`basename $FILE`
     authorName=`git config user.name`
@@ -44,8 +44,8 @@ find "$@" -name 'CMakeLists.txt' | while read FILE; do
 #  This file is part of GammaRay, the Qt application inspection and
 #  manipulation tool.
 #
-#  Copyright (C) 2010-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
-#  Author: Volker Krause <volker.krause@kdab.com>
+#  Copyright (C) $thisYear Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+#  Author: $authorName <$authorEmail>
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by

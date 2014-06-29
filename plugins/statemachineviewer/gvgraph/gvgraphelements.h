@@ -19,8 +19,8 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef GAMMARAY_GVGRAPHELEMENTS_H
-#define GAMMARAY_GVGRAPHELEMENTS_H
+#ifndef GAMMARAY_STATEMACHINEVIEWER_GVGRAPHELEMENTS_H
+#define GAMMARAY_STATEMACHINEVIEWER_GVGRAPHELEMENTS_H
 
 #include <QColor>
 #include <QFont>
@@ -36,8 +36,8 @@ class GVElement
     friend class GVGraph;
 
     explicit GVElement(const QString &name)
-      : m_name(name)
-      , m_font(QFont("Helvetica [Cronxy]", 6))
+      : m_font(QFont("Helvetica [Cronxy]", 6)),
+        m_name(name)
     {
     }
 

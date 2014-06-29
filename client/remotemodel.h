@@ -24,6 +24,7 @@
 #ifndef GAMMARAY_REMOTEMODEL_H
 #define GAMMARAY_REMOTEMODEL_H
 
+#include <common/objectmodel.h>
 #include <common/protocol.h>
 
 #include <QAbstractItemModel>
@@ -57,6 +58,18 @@ class RemoteModel : public QAbstractItemModel
     void serverRegistered(const QString &objectName, Protocol::ObjectAddress objectAddress);
     void serverUnregistered(const QString& objectName, Protocol::ObjectAddress objectAddress);
 
+  public:
+    enum Roles {
+      LoadingState = ObjectModel::UserRole + 128 // TODO: Tidy up roles in general (and give loading state a proper id)
+    };
+    enum NodeState {
+      NoState = 0,
+      Empty = 1,
+      Loading = 2,
+      Outdated = 4
+    };
+    Q_DECLARE_FLAGS(NodeStates, NodeState)
+
   private:
     struct Node { // represents one row
       Node() : parent(0), rowCount(-1), columnCount(-1) {}
@@ -67,7 +80,7 @@ class RemoteModel : public QAbstractItemModel
       qint32 columnCount;
       QHash<int, QHash<int, QVariant> > data; // column -> role -> data
       QHash<int, Qt::ItemFlags> flags;        // column -> flags
-      QSet<int> loading;                      // columns waiting for data (ie. showing "Loading...")
+      QHash<int, NodeStates> state;           // column -> state (cache outdated, waiting for data, etc)
     };
 
     void clear();
@@ -78,6 +91,8 @@ class RemoteModel : public QAbstractItemModel
     Node* nodeForIndex(const QModelIndex &index) const;
     Node* nodeForIndex(const Protocol::ModelIndex &index) const;
     QModelIndex modelIndexForNode(GammaRay::RemoteModel::Node* node, int column) const;
+
+    NodeStates stateForColumn(Node* node, int columnIndex) const;
 
     void requestRowColumnCount(const QModelIndex &index) const;
     void requestDataAndFlags(const QModelIndex &index) const;
@@ -105,5 +120,8 @@ class RemoteModel : public QAbstractItemModel
 };
 
 }
+
+Q_DECLARE_OPERATORS_FOR_FLAGS(GammaRay::RemoteModel::NodeStates)
+Q_DECLARE_METATYPE(GammaRay::RemoteModel::NodeStates)
 
 #endif

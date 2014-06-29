@@ -38,13 +38,14 @@ class ObjectPropertyModel : public QAbstractTableModel
     explicit ObjectPropertyModel(QObject *parent = 0);
     void setObject(QObject *object);
 
+    int columnCount(const QModelIndex& parent = QModelIndex()) const;
     QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
+    QMap<int, QVariant> itemData(const QModelIndex& index) const;
 
   protected:
     /** Reimplement to set up watching property change notifications. */
-    // TODO make these pure virtual once property signal handling is moved to the static property model
-    virtual void monitorObject(QObject* obj) { Q_UNUSED(obj); };
-    virtual void unmonitorObject(QObject* obj) { Q_UNUSED(obj); };
+    virtual void monitorObject(QObject* obj) = 0;
+    virtual void unmonitorObject(QObject* obj) = 0;
 
     QPointer<QObject> m_obj;
 

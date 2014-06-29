@@ -23,13 +23,19 @@
 
 #include "objectdynamicpropertymodel.h"
 #include "varianthandler.h"
+#include "toolmodel.h"
+#include "probe.h"
+#include "toolfactory.h"
+#include "metaobjectrepository.h"
+
+#include <common/propertymodel.h>
 
 #include <QEvent>
 
 using namespace GammaRay;
 
 ObjectDynamicPropertyModel::ObjectDynamicPropertyModel(QObject *parent)
-  : ObjectPropertyModel(parent)
+  : ObjectPropertyModel(parent), m_propertyCount(0)
 {
   connect(this, SIGNAL(modelReset()), SLOT(updatePropertyCount()));
 }
@@ -46,16 +52,36 @@ QVariant ObjectDynamicPropertyModel::data(const QModelIndex &index, int role) co
   }
 
   const QByteArray propName = propNames.at(index.row());
+  const QVariant propValue = m_obj.data()->property(propName);
 
   if (role == Qt::DisplayRole || role == Qt::EditRole) {
-    const QVariant propValue = m_obj.data()->property(propName);
     if (index.column() == 0) {
       return QString::fromUtf8(propName);
     } else if (index.column() == 1) {
       return role == Qt::EditRole ? propValue : VariantHandler::displayString(propValue);
     } else if (index.column() == 2) {
       return propValue.typeName();
+    } else if (index.column() == 3) {
+      return tr("<dynamic>");
     }
+  } else if (role == PropertyModel::ActionRole) {
+    return PropertyModel::Delete
+         | ((MetaObjectRepository::instance()->metaObject(propValue.typeName()) && *reinterpret_cast<void* const*>(propValue.data())) || propValue.value<QObject*>()
+            ? PropertyModel::NavigateTo
+            : PropertyModel::NoAction);
+  } else if (role == PropertyModel::ValueRole) {
+    return propValue;
+  } else if (role == PropertyModel::AppropriateToolRole) {
+    ToolModel *toolModel = Probe::instance()->toolModel();
+    ToolFactory *factory;
+    if (propValue.canConvert<QObject*>())
+      factory = toolModel->data(toolModel->toolForObject(propValue.value<QObject*>()), ToolModelRole::ToolFactory).value<ToolFactory*>();
+    else
+      factory = toolModel->data(toolModel->toolForObject(*reinterpret_cast<void* const*>(propValue.data()), propValue.typeName()), ToolModelRole::ToolFactory).value<ToolFactory*>();
+    if (factory) {
+      return factory->name();
+    }
+    return QVariant();
   }
 
   return QVariant();
@@ -91,14 +117,6 @@ Qt::ItemFlags ObjectDynamicPropertyModel::flags(const QModelIndex &index) const
   }
 
   return flags | Qt::ItemIsEditable;
-}
-
-int ObjectDynamicPropertyModel::columnCount(const QModelIndex &parent) const
-{
-  if (parent.isValid()) {
-    return 0;
-  }
-  return 3;
 }
 
 int ObjectDynamicPropertyModel::rowCount(const QModelIndex &parent) const

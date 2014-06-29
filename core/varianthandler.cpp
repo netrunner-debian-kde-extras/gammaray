@@ -318,6 +318,26 @@ QString VariantHandler::displayString(const QVariant &value)
     return (*it.value())(value);
   }
 
+  // recurse into sequences
+#if QT_VERSION >= QT_VERSION_CHECK(5, 2, 0)
+  if (value.canConvert<QVariantList>()) {
+    QStringList s;
+    QSequentialIterable it = value.value<QSequentialIterable>();
+    int emptyStrings = 0;
+    foreach (const QVariant &v, it) {
+      s.push_back(displayString(v));
+      if (s.last().isEmpty())
+        ++emptyStrings;
+    }
+    if (it.size() == 0)
+      return QObject::tr("<empty>");
+    else if (it.size() == emptyStrings) // we don't know the content either
+      return QObject::tr("%1 entries").arg(emptyStrings);
+    else
+      return s.join(", ");
+  }
+#endif
+
   return value.toString();
 }
 
@@ -335,6 +355,7 @@ QVariant VariantHandler::decoration(const QVariant &value)
       painter.drawRect(0, 0, p.width() - 1, p.height() - 1);
       return p;
     }
+    break;
   }
   case QVariant::Color:
   {
@@ -346,6 +367,7 @@ QVariant VariantHandler::decoration(const QVariant &value)
       painter.drawRect(0, 0, p.width() - 1, p.height() - 1);
       return p;
     }
+    break;
   }
 #ifndef QT_NO_CURSOR
   case QVariant::Cursor:
@@ -354,6 +376,7 @@ QVariant VariantHandler::decoration(const QVariant &value)
     if (!c.pixmap().isNull()) {
       return c.pixmap().scaled(16, 16, Qt::KeepAspectRatio, Qt::FastTransformation);
     }
+    break;
   }
 #endif
   case QVariant::Icon:
@@ -372,6 +395,7 @@ QVariant VariantHandler::decoration(const QVariant &value)
       painter.drawLine(0, 0, p.width(), 0);
       return p;
     }
+    break;
   }
   case QVariant::Pixmap:
   {
@@ -379,6 +403,7 @@ QVariant VariantHandler::decoration(const QVariant &value)
     if(!p.isNull()) {
       return QVariant::fromValue(p.scaled(16, 16, Qt::KeepAspectRatio, Qt::FastTransformation));
     }
+    break;
   }
   default: break;
   }

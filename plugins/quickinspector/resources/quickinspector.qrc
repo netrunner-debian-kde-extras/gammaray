@@ -1,0 +1,15 @@
+<RCC>
+  <qresource prefix="gammaray/plugins/quickinspector">
+    <file>quickpreview.qml</file>
+    <file>focus.png</file>
+    <file>warning.png</file>
+    <file>active-focus.png</file>
+    <file>visualize-clipping.png</file>
+    <file>visualize-overdraw.png</file>
+    <file>visualize-batches.png</file>
+    <file>visualize-changes.png</file>
+    <file>measure-pixels.png</file>
+    <file>redirect-input.png</file>
+    <file>move-preview.png</file>
+  </qresource>
+</RCC>

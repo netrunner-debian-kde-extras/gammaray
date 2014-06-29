@@ -24,6 +24,7 @@
 #include "probefinder.h"
 
 #include <common/paths.h>
+#include <common/probeabi.h>
 
 #include <qglobal.h>
 #include <QCoreApplication>
@@ -33,14 +34,16 @@
 #include <QString>
 #include <QStringBuilder>
 
+#include <algorithm>
+
 namespace GammaRay {
 
 namespace ProbeFinder {
 
-QString findProbe(const QString &baseName, const QString &probeAbi)
+QString findProbe(const QString &baseName, const ProbeABI &probeAbi)
 {
   const QString probePath =
-    Paths::probePath(probeAbi) %
+    Paths::probePath(probeAbi.id()) %
     QDir::separator() %
     baseName %
     fileExtension();
@@ -56,10 +59,36 @@ QString findProbe(const QString &baseName, const QString &probeAbi)
   return canonicalPath;
 }
 
-QStringList listProbeABIs()
+ProbeABI findBestMatchingABI(const ProbeABI& targetABI)
 {
+  return findBestMatchingABI(targetABI, listProbeABIs());
+}
+
+ProbeABI findBestMatchingABI(const ProbeABI &targetABI, const QVector<ProbeABI> &availableABIs)
+{
+  QVector<ProbeABI> compatABIs;
+  foreach (const ProbeABI &abi, availableABIs) {
+    if (targetABI.isCompatible(abi))
+      compatABIs.push_back(abi);
+  }
+
+  if (compatABIs.isEmpty())
+    return ProbeABI();
+
+  std::sort(compatABIs.begin(), compatABIs.end());
+  return compatABIs.last();
+}
+
+QVector<ProbeABI> listProbeABIs()
+{
+  QVector<ProbeABI> abis;
   const QDir dir(Paths::probePath(QString()));
-  return dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+  foreach (const QString &abiId, dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot)) {
+    const ProbeABI abi = ProbeABI::fromString(abiId);
+    if (abi.isValid())
+      abis.push_back(abi);
+  }
+  return abis;
 }
 
 QString fileExtension()
