@@ -49,6 +49,8 @@ class ObjectInspector : public QObject
     void objectSelected(QObject *object);
 
   private:
+    void registerPCExtensions();
+
     PropertyController *m_propertyController;
     QItemSelectionModel *m_selectionModel;
 };

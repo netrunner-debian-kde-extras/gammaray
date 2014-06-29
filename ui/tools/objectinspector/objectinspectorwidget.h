@@ -25,6 +25,18 @@
 #define GAMMARAY_OBJECTINSPECTOR_OBJECTINSPECTORWIDGET_H
 
 #include <QWidget>
+#include "tooluifactory.h"
+#include "propertywidget.h"
+#include "propertiestab.h"
+#include "methodstab.h"
+#include "connectionstab.h"
+#include "enumstab.h"
+#include "classinfotab.h"
+#include "propertiesextensionclient.h"
+#include "methodsextensionclient.h"
+#include "connectionsextensionclient.h"
+
+#include <common/objectbroker.h>
 
 class QItemSelection;
 
@@ -32,6 +44,12 @@ namespace GammaRay {
 
 namespace Ui {
   class ObjectInspectorWidget;
+}
+
+template <typename T>
+static QObject* createExtension(const QString &name, QObject *parent)
+{
+  return new T(name, parent);
 }
 
 class ObjectInspectorWidget : public QWidget
@@ -46,6 +64,24 @@ class ObjectInspectorWidget : public QWidget
 
   private:
     QScopedPointer<Ui::ObjectInspectorWidget> ui;
+};
+
+class ObjectInspectorFactory : public ToolUiFactory {
+public:
+  virtual inline QString id() const { return "GammaRay::ObjectInspector"; }
+  virtual inline QWidget *createWidget(QWidget *parentWidget) { return new ObjectInspectorWidget(parentWidget); }
+  virtual inline bool remotingSupported() const { return true; }
+  virtual void initUi()
+  {
+    PropertyWidget::registerTab<PropertiesTab>("properties", QObject::tr("Properties"));
+    ObjectBroker::registerClientObjectFactoryCallback<PropertiesExtensionInterface*>(createExtension<PropertiesExtensionClient>);
+    PropertyWidget::registerTab<MethodsTab>("methods", QObject::tr("Methods"));
+    ObjectBroker::registerClientObjectFactoryCallback<MethodsExtensionInterface*>(createExtension<MethodsExtensionClient>);
+    PropertyWidget::registerTab<ConnectionsTab>("connections", QObject::tr("Connections"));
+    ObjectBroker::registerClientObjectFactoryCallback<ConnectionsExtensionInterface*>(createExtension<ConnectionsExtensionClient>);
+    PropertyWidget::registerTab<EnumsTab>("enums", QObject::tr("Enums"));
+    PropertyWidget::registerTab<ClassInfoTab>("classInfo", QObject::tr("Class Info"));
+  }
 };
 
 }

@@ -24,6 +24,11 @@
 #include "objectinspector.h"
 #include "propertycontroller.h"
 #include "probeinterface.h"
+#include "methodsextension.h"
+#include "classinfoextension.h"
+#include "enumsextension.h"
+#include "propertiesextension.h"
+#include "connectionsextension.h"
 
 #include <common/objectbroker.h>
 #include <common/objectmodel.h>
@@ -34,9 +39,12 @@
 using namespace GammaRay;
 
 ObjectInspector::ObjectInspector(ProbeInterface *probe, QObject *parent)
-  : QObject(parent),
-  m_propertyController(new PropertyController("com.kdab.GammaRay.ObjectInspector", this))
+  : QObject(parent)
 {
+  registerPCExtensions();
+
+  m_propertyController = new PropertyController("com.kdab.GammaRay.ObjectInspector", this);
+
   m_selectionModel = ObjectBroker::selectionModel(ObjectBroker::model("com.kdab.GammaRay.ObjectTree"));
 
   connect(m_selectionModel,
@@ -102,3 +110,11 @@ void ObjectInspector::objectSelected(QObject *object)
   objectSelected(index);
 }
 
+void ObjectInspector::registerPCExtensions()
+{
+  PropertyController::registerExtension<ClassInfoExtension>();
+  PropertyController::registerExtension<MethodsExtension>();
+  PropertyController::registerExtension<EnumsExtension>();
+  PropertyController::registerExtension<PropertiesExtension>();
+  PropertyController::registerExtension<ConnectionsExtension>();
+}

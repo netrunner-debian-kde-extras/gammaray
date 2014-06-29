@@ -21,23 +21,24 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "core/probe.h"
+#include <config-gammaray.h>
+
+#include "hooks.h"
 #include "functionoverwriterfactory.h"
 #include "probecreator.h"
 
+#include <core/probe.h>
+
 #include <QCoreApplication>
 
-#ifndef Q_OS_WIN
-#include <dlfcn.h>
-#else
-#include <windows.h>
+#ifdef GAMMARAY_USE_QHOOKS
+#include <private/qhooks_p.h>
 #endif
 
 #include <stdio.h>
 #include <cassert>
 
 #ifdef Q_OS_MAC
-#include <dlfcn.h>
 #include <inttypes.h>
 #include <sys/mman.h>
 #include <sys/types.h>
@@ -48,127 +49,99 @@
 
 using namespace GammaRay;
 
-bool functionsOverwritten = false;
-
-extern "C" Q_DECL_EXPORT void qt_startup_hook()
+extern "C" Q_DECL_EXPORT void gammaray_startup_hook()
 {
   Probe::startupHookReceived();
 
   new ProbeCreator(ProbeCreator::CreateOnly);
-#if !defined Q_OS_WIN && !defined Q_OS_MAC
-  if (!functionsOverwritten) {
-    static void(*next_qt_startup_hook)() = (void (*)()) dlsym(RTLD_NEXT, "qt_startup_hook");
-    next_qt_startup_hook();
-  }
-#endif
 }
 
-extern "C" Q_DECL_EXPORT void qt_addObject(QObject *obj)
+extern "C" Q_DECL_EXPORT void gammaray_addObject(QObject *obj)
 {
   Probe::objectAdded(obj, true);
-
-#if !defined Q_OS_WIN && !defined Q_OS_MAC
-  if (!functionsOverwritten) {
-    static void (*next_qt_addObject)(QObject *obj) =
-      (void (*)(QObject *obj)) dlsym(RTLD_NEXT, "qt_addObject");
-    next_qt_addObject(obj);
-  }
-#endif
 }
 
-extern "C" Q_DECL_EXPORT void qt_removeObject(QObject *obj)
+extern "C" Q_DECL_EXPORT void gammaray_removeObject(QObject *obj)
 {
   Probe::objectRemoved(obj);
-
-#if !defined Q_OS_WIN && !defined Q_OS_MAC
-  if (!functionsOverwritten) {
-    static void (*next_qt_removeObject)(QObject *obj) =
-      (void (*)(QObject *obj)) dlsym(RTLD_NEXT, "qt_removeObject");
-    next_qt_removeObject(obj);
-  }
-#endif
 }
 
-#ifndef GAMMARAY_UNKNOWN_CXX_MANGLED_NAMES
-#ifndef Q_OS_WIN
-Q_DECL_EXPORT const char *qFlagLocation(const char *method)
-#else
-Q_DECL_EXPORT const char *myFlagLocation(const char *method)
-#endif
+const char* gammaray_flagLocation(const char* method)
 {
   SignalSlotsLocationStore::flagLocation(method);
-
-#ifndef Q_OS_WIN
-  static const char *(*next_qFlagLocation)(const char *method) =
-    (const char * (*)(const char *method)) dlsym(RTLD_NEXT, "_Z13qFlagLocationPKc");
-
-  Q_ASSERT_X(next_qFlagLocation, "",
-             "Recompile with GAMMARAY_UNKNOWN_CXX_MANGLED_NAMES enabled, "
-             "your compiler uses an unsupported C++ name mangling scheme");
-  return next_qFlagLocation(method);
-#else
   return method;
-#endif
+}
+
+#ifdef GAMMARAY_USE_QHOOKS
+static void installQHooks()
+{
+  Q_ASSERT(qtHookData[QHooks::HookDataVersion] >= 1);
+  Q_ASSERT(qtHookData[QHooks::HookDataSize] >= 6);
+
+  if (qtHookData[QHooks::AddQObject] || qtHookData[QHooks::RemoveQObject] || qtHookData[QHooks::Startup])
+    qFatal("There is another debugging tool using QHooks already, this is not yet supported!\n");
+
+  qtHookData[QHooks::AddQObject] = reinterpret_cast<quintptr>(&gammaray_addObject);
+  qtHookData[QHooks::RemoveQObject] = reinterpret_cast<quintptr>(&gammaray_removeObject);
+  qtHookData[QHooks::Startup] = reinterpret_cast<quintptr>(&gammaray_startup_hook);
 }
 #endif
 
-#if defined(Q_OS_WIN) || defined(Q_OS_MAC)
-void overwriteQtFunctions()
+#ifdef GAMMARAY_USE_FUNCTION_OVERWRITE
+static bool functionsOverwritten = false;
+
+static void overwriteQtFunctions()
 {
   functionsOverwritten = true;
   AbstractFunctionOverwriter *overwriter = FunctionOverwriterFactory::createFunctionOverwriter();
 
-  overwriter->overwriteFunction(QLatin1String("qt_startup_hook"), (void*)qt_startup_hook);
-  overwriter->overwriteFunction(QLatin1String("qt_addObject"), (void*)qt_addObject);
-  overwriter->overwriteFunction(QLatin1String("qt_removeObject"), (void*)qt_removeObject);
+  overwriter->overwriteFunction(QLatin1String("qt_startup_hook"), (void*)gammaray_startup_hook);
+  overwriter->overwriteFunction(QLatin1String("qt_addObject"), (void*)gammaray_addObject);
+  overwriter->overwriteFunction(QLatin1String("qt_removeObject"), (void*)gammaray_removeObject);
 #if defined(Q_OS_WIN)
 #ifdef ARCH_64
 #ifdef __MINGW32__
   overwriter->overwriteFunction(
-    QLatin1String("_Z13qFlagLocationPKc"), (void*)myFlagLocation);
+    QLatin1String("_Z13qFlagLocationPKc"), (void*)gammaray_flagLocation);
 #else
   overwriter->overwriteFunction(
-    QLatin1String("?qFlagLocation@@YAPEBDPEBD@Z"), (void*)myFlagLocation);
+    QLatin1String("?qFlagLocation@@YAPEBDPEBD@Z"), (void*)gammaray_flagLocation);
 #endif
 #else
 # ifdef __MINGW32__
   overwriter->overwriteFunction(
-    QLatin1String("_Z13qFlagLocationPKc"), (void*)myFlagLocation);
+    QLatin1String("_Z13qFlagLocationPKc"), (void*)gammaray_flagLocation);
 # else
   overwriter->overwriteFunction(
-    QLatin1String("?qFlagLocation@@YAPBDPBD@Z"), (void*)myFlagLocation);
+    QLatin1String("?qFlagLocation@@YAPBDPBD@Z"), (void*)gammaray_flagLocation);
 # endif
 #endif
 #endif
 }
 #endif
 
-#ifdef Q_OS_WIN
-extern "C" Q_DECL_EXPORT void gammaray_probe_inject();
-
-extern "C" BOOL WINAPI DllMain(HINSTANCE/*hInstance*/, DWORD dwReason, LPVOID/*lpvReserved*/)
+bool Hooks::hooksInstalled()
 {
-  switch(dwReason) {
-  case DLL_THREAD_ATTACH:
-  {
-    if (!functionsOverwritten) {
-      overwriteQtFunctions();
-    }
-    if (!Probe::isInitialized()) {
-      gammaray_probe_inject();
-    }
-    break;
-  }
-  case DLL_PROCESS_DETACH:
-  {
-      //Unloading does not work, because we overwrite existing code
-      exit(-1);
-      break;
-  }
-  };
-  return TRUE; //krazy:exclude=captruefalse
-}
+#ifdef GAMMARAY_USE_QHOOKS
+  return qtHookData[QHooks::AddQObject] == reinterpret_cast<quintptr>(&gammaray_addObject);
+#elif defined(GAMMARAY_USE_FUNCTION_OVERWRITE)
+  return functionsOverwritten;
+#else
+  return false;
 #endif
+}
+
+void Hooks::installHooks()
+{
+  if (hooksInstalled())
+    return;
+
+#ifdef GAMMARAY_USE_QHOOKS
+  installQHooks();
+#elif defined(GAMMARAY_USE_FUNCTION_OVERWRITE)
+  overwriteQtFunctions();
+#endif
+}
 
 extern "C" Q_DECL_EXPORT void gammaray_probe_inject()
 {
@@ -179,18 +152,3 @@ extern "C" Q_DECL_EXPORT void gammaray_probe_inject()
   // make it possible to re-attach
   new ProbeCreator(ProbeCreator::CreateAndFindExisting);
 }
-
-#ifdef Q_OS_MAC
-// we need a way to execute some code upon load, so let's abuse
-// static initialization
-class HitMeBabyOneMoreTime
-{
-  public:
-    HitMeBabyOneMoreTime()
-    {
-      overwriteQtFunctions();
-    }
-
-};
-static HitMeBabyOneMoreTime britney;
-#endif

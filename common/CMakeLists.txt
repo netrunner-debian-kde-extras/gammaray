@@ -22,12 +22,11 @@ set_target_properties(gammaray_common PROPERTIES
 )
 
 if(Qt5Core_FOUND)
-  target_link_libraries(gammaray_common Qt5::Core Qt5::Network)
+  target_link_libraries(gammaray_common LINK_PUBLIC Qt5::Core LINK_PRIVATE Qt5::Network)
 else()
   target_link_libraries(gammaray_common
-    ${QT_QTCORE_LIBRARIES}
-    ${QT_QTGUI_LIBRARIES}
-    ${QT_QTNETWORK_LIBRARIES}
+    LINK_PUBLIC ${QT_QTCORE_LIBRARIES}
+    LINK_PRIVATE ${QT_QTGUI_LIBRARIES} ${QT_QTNETWORK_LIBRARIES}
   )
 endif()
 
@@ -42,13 +41,26 @@ set(gammaray_common_internal_srcs
   resourcebrowserinterface.cpp
   networkselectionmodel.cpp
   streamoperators.cpp
+  probeabi.cpp
+  probeabidetector.cpp
+
+  tools/objectinspector/propertiesextensioninterface.cpp
+  tools/objectinspector/methodsextensioninterface.cpp
+  tools/objectinspector/connectionsextensioninterface.cpp
 )
 
-if(NOT WIN32)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+if(WIN32)
+  list(APPEND gammaray_common_internal_srcs probeabidetector_win.cpp)
+elseif(APPLE)
+  list(APPEND gammaray_common_internal_srcs probeabidetector_mac.cpp)
+elseif(UNIX AND NOT QNXNTO)
+  list(APPEND gammaray_common_internal_srcs probeabidetector_elf.cpp)
+else()
+  list(APPEND gammaray_common_internal_srcs probeabidetector_dummy.cpp)
 endif()
 
 add_library(gammaray_common_internal STATIC ${gammaray_common_internal_srcs})
+set_target_properties(gammaray_common_internal PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 target_link_libraries(gammaray_common_internal gammaray_common)
 if(Qt5Core_FOUND)
@@ -59,6 +71,10 @@ else()
     ${QT_QTGUI_LIBRARIES}
     ${QT_QTNETWORK_LIBRARIES}
   )
+endif()
+
+if(WIN32)
+  target_link_libraries(gammaray_common_internal version)
 endif()
 
 gammaray_install_headers(

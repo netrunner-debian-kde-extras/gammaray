@@ -27,8 +27,11 @@
 
 #cmakedefine HAVE_VTK
 #cmakedefine HAVE_GRAPHVIZ
+#cmakedefine HAVE_ELF_H
 
 #include <qglobal.h>
 #if !defined(QT_NO_SHAREDMEMORY) && !defined(QT_NO_SYSTEMSEMAPHORE)
 #define HAVE_SHM
 #endif
+
+#cmakedefine GAMMARAY_UNKNOWN_CXX_MANGLED_NAMES

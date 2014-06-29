@@ -24,22 +24,33 @@
 #ifndef GAMMARAY_PROBEFINDER_H
 #define GAMMARAY_PROBEFINDER_H
 
-class QStringList;
+#include <QVector>
+
 class QString;
+class QStringList;
 
 namespace GammaRay {
+
+class ProbeABI;
 
 namespace ProbeFinder {
 
   /**
    * Attempts to find the full path of the probe DLL.
    */
-  QString findProbe(const QString& baseName, const QString& probeAbi);
+  QString findProbe(const QString& baseName, const ProbeABI& probeAbi);
+
+  /**
+   * Find the best matching probe for the given @p targetABI.
+   * An invalid ProbeABI instance is returned if there is no compatible probe installed.
+   */
+  ProbeABI findBestMatchingABI(const ProbeABI &targetABI);
+  ProbeABI findBestMatchingABI(const ProbeABI &targetABI, const QVector<ProbeABI> &availableABIs);
 
   /**
    * List all available probe ABIs.
    */
-  QStringList listProbeABIs();
+  QVector<ProbeABI> listProbeABIs();
 
   /**
    * Returns the platform-specific file name extenstion.

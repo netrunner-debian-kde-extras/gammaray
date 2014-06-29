@@ -23,6 +23,8 @@
 
 #include "objectpropertymodel.h"
 
+#include <common/propertymodel.h>
+
 #include <QMetaProperty>
 #include <QTimer>
 
@@ -44,27 +46,22 @@ void ObjectPropertyModel::setObject(QObject *object)
   beginResetModel();
   if (m_obj) {
     unmonitorObject(m_obj.data());
-    disconnect(m_obj.data(), 0, this, SLOT(updateAll()));
     disconnect(m_obj.data(), 0, this, SLOT(slotReset()));
   }
   m_obj = object;
   if (object) {
     connect(object, SIGNAL(destroyed(QObject*)), SLOT(slotReset()));
     monitorObject(object);
-    for (int i = 0; i < object->metaObject()->propertyCount(); ++i) {
-      const QMetaProperty prop = object->metaObject()->property(i);
-      if (prop.hasNotifySignal()) {
-        connect(object, QByteArray("2") +
-#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
-            prop.notifySignal().signature()
-#else
-            prop.notifySignal().methodSignature()
-#endif
-            , SLOT(updateAll()));
-      }
-    }
   }
   endResetModel();
+}
+
+int ObjectPropertyModel::columnCount(const QModelIndex& parent) const
+{
+  if (parent.isValid()) {
+    return 0;
+  }
+  return 4;
 }
 
 QVariant ObjectPropertyModel::headerData(int section, Qt::Orientation orientation, int role) const
@@ -82,6 +79,14 @@ QVariant ObjectPropertyModel::headerData(int section, Qt::Orientation orientatio
     }
   }
   return QAbstractItemModel::headerData(section, orientation, role);
+}
+
+QMap< int, QVariant > ObjectPropertyModel::itemData(const QModelIndex& index) const
+{
+  QMap<int, QVariant> d = QAbstractItemModel::itemData(index);
+  d.insert(PropertyModel::ActionRole, data(index, PropertyModel::ActionRole));
+  d.insert(PropertyModel::AppropriateToolRole, data(index, PropertyModel::AppropriateToolRole));
+  return d;
 }
 
 void ObjectPropertyModel::updateAll()

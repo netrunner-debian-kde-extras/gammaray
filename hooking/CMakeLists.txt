@@ -3,14 +3,27 @@ set(gammaray_probe_srcs
   hooks.cpp
 )
 
+if(UNIX AND Qt5Core_VERSION VERSION_LESS 5.4.0)
+  list(APPEND gammaray_probe_srcs preload.cpp)
+endif()
+
 if(WIN32 OR APPLE)
-  set(gammaray_probe_srcs
-    ${gammaray_probe_srcs}
+  list(APPEND gammaray_probe_srcs
     abstractfunctionoverwriter.cpp
     functionoverwriterfactory.cpp
-    winfunctionoverwriter.cpp
     unixfunctionoverwriter.cpp
   )
+endif()
+
+if(WIN32)
+  list(APPEND gammaray_probe_srcs
+    entry_win.cpp
+    winfunctionoverwriter.cpp
+  )
+endif()
+
+if(APPLE OR NOT Qt5Core_VERSION VERSION_LESS 5.4.0)
+  list(APPEND gammaray_probe_srcs entry_unix.cpp)
 endif()
 
 # probe lib

@@ -59,6 +59,10 @@ class ToolModel : public QAbstractListModel
     QVector<ToolFactory*> plugins() const;
     /** returns all plugin load errors. */
     PluginLoadErrors pluginErrors() const;
+    /** returns the tool that is best suited to show information about \p object. */
+    QModelIndex toolForObject(QObject *object) const;
+    /** returns the tool that is best suited to show information about \p object. */
+    QModelIndex toolForObject(const void *object, const QString typeName) const;
 
   public slots:
     /** Check if we have to activate tools for this type */
@@ -72,6 +76,8 @@ class ToolModel : public QAbstractListModel
      * NOTE: must be called from the GUI thread
      */
     void objectAdded(const QMetaObject *mo);
+
+    void addToolFactory(ToolFactory* tool);
 
   private:
     QVector<ToolFactory*> m_tools;

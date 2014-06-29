@@ -19,8 +19,8 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef GAMMARAY_GVGRAPH_H
-#define GAMMARAY_GVGRAPH_H
+#ifndef GAMMARAY_STATEMACHINEVIEWER_GVGRAPH_H
+#define GAMMARAY_STATEMACHINEVIEWER_GVGRAPH_H
 
 #include "gvgraphelements.h"
 #include "gvtypes.h"
@@ -112,7 +112,6 @@ class GVGraph
     GVC_t *_context;
     Agraph_t *_graph;
     QFont _font;
-    qreal _dpi;
 
     QString _name;
 

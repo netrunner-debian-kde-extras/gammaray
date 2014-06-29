@@ -24,12 +24,13 @@
 #ifndef GAMMARAY_PROPERTYWIDGET_H
 #define GAMMARAY_PROPERTYWIDGET_H
 
-#include <QWidget>
+#include <QTabWidget>
 #include <QPointer>
 #include <QHash>
 
 #include "gammaray_ui_export.h"
 #include <common/enums.h>
+#include "propertywidgettab.h"
 
 class QAbstractItemModel;
 class QAbstractItemView;
@@ -41,37 +42,40 @@ class Ui_PropertyWidget;
 class PropertyControllerInterface;
 
 /** @brief Client-side counter-part GammaRay::PropertyController. */
-class GAMMARAY_UI_EXPORT PropertyWidget : public QWidget
+class GAMMARAY_UI_EXPORT PropertyWidget : public QTabWidget
 {
   Q_OBJECT
   public:
     explicit PropertyWidget(QWidget *parent = 0);
     virtual ~PropertyWidget();
 
+    QString objectBaseName() const;
     void setObjectBaseName(const QString &baseName);
 
-  private slots:
-    void setDisplayState(GammaRay::PropertyWidgetDisplayState::State state);
-    void methodActivated(const QModelIndex &index);
-    void methodConextMenu(const QPoint &pos);
-
-    void onDoubleClick(const QModelIndex &index);
+    template<typename T> static void registerTab(QString name, QString label)
+    {
+      s_tabFactories << new PropertyWidgetTabFactory<T>(name, label);
+      foreach (PropertyWidget *widget, s_propertyWidgets)
+        widget->createWidgets();
+    }
 
   private:
-    /// Decides if widget is supposed to be shown at this display state
-    bool showTab(const QWidget *widget, PropertyWidgetDisplayState::State state) const;
+    void createWidgets();
 
-    QAbstractItemModel* model(const QString &nameSuffix);
+  private slots:
+    void updateShownTabs(const QStringList& availableExtensions);
 
-    Ui_PropertyWidget *m_ui;
 
+  private:
     QString m_objectBaseName;
 
-    // Contains initially added tab widgets (Tab widget/Label)
-    QVector< QPair<QWidget *,QString> > m_tabWidgets;
+    // Contains all tab widgets
+    QHash<PropertyWidgetTabFactoryBase*, QWidget*> m_tabWidgets;
 
-    PropertyWidgetDisplayState::State m_displayState;
     PropertyControllerInterface *m_controller;
+
+    static QVector<PropertyWidgetTabFactoryBase*> s_tabFactories;
+    static QVector<PropertyWidget*> s_propertyWidgets;
 };
 
 }

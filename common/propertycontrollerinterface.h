@@ -28,6 +28,7 @@
 
 #include "enums.h"
 
+class QStringList;
 namespace GammaRay {
 
 /** @brief Client/Server interface of the property editor. */
@@ -40,12 +41,8 @@ class PropertyControllerInterface : public QObject
 
     QString name() const;
 
-  public slots:
-    virtual void activateMethod() = 0;
-    virtual void invokeMethod(Qt::ConnectionType type) = 0;
-
   signals:
-    void displayStateChanged(GammaRay::PropertyWidgetDisplayState::State displayState);
+    void availableExtensionsChanged(const QStringList &availableExtensions);
 
   private:
     QString m_name;

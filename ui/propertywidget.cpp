@@ -22,268 +22,84 @@
 */
 
 #include "propertywidget.h"
-#include "ui_propertywidget.h"
 
-#include "ui/methodinvocationdialog.h"
-#include "ui/propertyeditor/propertyeditordelegate.h"
-#include "ui/deferredresizemodesetter.h"
-
-#include "variantcontainermodel.h"
-
+#include "common/endpoint.h"
 #include "common/objectbroker.h"
-#include "common/modelroles.h"
-#include "common/metatypedeclarations.h"
 #include "common/propertycontrollerinterface.h"
-
-#include "kde/krecursivefilterproxymodel.h"
-
-#include <QDebug>
-#include <QMenu>
-#include <QStandardItemModel>
-#include <QStyledItemDelegate>
-#include <QTime>
 
 using namespace GammaRay;
 
-static bool removePage(QTabWidget *tabWidget, QWidget *widget)
-{
-  const int index = tabWidget->indexOf(widget);
-  if (index == -1) {
-    return false;
-  }
-
-  tabWidget->removeTab(index);
-  return true;
-}
+QVector<PropertyWidgetTabFactoryBase*> PropertyWidget::s_tabFactories = QVector<PropertyWidgetTabFactoryBase*>();
+QVector<PropertyWidget*> PropertyWidget::s_propertyWidgets;
 
 PropertyWidget::PropertyWidget(QWidget *parent)
-  : QWidget(parent),
-    m_ui(new Ui_PropertyWidget),
-    m_displayState(PropertyWidgetDisplayState::QObject),
+  : QTabWidget(parent),
     m_controller(0)
 {
-  m_ui->setupUi(this);
+  s_propertyWidgets.push_back(this);
 }
 
 PropertyWidget::~PropertyWidget()
 {
+  const int index = s_propertyWidgets.indexOf(this);
+  if (index >= 0)
+    s_propertyWidgets.remove(index);
+}
+
+QString PropertyWidget::objectBaseName() const
+{
+  Q_ASSERT(!m_objectBaseName.isEmpty());
+  return m_objectBaseName;
 }
 
 void PropertyWidget::setObjectBaseName(const QString &baseName)
 {
+  Q_ASSERT(m_objectBaseName.isEmpty()); // ideally the object base name would be a ctor argument, but then this doesn't work in Designer anymore
   m_objectBaseName = baseName;
 
-  QSortFilterProxyModel *proxy = new QSortFilterProxyModel(this);
-  proxy->setDynamicSortFilter(true);
-  proxy->setSourceModel(model("staticProperties"));
-  m_ui->staticPropertyView->setModel(proxy);
-  m_ui->staticPropertyView->sortByColumn(0, Qt::AscendingOrder);
-  new DeferredResizeModeSetter(
-    m_ui->staticPropertyView->header(), 0, QHeaderView::ResizeToContents);
-  m_ui->staticPropertySearchLine->setProxy(proxy);
-  m_ui->staticPropertyView->setItemDelegate(new PropertyEditorDelegate(this));
-
-#if QT_VERSION >= QT_VERSION_CHECK(5, 2, 0)
-  connect(m_ui->staticPropertyView, SIGNAL(doubleClicked(QModelIndex)),
-          SLOT(onDoubleClick(QModelIndex)));
-#endif
-
-  proxy = new QSortFilterProxyModel(this);
-  proxy->setDynamicSortFilter(true);
-  proxy->setSourceModel(model("dynamicProperties"));
-  m_ui->dynamicPropertyView->setModel(proxy);
-  m_ui->dynamicPropertyView->sortByColumn(0, Qt::AscendingOrder);
-  new DeferredResizeModeSetter(
-    m_ui->dynamicPropertyView->header(), 0, QHeaderView::ResizeToContents);
-  m_ui->dynamicPropertyView->setItemDelegate(new PropertyEditorDelegate(this));
-  m_ui->dynamicPropertySearchLine->setProxy(proxy);
-
-#if QT_VERSION >= QT_VERSION_CHECK(5, 2, 0)
-  connect(m_ui->dynamicPropertyView, SIGNAL(doubleClicked(QModelIndex)),
-          SLOT(onDoubleClick(QModelIndex)));
-#endif
-
-  proxy = new QSortFilterProxyModel(this);
-  proxy->setDynamicSortFilter(true);
-  proxy->setSourceModel(model("methods"));
-  m_ui->methodView->setModel(proxy);
-  m_ui->methodView->sortByColumn(0, Qt::AscendingOrder);
-  m_ui->methodView->setSelectionModel(ObjectBroker::selectionModel(proxy));
-  m_ui->methodView->header()->setResizeMode(QHeaderView::ResizeToContents);
-  m_ui->methodSearchLine->setProxy(proxy);
-  connect(m_ui->methodView, SIGNAL(doubleClicked(QModelIndex)),
-          SLOT(methodActivated(QModelIndex)));
-  connect(m_ui->methodView, SIGNAL(customContextMenuRequested(QPoint)),
-          SLOT(methodConextMenu(QPoint)));
-  m_ui->methodLog->setModel(model("methodLog"));
-
-  proxy = new QSortFilterProxyModel(this);
-  proxy->setDynamicSortFilter(true);
-  proxy->setSourceModel(model("classInfo"));
-  m_ui->classInfoView->setModel(proxy);
-  m_ui->classInfoView->sortByColumn(0, Qt::AscendingOrder);
-  m_ui->classInfoView->header()->setResizeMode(QHeaderView::ResizeToContents);
-  m_ui->classInfoSearchLine->setProxy(proxy);
-
-  proxy = new QSortFilterProxyModel(this);
-  proxy->setDynamicSortFilter(true);
-  proxy->setSourceModel(model("inboundConnections"));
-  m_ui->inboundConnectionView->setModel(proxy);
-  m_ui->inboundConnectionView->sortByColumn(0, Qt::AscendingOrder);
-  m_ui->inboundConnectionSearchLine->setProxy(proxy);
-
-  proxy = new QSortFilterProxyModel(this);
-  proxy->setDynamicSortFilter(true);
-  proxy->setSourceModel(model("outboundConnections"));
-  m_ui->outboundConnectionView->setModel(proxy);
-  m_ui->outboundConnectionView->sortByColumn(0, Qt::AscendingOrder);
-  m_ui->outboundConnectionSearchLine->setProxy(proxy);
-
-  proxy = new KRecursiveFilterProxyModel(this);
-  proxy->setDynamicSortFilter(true);
-  proxy->setSourceModel(model("enums"));
-  m_ui->enumView->setModel(proxy);
-  m_ui->enumView->sortByColumn(0, Qt::AscendingOrder);
-  m_ui->enumView->header()->setResizeMode(QHeaderView::ResizeToContents);
-  m_ui->enumSearchLine->setProxy(proxy);
-
-  // save back initial tab widgets
-  for (int i = 0; i < m_ui->tabWidget->count(); ++i) {
-    m_tabWidgets.push_back(qMakePair(m_ui->tabWidget->widget(i), m_ui->tabWidget->tabText(i)));
-  }
-
-  proxy = new QSortFilterProxyModel(this);
-  proxy->setDynamicSortFilter(true);
-  proxy->setSourceModel(model("nonQProperties"));
-  m_ui->metaPropertyView->setModel(proxy);
-  m_ui->metaPropertyView->sortByColumn(0, Qt::AscendingOrder);
-  m_ui->metaPropertySearchLine->setProxy(proxy);
-  m_ui->metaPropertyView->setItemDelegate(new PropertyEditorDelegate(this));
+  if (Endpoint::instance()->objectAddress(baseName + ".controller") == Protocol::InvalidObjectAddress)
+    return; // unknown property controller, likely disabled/not supported on the server
 
   if (m_controller) {
     disconnect(m_controller,
-               SIGNAL(displayStateChanged(GammaRay::PropertyWidgetDisplayState::State)),
-               this, SLOT(setDisplayState(GammaRay::PropertyWidgetDisplayState::State)));
+               SIGNAL(availableExtensionsChanged(QStringList)),
+               this, SLOT(updateShownTabs(QStringList)));
   }
   m_controller =
     ObjectBroker::object<PropertyControllerInterface*>(m_objectBaseName + ".controller");
-  connect(m_controller, SIGNAL(displayStateChanged(GammaRay::PropertyWidgetDisplayState::State)),
-          this, SLOT(setDisplayState(GammaRay::PropertyWidgetDisplayState::State)));
+  connect(m_controller, SIGNAL(availableExtensionsChanged(QStringList)),
+          this, SLOT(updateShownTabs(QStringList)));
+
+  createWidgets();
 }
 
-QAbstractItemModel *PropertyWidget::model(const QString &nameSuffix)
+void PropertyWidget::createWidgets()
 {
-  return ObjectBroker::model(m_objectBaseName + '.' + nameSuffix);
-}
-
-void GammaRay::PropertyWidget::methodActivated(const QModelIndex &index)
-{
-  if (!index.isValid() || m_displayState != PropertyWidgetDisplayState::QObject) {
+  if (m_objectBaseName.isEmpty())
     return;
-  }
-  m_controller->activateMethod();
-
-  const QMetaMethod::MethodType methodType =
-    index.data(ObjectMethodModelRole::MetaMethodType).value<QMetaMethod::MethodType>();
-  if (methodType == QMetaMethod::Slot) {
-    MethodInvocationDialog dlg(this);
-    dlg.setArgumentModel(model("methodArguments"));
-    if (dlg.exec()) {
-      m_controller->invokeMethod(dlg.connectionType());
+  foreach (PropertyWidgetTabFactoryBase *factory, s_tabFactories) {
+    if (!m_tabWidgets.contains(factory)) {
+      QWidget *widget = factory->createWidget(this);
+      m_tabWidgets.insert(factory, widget);
+      addTab(widget, factory->label());
     }
   }
 }
 
-void PropertyWidget::methodConextMenu(const QPoint &pos)
+void PropertyWidget::updateShownTabs(const QStringList &availableExtensions)
 {
-  const QModelIndex index = m_ui->methodView->indexAt(pos);
-  if (!index.isValid() || m_displayState != PropertyWidgetDisplayState::QObject) {
-    return;
-  }
+  setUpdatesEnabled(false);
 
-  const QMetaMethod::MethodType methodType =
-    index.data(ObjectMethodModelRole::MetaMethodType).value<QMetaMethod::MethodType>();
-  QMenu contextMenu;
-  if (methodType == QMetaMethod::Slot) {
-    contextMenu.addAction(tr("Invoke"));
-  } else if (methodType == QMetaMethod::Signal) {
-    contextMenu.addAction(tr("Connect to"));
-  }
-
-  if (contextMenu.exec(m_ui->methodView->viewport()->mapToGlobal(pos))) {
-    methodActivated(index);
-  }
-}
-
-bool PropertyWidget::showTab(const QWidget *widget, PropertyWidgetDisplayState::State state) const
-{
-  // TODO: this check needs to consider the server-side Qt version!
-#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
-  if (widget == m_ui->inboundConnectionTab ||
-      widget == m_ui->outboundConnectionTab) {
-    return false;
-  }
-#endif
-  switch(state) {
-  case PropertyWidgetDisplayState::QObject:
-    return true; // show all
-  case PropertyWidgetDisplayState::Object:
-    if (widget == m_ui->metaPropertyTab) {
-      return true;
-    }
-    break;
-  case PropertyWidgetDisplayState::MetaObject:
-    if (widget == m_ui->enumTab || widget == m_ui->classInfoTab || widget == m_ui->methodTab) {
-      return true;
-    }
-    break;
-  }
-  return false;
-}
-
-void PropertyWidget::setDisplayState(PropertyWidgetDisplayState::State state)
-{
-  m_displayState = state;
-  QWidget *currentWidget = m_ui->tabWidget->currentWidget();
-
-  // iterate through all tabs, decide for each tab if it gets hidden or not
-  typedef QPair<QWidget *, QString> WidgetStringPair;
-  Q_FOREACH (const WidgetStringPair &tab, m_tabWidgets) {
-    const bool show = showTab(tab.first, state);
-    if (show) {
-      m_ui->tabWidget->addTab(tab.first, tab.second);
-    } else {
-      removePage(m_ui->tabWidget, tab.first);
+  for (QHash<PropertyWidgetTabFactoryBase*, QWidget*>::const_iterator it = m_tabWidgets.constBegin(); it != m_tabWidgets.constEnd(); ++it) {
+    QWidget *widget = it.value();
+    const int index = indexOf(widget);
+    if (availableExtensions.contains(m_objectBaseName + '.' + it.key()->name())) {
+      if (index == -1)
+        addTab(widget, it.key()->label());
+    } else if (index != -1) {
+      removeTab(index);
     }
   }
 
-  if (m_ui->tabWidget->indexOf(currentWidget) >= 0) {
-    m_ui->tabWidget->setCurrentWidget(currentWidget);
-  }
-
-  m_ui->methodLog->setVisible(m_displayState == PropertyWidgetDisplayState::QObject);
+  setUpdatesEnabled(true);
 }
-
-void PropertyWidget::onDoubleClick(const QModelIndex &index)
-{
-  if (index.column() != 0) {
-    return;
-  }
-
-#if QT_VERSION >= QT_VERSION_CHECK(5, 2, 0)
-  QVariant var = index.sibling(index.row(), 1).data(Qt::EditRole);
-
-  if (!var.canConvert<QVariantList>() && !var.canConvert<QVariantHash>()) {
-    return;
-  }
-
-  QTreeView *v = new QTreeView;
-
-  VariantContainerModel *m = new VariantContainerModel(v);
-  m->setVariant(var);
-
-  v->setModel(m);
-  v->show();
-#endif
-}
-

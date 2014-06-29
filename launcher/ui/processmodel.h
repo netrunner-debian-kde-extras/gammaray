@@ -24,7 +24,10 @@
 #ifndef GAMMARAY_PROCESSMODEL_H
 #define GAMMARAY_PROCESSMODEL_H
 
+#include <common/probeabi.h>
+
 #include <QAbstractTableModel>
+#include <QVector>
 
 #include "processlist.h"
 
@@ -61,16 +64,19 @@ class ProcessModel : public QAbstractTableModel
       PIDRole = Qt::UserRole,
       NameRole,
       StateRole,
-      UserRole
+      UserRole,
+      ABIRole
     };
 
     virtual QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const;
+    Qt::ItemFlags flags(const QModelIndex& index) const;
 
     virtual QVariant headerData(int section, Qt::Orientation orientation,
                                 int role = Qt::DisplayRole) const;
 
   private:
     ProcDataList m_data;
+    QVector<ProbeABI> m_availableABIs;
 };
 
 }
