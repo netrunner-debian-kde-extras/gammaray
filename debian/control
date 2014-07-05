@@ -65,6 +65,25 @@ Description: GammaRay support for inspecting Qt4 applications
 # Also, for use with 3D glasses, various types of stereoscopic rendering
 # are supported.
 
+Package: gammaray-plugin-quickinspector
+Architecture: any
+Depends: gammaray (= ${binary:Version}),
+         qml-module-qtquick2,
+         qml-module-qtquick-controls,
+         ${shlibs:Depends},
+         ${misc:Depends}
+Description: GammaRay plugin for inspecting QtQuick2 applications
+ This plugin provides the user with the following inspection and debugging
+ facilities:
+ .
+  * Tree view of all QQuickItems in the scene, marking invisible items
+    and items having focus.
+  * Object inspector allowing to see all the properties, inspect
+    signal-slot connections, and directly invoke slots and Q_INVOKABLE
+    methods.
+  * Live-preview of the QtQuick scene inside the GammaRay window.
+  * Qt Quick scene graph inspector.
+
 Package: gammaray-plugin-kjobtracker
 Architecture: any
 Depends: gammaray (= ${binary:Version}),

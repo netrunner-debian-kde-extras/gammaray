@@ -7,6 +7,7 @@ gammaray (2.1.0-1) UNRELEASED; urgency=medium
   * New upstream release.
   * Removed no longer needed use-empty-rpath.patch.
   * Build-depend on qtdeclarative5-private-dev.
+  * Create gammaray-plugin-quickinspector binary package.
 
  -- Jakub Adam <jakub.adam@ktknet.cz>  Sun, 29 Jun 2014 08:06:06 +0200
 
