@@ -1,4 +1,4 @@
-gammaray (2.1.0-1) UNRELEASED; urgency=medium
+gammaray (2.1.0-1) unstable; urgency=medium
 
   [ Felix Geyer ]
   * Call dh_auto_clean for both build directories.
@@ -10,7 +10,7 @@ gammaray (2.1.0-1) UNRELEASED; urgency=medium
   * Create gammaray-plugin-quickinspector binary package.
   * Removed unused license paragraph from d/copyright.
 
- -- Jakub Adam <jakub.adam@ktknet.cz>  Sun, 29 Jun 2014 08:06:06 +0200
+ -- Jakub Adam <jakub.adam@ktknet.cz>  Mon, 07 Jul 2014 21:38:05 +0200
 
 gammaray (2.0.2-1) unstable; urgency=medium
 
