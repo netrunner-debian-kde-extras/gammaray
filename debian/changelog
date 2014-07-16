@@ -1,3 +1,9 @@
+gammaray (2.1.0-2) UNRELEASED; urgency=medium
+
+  * Fix FTBFS on kFreeBSD, Hurd, mips, ppc, and s390x (Closes: #754986).
+
+ -- Jakub Adam <jakub.adam@ktknet.cz>  Wed, 16 Jul 2014 15:29:58 +0200
+
 gammaray (2.1.0-1) unstable; urgency=medium
 
   [ Felix Geyer ]
