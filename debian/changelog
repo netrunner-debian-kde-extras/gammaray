@@ -1,3 +1,11 @@
+gammaray (2.1.0-3) UNRELEASED; urgency=medium
+
+  * Force 24-bit color depth to Xvfb
+    - attempts to fix "Unsupported screen depth: 8" failures during
+      the test runs on some architectures. 
+
+ -- Jakub Adam <jakub.adam@ktknet.cz>  Sat, 19 Jul 2014 13:58:03 +0200
+
 gammaray (2.1.0-2) unstable; urgency=medium
 
   * Fix FTBFS on kFreeBSD, Hurd, mips, ppc, and s390x (Closes: #754986).

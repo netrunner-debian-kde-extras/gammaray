@@ -21,7 +21,7 @@ override_dh_auto_build:
 	dh_auto_build -B obj-qt4 -O--parallel
 
 override_dh_auto_test:
-	xvfb-run dh_auto_test -B obj-qt5
+	xvfb-run -s "-screen 0 640x480x24" dh_auto_test -B obj-qt5
 
 override_dh_auto_install:
 	dh_auto_install -B obj-qt5
