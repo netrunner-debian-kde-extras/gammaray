@@ -1,9 +1,11 @@
-gammaray (2.1.0-3) UNRELEASED; urgency=medium
+gammaray (2.1.0-3) unstable; urgency=medium
+
+  * Team upload.
 
   [ Jakub Adam ]
   * Force 24-bit color depth to Xvfb
     - attempts to fix "Unsupported screen depth: 8" failures during
-      the test runs on some architectures. 
+      the test runs on some architectures.
 
   [ Felix Geyer ]
   * Fix FTBFS on mips64 kernel, ppc64 and arm64.
@@ -12,7 +14,7 @@ gammaray (2.1.0-3) UNRELEASED; urgency=medium
   * Run tests sequentially in the hope that it helps running them on
     architectures with low resources.
 
- -- Jakub Adam <jakub.adam@ktknet.cz>  Sat, 19 Jul 2014 13:58:03 +0200
+ -- Felix Geyer <fgeyer@debian.org>  Sun, 27 Jul 2014 17:22:50 +0200
 
 gammaray (2.1.0-2) unstable; urgency=medium
 
