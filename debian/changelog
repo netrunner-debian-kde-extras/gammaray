@@ -1,8 +1,12 @@
 gammaray (2.1.0-3) UNRELEASED; urgency=medium
 
+  [ Jakub Adam ]
   * Force 24-bit color depth to Xvfb
     - attempts to fix "Unsupported screen depth: 8" failures during
       the test runs on some architectures. 
+
+  [ Felix Geyer ]
+  * Fix FTBFS on mips64 kernel, ppc64 and arm64.
 
  -- Jakub Adam <jakub.adam@ktknet.cz>  Sat, 19 Jul 2014 13:58:03 +0200
 
