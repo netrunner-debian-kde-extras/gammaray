@@ -25,9 +25,9 @@ override_dh_auto_build:
 override_dh_auto_test:
 # tests fail on kfreebsd because of bug #570805: Wrong path in /proc/pid/maps when bind mounted
 ifneq (,$(filter $(DEB_HOST_ARCH), kfreebsd-amd64 kfreebsd-i386))
-	xvfb-run -s "-screen 0 640x480x24" dh_auto_test -B obj-qt5 || true
+	xvfb-run -s "-screen 0 640x480x24" dh_auto_test --max-parallel=1 -B obj-qt5 || true
 else
-	xvfb-run -s "-screen 0 640x480x24" dh_auto_test -B obj-qt5
+	xvfb-run -s "-screen 0 640x480x24" dh_auto_test --max-parallel=1 -B obj-qt5
 endif
 
 override_dh_auto_install:
