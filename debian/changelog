@@ -7,6 +7,8 @@ gammaray (2.1.0-3) UNRELEASED; urgency=medium
 
   [ Felix Geyer ]
   * Fix FTBFS on mips64 kernel, ppc64 and arm64.
+  * Make testsuite non-fatal on kfreebsd due to bug #570805:
+    Wrong path in /proc/pid/maps when bind mounted.
 
  -- Jakub Adam <jakub.adam@ktknet.cz>  Sat, 19 Jul 2014 13:58:03 +0200
 
