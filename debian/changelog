@@ -1,3 +1,9 @@
+gammaray (2.1.0-4) UNRELEASED; urgency=medium
+
+  * Fix FTBFS on ppc64el.
+
+ -- Felix Geyer <fgeyer@debian.org>  Mon, 28 Jul 2014 19:27:29 +0200
+
 gammaray (2.1.0-3) unstable; urgency=medium
 
   * Team upload.
