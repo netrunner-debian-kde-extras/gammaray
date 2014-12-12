@@ -65,14 +65,29 @@ class GAMMARAY_CORE_EXPORT MetaProperty
     MetaObject *m_class;
 };
 
+///@cond internal
+namespace detail {
+
+template <typename T>
+struct strip_const_ref { typedef T type; };
+
+template <typename T>
+struct strip_const_ref<const T&> { typedef T type; };
+
+}
+///@endcond
+
 /** @brief Template-ed implementation of MetaProperty. */
-template <typename Class, typename ValueType, typename SetterArgType = ValueType>
+template <typename Class, typename GetterReturnType, typename SetterArgType = GetterReturnType>
 class MetaPropertyImpl : public MetaProperty
 {
+  private:
+    typedef typename detail::strip_const_ref<GetterReturnType>::type ValueType;
+
   public:
     inline MetaPropertyImpl(
       const QString &name,
-      ValueType (Class::*getter)() const, void (Class::*setter)(SetterArgType) = 0)
+      GetterReturnType (Class::*getter)() const, void (Class::*setter)(SetterArgType) = 0)
       : m_name(name), m_getter(getter), m_setter(setter)
     {
     }
@@ -121,7 +136,7 @@ class MetaPropertyImpl : public MetaProperty
 
   private:
     QString m_name;
-    ValueType (Class::*m_getter)() const;
+    GetterReturnType (Class::*m_getter)() const;
     void (Class::*m_setter)(SetterArgType);
 };
 

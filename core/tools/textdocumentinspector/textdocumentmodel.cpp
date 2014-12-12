@@ -31,6 +31,19 @@
 
 using namespace GammaRay;
 
+static QString formatTypeToString(int type)
+{
+  switch (type) {
+    case QTextFormat::InvalidFormat: return "Invalid";
+    case QTextFormat::BlockFormat: return "Block";
+    case QTextFormat::CharFormat: return "Char";
+    case QTextFormat::ListFormat: return "List";
+    case QTextFormat::FrameFormat: return "Frame";
+    case QTextFormat::UserFormat: return "User";
+  }
+  return QString("Unknown format: %1").arg(type);
+}
+
 TextDocumentModel::TextDocumentModel(QObject *parent)
   : QStandardItemModel(parent), m_document(0)
 {
@@ -43,8 +56,10 @@ void TextDocumentModel::setDocument(QTextDocument *doc)
   }
 
   m_document = doc;
-  connect(m_document, SIGNAL(contentsChanged()), SLOT(documentChanged()));
   fillModel();
+
+  if (m_document)
+    connect(m_document, SIGNAL(contentsChanged()), SLOT(documentChanged()));
 }
 
 void TextDocumentModel::documentChanged()
@@ -63,6 +78,7 @@ void TextDocumentModel::fillModel()
   QStandardItem *item = new QStandardItem(tr("Root Frame"));
   const QTextFormat f = m_document->rootFrame()->frameFormat();
   item->setData(QVariant::fromValue(f), FormatRole);
+  item->setEditable(false);
   QStandardItemModel::appendRow(QList<QStandardItem*>()
                                 << item
                                 << formatItem(m_document->rootFrame()->frameFormat()));
@@ -135,8 +151,9 @@ QStandardItem *TextDocumentModel::formatItem(const QTextFormat &format)
     const QTextImageFormat imgformat = format.toImageFormat();
     item->setText(tr("Image: %1").arg(imgformat.name()));
   } else {
-    item->setText(tr("Format type: %1").arg(format.type()));
+    item->setText(formatTypeToString(format.type()));
   }
+  item->setEditable(false);
   return item;
 }
 
@@ -145,6 +162,7 @@ void TextDocumentModel::appendRow(QStandardItem *parent, QStandardItem *item,
 {
   item->setData(QVariant::fromValue(format), FormatRole);
   item->setData(boundingBox, BoundingBoxRole);
+  item->setEditable(false);
   parent->appendRow(QList<QStandardItem*>() << item << formatItem(format));
 }
 

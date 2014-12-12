@@ -22,10 +22,19 @@
 */
 
 #include "materialextension.h"
+
+#include <core/metapropertymodel.h>
 #include <core/propertycontroller.h>
+#include <core/varianthandler.h>
+#include <common/metatypedeclarations.h>
+
 #include <QFile>
+#include <QStandardItemModel>
 #include <QSGNode>
 #include <QSGMaterial>
+#include <QSGFlatColorMaterial>
+#include <QSGTextureMaterial>
+#include <QSGVertexColorMaterial>
 
 #include "config-gammaray.h"
 
@@ -43,14 +52,31 @@ class SGMaterialShaderThief : public QSGMaterialShader
 };
 
 MaterialExtension::MaterialExtension(PropertyController *controller)
-  : PropertyControllerExtension(controller->objectBaseName() + ".material"),
-    MaterialExtensionInterface(controller->objectBaseName() + ".material", controller),
-    m_node(0)
+  : MaterialExtensionInterface(controller->objectBaseName() + ".material", controller),
+    PropertyControllerExtension(controller->objectBaseName() + ".material"),
+    m_node(0),
+    m_materialPropertyModel(new MetaPropertyModel(this)),
+    m_shaderModel(new QStandardItemModel(this))
 {
+  controller->registerModel(m_materialPropertyModel, "materialPropertyModel");
+  controller->registerModel(m_shaderModel, "shaderModel");
 }
 
 MaterialExtension::~MaterialExtension()
 {
+}
+
+#include <iostream>
+
+static const char* typeForMaterial(QSGMaterial *material)
+{
+#define MT(type) if (dynamic_cast<type*>(material)) return #type;
+  MT(QSGFlatColorMaterial)
+  MT(QSGTextureMaterial)
+  MT(QSGOpaqueTextureMaterial)
+  MT(QSGVertexColorMaterial)
+#undef MT
+  return "QSGMaterial";
 }
 
 bool MaterialExtension::setObject(void *object, const QString &typeName)
@@ -58,18 +84,27 @@ bool MaterialExtension::setObject(void *object, const QString &typeName)
   if (typeName == "QSGGeometryNode") {
     m_node = static_cast<QSGGeometryNode*>(object);
 
+    m_materialPropertyModel->setObject(m_node->material(), typeForMaterial(m_node->material()));
+
     QSGMaterialShader *materialShader = m_node->material()->createShader();
     SGMaterialShaderThief *thief = reinterpret_cast<SGMaterialShaderThief*>(materialShader);
-    QHash<QOpenGLShader::ShaderType, QStringList> shaderSources = thief->getShaderSources();
+    const QHash<QOpenGLShader::ShaderType, QStringList> shaderSources = thief->getShaderSources();
 
-    QStringList sourceFiles;
-    foreach (const QStringList &fileList, shaderSources) {
-      sourceFiles << fileList;
+    m_shaderModel->clear();
+    m_shaderModel->setHorizontalHeaderLabels(QStringList() << "Shader");
+    for (auto it = shaderSources.constBegin(); it != shaderSources.constEnd(); ++it) {
+      foreach (const QString &source, it.value()) {
+        auto *item = new QStandardItem(source);
+        item->setEditable(false);
+        item->setToolTip(tr("Shader type: %1").arg(VariantHandler::displayString(it.key())));
+        m_shaderModel->appendRow(item);
+      }
     }
 
-    emit shaderListChanged(sourceFiles);
     return true;
   }
+
+  m_materialPropertyModel->setObject(0);
   return false;
 }
 

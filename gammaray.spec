@@ -1,17 +1,17 @@
 Name:           gammaray
-Version:        2.1.0
+Version:        2.2.0
 Release:        2
 Summary:        An introspection tool for Qt applications
 Source:         %{name}-%{version}.tar.gz
 Url:            http://github.com/KDAB/GammaRay
-Group:          Development/Tools/Debuggers
+Group:          Development/Tools
 License:        GPL-2.0+
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 Vendor:         Klaralvdalens Datakonsult AB (KDAB)
 Packager:       Klaralvdalens Datakonsult AB (KDAB) <info@kdab.com>
 
-%define rel 2.1
-%define sover 2.1.0
+%define rel 2.2
+%define sover 2.2.0
 %define qtver qt4.8
 %define this_arch %(uname -p)
 %if %{this_arch} == "athlon"
@@ -28,6 +28,11 @@ BuildRequires:  vtk-devel libxml2-devel
 %if 0%{?suse_version} > 1230
 BuildRequires:  python-devel
 %endif
+%if 0%{?suse_version} > 1310
+# dependency ambiguity for vtk-java needed by vtk-devel in openSUSE > 13.1
+#!BuildIgnore:  java-1_7_0-openjdk-bootstrap-headless
+#!BuildIgnore:  java-1_7_0-openjdk-headless
+%endif
 Requires:       graphviz
 %endif
 
@@ -43,6 +48,9 @@ BuildRequires:  java-1.8.0-openjdk
 # for pod2man
 %if 0%{?fedora} >= 19
 BuildRequires: perl-podlators
+%endif
+%if 0%{?fedora} >= 20
+BuildRequires: hdf5-devel libxml2-devel
 %endif
 Requires:       graphviz
 %endif
@@ -62,7 +70,7 @@ Authors:
 
 %package kde4-plugins
 Summary:        GammaRay plug-ins to introspect KDE4 applications
-Group:          Development/Tools/Debuggers
+Group:          Development/Tools
 Requires:       %{name} = %{version}
 
 %description kde4-plugins
@@ -72,7 +80,7 @@ such as a KJob tracker.
 %if 0%{?suse_version} >= 1220 || 0%{?fedora} >= 17
 %package vtk-plugins
 Summary:        GammaRay visualization plug-ins using VTK
-Group:          Development/Tools/Debuggers
+Group:          Development/Tools
 Requires:       %{name} = %{version}
 
 %description vtk-plugins
@@ -81,7 +89,7 @@ Visualization plug-ins for the GammaRay introspection tool that depend on VTK.
 
 %package devel
 Summary:        Development files for %{name}
-Group:          Development/Libraries/C and C++
+Group:          Development/Libraries
 Requires:       %{name} = %{version}
 
 %description devel
@@ -149,6 +157,10 @@ cmake . -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release
 %{_libdir}/gammaray/%{rel}/%{abi}/gammaray_selectionmodelinspector.desktop
 %{_libdir}/gammaray/%{rel}/%{abi}/gammaray_selectionmodelinspector_ui_plugin.so
 %{_libdir}/gammaray/%{rel}/%{abi}/gammaray_selectionmodelinspector_ui.desktop
+%{_libdir}/gammaray/%{rel}/%{abi}/gammaray_signalmonitor.so
+%{_libdir}/gammaray/%{rel}/%{abi}/gammaray_signalmonitor.desktop
+%{_libdir}/gammaray/%{rel}/%{abi}/gammaray_signalmonitor_ui.so
+%{_libdir}/gammaray/%{rel}/%{abi}/gammaray_signalmonitor_ui.desktop
 %{_libdir}/gammaray/%{rel}/%{abi}/gammaray_statemachineviewer_plugin.so
 %{_libdir}/gammaray/%{rel}/%{abi}/gammaray_statemachineviewer.desktop
 %{_libdir}/gammaray/%{rel}/%{abi}/gammaray_statemachineviewer_ui_plugin.so
@@ -199,6 +211,12 @@ cmake . -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release
 %{_libdir}/cmake/GammaRay/
 
 %changelog
+* Fri Oct 31 2014 Allen Winter <allen.winter@kdab.com> 2.2.0
+  2.2.0 final
+* Thu Oct 23 2014 Allen Winter <allen.winter@kdab.com> 2.1.2
+  2.1.2 final
+* Sat Aug 30 2014 Allen Winter <allen.winter@kdab.com> 2.1.1
+  2.1.1 final
 * Fri Jun 27 2014 Allen Winter <allen.winter@kdab.com> 2.1.0
   2.1.0 final
 * Thu Jun 26 2014 Allen Winter <allen.winter@kdab.com> 2.0.98

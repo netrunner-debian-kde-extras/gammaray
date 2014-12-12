@@ -25,10 +25,10 @@
 
 #include "timerinfo.h"
 
-#include <core/objecttypefilterproxymodel.h>
 #include <common/modelroles.h>
 
 #include <QAbstractTableModel>
+#include <QSet>
 
 class QTimer;
 
@@ -66,7 +66,7 @@ class TimerModel : public QAbstractTableModel
     /// if set, filters out object owned by the probe
     void setProbe(ProbeInterface *probe);
 
-    void setSourceModel(ObjectTypeFilterProxyModel<QTimer> *sourceModel);
+    void setSourceModel(QAbstractItemModel *sourceModel);
 
     /* reimp */
     int columnCount(const QModelIndex &parent = QModelIndex()) const;
@@ -90,6 +90,7 @@ class TimerModel : public QAbstractTableModel
     void slotEndInsertRows();
     void slotBeginReset();
     void slotEndReset();
+    void flushEmitPendingChangedRows();
 
   private:
     explicit TimerModel(QObject *parent = 0);
@@ -101,20 +102,27 @@ class TimerModel : public QAbstractTableModel
     TimerInfoPtr findOrCreateTimerInfo(const QModelIndex &index);
 
     // Finds QTimer timers
-    TimerInfoPtr findOrCreateQTimerTimerInfo(QTimer *timer);
+    TimerInfoPtr findOrCreateQTimerTimerInfo(QObject* timer);
 
     // Finds QObject timers
     TimerInfoPtr findOrCreateFreeTimerInfo(int timerId);
 
-    int rowFor(QTimer *timer) ;
+    int rowFor(QObject *timer) ;
+    void emitTimerObjectChanged(int row);
+    void emitFreeTimerChanged(int row);
 
-    ObjectTypeFilterProxyModel<QTimer> *m_sourceModel;
+    QAbstractItemModel *m_sourceModel;
     QList<TimerInfoPtr> m_freeTimers;
     ProbeInterface *m_probe;
     // current timer signals that are being processed
     QHash<QObject*, TimerInfoPtr> m_currentSignals;
+    // pending dataChanged() signals
+    QSet<int> m_pendingChangedTimerObjects;
+    QSet<int> m_pendingChangedFreeTimers;
+    QTimer *m_pendingChanedRowsTimer;
     // the method index of the timeout() signal of a QTimer
     const int m_timeoutIndex;
+    int m_qmlTimerTriggeredIndex;
 };
 
 }
