@@ -10,6 +10,7 @@ gammaray (2.1.0-4) unstable; urgency=medium
     - gammaray is the last package still using it and has the needed Qt4 private
       headers already bundled with the source code. Dropping the dependency will
       allow libqt4-private-dev to be removed from Debian.
+  * Bump Standards-Version to 3.9.6.
 
  -- Jakub Adam <jakub.adam@ktknet.cz>  Fri, 12 Dec 2014 21:28:26 +0100
 
