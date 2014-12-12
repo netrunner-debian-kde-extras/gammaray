@@ -13,6 +13,8 @@ usr/lib/gammaray/*/qt4*/gammaray_scriptenginedebugger.desktop
 usr/lib/gammaray/*/qt4*/gammaray_scriptenginedebugger_plugin.so
 usr/lib/gammaray/*/qt4*/gammaray_selectionmodelinspector.desktop
 usr/lib/gammaray/*/qt4*/gammaray_selectionmodelinspector_plugin.so
+usr/lib/gammaray/*/qt4*/gammaray_signalmonitor.desktop
+usr/lib/gammaray/*/qt4*/gammaray_signalmonitor.so
 usr/lib/gammaray/*/qt4*/gammaray_statemachineviewer.desktop
 usr/lib/gammaray/*/qt4*/gammaray_statemachineviewer_plugin.so
 usr/lib/gammaray/*/qt4*/gammaray_styleinspector.desktop

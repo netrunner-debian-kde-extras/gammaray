@@ -9,9 +9,11 @@ usr/lib/gammaray/*/qt5*/gammaray_probe.so
 usr/lib/gammaray/*/qt5*/gammaray_sceneinspector*
 usr/lib/gammaray/*/qt5*/gammaray_scriptenginedebugger*
 usr/lib/gammaray/*/qt5*/gammaray_selectionmodelinspector*
+usr/lib/gammaray/*/qt5*/gammaray_signalmonitor*
 usr/lib/gammaray/*/qt5*/gammaray_statemachineviewer*
 usr/lib/gammaray/*/qt5*/gammaray_styleinspector*
 usr/lib/gammaray/*/qt5*/gammaray_timertop*
+usr/lib/gammaray/*/qt5*/gammaray_translatorinspector*
 usr/lib/gammaray/*/qt5*/gammaray_webinspector*
 usr/lib/gammaray/*/qt5*/gammaray_widgetinspector*
 usr/lib/gammaray/*/qt5*/libgammaray_widget_export_actions.so
