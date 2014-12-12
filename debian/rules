@@ -1,6 +1,6 @@
 #!/usr/bin/make -f
 
-.PHONY: override_dh_auto_configure override_dh_auto_build override_dh_auto_test override_dh_auto_install override_dh_installdocs override_dh_strip override_dh_clean
+.PHONY: override_dh_auto_configure override_dh_auto_build override_dh_auto_test override_dh_auto_install override_dh_installdocs override_dh_strip
 
 export DEB_LDFLAGS_MAINT_APPEND=-Wl,--as-needed
 
@@ -10,11 +10,6 @@ DEB_HOST_ARCH ?= $(shell dpkg-architecture -qDEB_HOST_ARCH)
 	dh $@ --parallel
 
 override_dh_auto_configure:
-	# Move away bundled Qt private headers so that system versions are used
-	if [ -d 3rdparty/qt/private ]; then \
-		mv 3rdparty/qt/private 3rdparty/qt/private.dont.use; \
-	fi
-
 	dh_auto_configure -B obj-qt5
 	dh_auto_configure -B obj-qt4 -- -DGAMMARAY_ENFORCE_QT4_BUILD=ON -DGAMMARAY_PROBE_ONLY_BUILD=ON
 
@@ -44,11 +39,3 @@ override_dh_installdocs:
 
 override_dh_strip:
 	dh_strip --dbg-package=gammaray-dbg
-
-override_dh_clean:
-	dh_clean
-
-	# Put back bundled Qt private headers to restore sources into original state
-	if [ -d 3rdparty/qt/private.dont.use ]; then \
-		mv 3rdparty/qt/private.dont.use 3rdparty/qt/private; \
-	fi

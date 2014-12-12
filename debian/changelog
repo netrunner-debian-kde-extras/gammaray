@@ -1,10 +1,17 @@
-gammaray (2.1.0-4) UNRELEASED; urgency=medium
+gammaray (2.1.0-4) unstable; urgency=medium
 
+  [ Felix Geyer ]
   * Fix FTBFS on ppc64el (Closes: #765672).
   * Let xvfb-run choose a free server number so it doesn't fail when one is
     already taken.
 
- -- Felix Geyer <fgeyer@debian.org>  Mon, 28 Jul 2014 19:27:29 +0200
+  [ Jakub Adam ]
+  * Drop build dependency on libqt4-private-dev (Closes: #763852)
+    - gammaray is the last package still using it and has the needed Qt4 private
+      headers already bundled with the source code. Dropping the dependency will
+      allow libqt4-private-dev to be removed from Debian.
+
+ -- Jakub Adam <jakub.adam@ktknet.cz>  Fri, 12 Dec 2014 21:28:26 +0100
 
 gammaray (2.1.0-3.1) unstable; urgency=low
 
