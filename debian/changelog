@@ -1,6 +1,6 @@
 gammaray (2.1.0-4) UNRELEASED; urgency=medium
 
-  * Fix FTBFS on ppc64el.
+  * Fix FTBFS on ppc64el (Closes: #765672).
   * Let xvfb-run choose a free server number so it doesn't fail when one is
     already taken.
 
