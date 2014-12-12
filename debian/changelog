@@ -1,3 +1,11 @@
+gammaray (2.1.0-3.1) unstable; urgency=low
+
+  * Non-maintainer upload.
+  * Fix FTBFS on mips64(el), as on mips* platform, they use the same
+    e_machine value (Closes: #761805).
+
+ -- YunQiang Su <syq@debian.org>  Thu, 09 Oct 2014 13:24:02 +0800
+
 gammaray (2.1.0-3) unstable; urgency=medium
 
   * Team upload.
