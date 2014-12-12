@@ -29,6 +29,8 @@
 #include <QAction>
 #include <QDebug>
 
+Q_DECLARE_METATYPE(QAction::Priority)
+
 using namespace GammaRay;
 
 template<class T>
@@ -52,6 +54,8 @@ ActionModel::ActionModel(QObject *parent)
     SLOT(handleRowsRemoved(QModelIndex,int,int)));
 
   connect(this, SIGNAL(modelReset()), SLOT(handleModelReset()));
+
+  m_duplicateFinder->setActions(actions());
 }
 
 ActionModel::~ActionModel()
@@ -69,7 +73,7 @@ QAction *ActionModel::actionForIndex(const QModelIndex &index) const
 QList<QAction *> ActionModel::actions(const QModelIndex &parent, int start, int end)
 {
   QList<QAction *> actions;
-  for (int i = start; i < end; ++i) {
+  for (int i = start; i <= end; ++i) {
     const QModelIndex modelIndex = index(i, 0, parent);
     actions << actionForIndex(modelIndex);
   }
@@ -163,7 +167,7 @@ QVariant ActionModel::data(const QModelIndex &proxyIndex, int role) const
     case CheckedPropColumn:
       return VariantHandler::displayString(action->isChecked());
     case PriorityPropColumn:
-      return VariantHandler::displayString(action->priority());
+      return Util::enumToString(action->priority(), 0, action);
     case ShortcutsPropColumn:
       return toString(action->shortcuts());
     default:

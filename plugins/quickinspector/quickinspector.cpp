@@ -24,6 +24,7 @@
 #include "quickinspector.h"
 #include "quickitemmodel.h"
 #include "quickscenegraphmodel.h"
+#include "transferimage.h"
 #include "geometryextension/sggeometryextension.h"
 #include "materialextension/materialextension.h"
 
@@ -54,6 +55,9 @@
 #include <QSGNode>
 #include <QSGGeometry>
 #include <QSGMaterial>
+#include <QSGFlatColorMaterial>
+#include <QSGTextureMaterial>
+#include <QSGVertexColorMaterial>
 #include <private/qquickshadereffectsource_p.h>
 #include <QMatrix4x4>
 #include <QCoreApplication>
@@ -78,6 +82,9 @@ Q_DECLARE_METATYPE(const QMatrix4x4 *)
 Q_DECLARE_METATYPE(const QSGClipNode *)
 Q_DECLARE_METATYPE(const QSGGeometry *)
 Q_DECLARE_METATYPE(QSGMaterial *)
+Q_DECLARE_METATYPE(QSGMaterial::Flags)
+Q_DECLARE_METATYPE(QSGTexture::WrapMode)
+Q_DECLARE_METATYPE(QSGTexture::Filtering)
 using namespace GammaRay;
 
 static QString qSGNodeFlagsToString(QSGNode::Flags flags)
@@ -98,6 +105,8 @@ static QString qSGNodeFlagsToString(QSGNode::Flags flags)
   if (flags & QSGNode::OwnsOpaqueMaterial) {
     list << "OwnsOpaqueMaterial";
   }
+  if (list.isEmpty())
+    return "<none>";
   return list.join(" | ");
 }
 static QString qSGNodeDirtyStateToString(QSGNode::DirtyState flags)
@@ -135,7 +144,44 @@ static QString qSGNodeDirtyStateToString(QSGNode::DirtyState flags)
   if (flags & QSGNode::DirtyPropagationMask) {
     list << "DirtyPropagationMask";
   }
+  if (list.isEmpty())
+    return "Clean";
   return list.join(" | ");
+}
+
+static QString qsgMaterialFlagsToString(QSGMaterial::Flags flags)
+{
+  QStringList list;
+#define F(f) if (flags & QSGMaterial::f) list.push_back(#f);
+  F(Blending)
+  F(RequiresDeterminant)
+  F(RequiresFullMatrixExceptTranslate)
+  F(RequiresFullMatrix)
+  F(CustomCompileStep)
+#undef F
+
+  if (list.isEmpty())
+    return "<none>";
+  return list.join(" | ");
+}
+
+static QString qsgTextureFilteringToString(QSGTexture::Filtering filtering)
+{
+  switch (filtering) {
+    case QSGTexture::None: return "None";
+    case QSGTexture::Nearest: return "Nearest";
+    case QSGTexture::Linear: return "Linear";
+  }
+  return QString("Unknown: %1").arg(filtering);
+}
+
+static QString qsgTextureWrapModeToString(QSGTexture::WrapMode wrapMode)
+{
+  switch (wrapMode) {
+    case QSGTexture::Repeat: return "Repeat";
+    case QSGTexture::ClampToEdge: return "ClampToEdge";
+  }
+  return QString("Unknown: %1").arg(wrapMode);
 }
 
 QuickInspector::QuickInspector(ProbeInterface *probe, QObject *parent)
@@ -144,10 +190,11 @@ QuickInspector::QuickInspector(ProbeInterface *probe, QObject *parent)
     m_probe(probe),
     m_currentSgNode(0),
     m_itemModel(new QuickItemModel(this)),
-    m_itemPropertyController(new PropertyController("com.kdab.GammaRay.QuickItem", this)),
     m_sgModel(new QuickSceneGraphModel(this)),
+    m_itemPropertyController(new PropertyController("com.kdab.GammaRay.QuickItem", this)),
     m_sgPropertyController(new PropertyController("com.kdab.GammaRay.QuickSceneGraph", this)),
-    m_clientConnected(false)
+    m_clientViewActive(false),
+    m_needsNewFrame(false)
 {
   registerPCExtensions();
   Server::instance()->registerMonitorNotifier(
@@ -211,22 +258,37 @@ void QuickInspector::selectWindow(QQuickWindow *window)
     // Insert a ShaderEffectSource to the scene, with the contentItem as its source, in
     // order to use it to generate a preview of the window as QImage to show on the client.
     QQuickItem *contentItem = m_window->contentItem();
-    if (m_source) {
-      delete m_source;
+#if QT_VERSION < QT_VERSION_CHECK(5, 3, 0) // working around the 0-sized contentItem in older Qt
+    if (contentItem->height() == 0 && contentItem->width() == 0) {
+      contentItem->setWidth(contentItem->childrenRect().width());
+      contentItem->setHeight(contentItem->childrenRect().height());
     }
+#endif
+    delete m_source;
     m_source = new QQuickShaderEffectSource(contentItem);
     m_source->setParent(this); // hides the item in the object tree (note: parent != parentItem)
     QQuickItemPrivate::get(m_source)->anchors()->setFill(contentItem);
     m_source->setScale(0); // The item shouldn't be visible in the original scene, but it still
                            // needs to be rendered. (i.e. setVisible(false) would cause it to
                            // not be rendered anymore)
-    m_source->setRecursive(true);
-    m_source->setSourceItem(contentItem);
-
+    setupPreviewSource();
     connect(window, &QQuickWindow::afterRendering,
             this, &QuickInspector::slotSceneChanged, Qt::DirectConnection);
 
     m_window->update();
+  }
+}
+
+void QuickInspector::setupPreviewSource()
+{
+  Q_ASSERT(m_window);
+  QQuickItem *contentItem = m_window->contentItem();
+  const QList<QQuickItem*> children = contentItem->childItems();
+  if (children.size() == 2) { // prefer non-recursive shader sources, then we don't re-render all the time
+    m_source->setSourceItem(children.at(children.indexOf(m_source) == 1 ? 0 : 1));
+  } else {
+    m_source->setRecursive(true);
+    m_source->setSourceItem(contentItem);
   }
 }
 
@@ -285,12 +347,18 @@ void QuickInspector::objectSelected(void *object, const QString &typeName)
 
 void QuickInspector::renderScene()
 {
-  if (!m_clientConnected || !m_window) {
+  if (!m_clientViewActive || !m_window) {
     return;
   }
 
+  m_needsNewFrame = true;
+  m_window->update();
+}
+
+void QuickInspector::sendRenderedScene()
+{
   QVariantMap previewData;
-  previewData.insert("image", QVariant::fromValue(m_currentFrame));
+  previewData.insert("rawImage", QVariant::fromValue(TransferImage(m_currentFrame))); // wrap to allow bypassing expensive PNG compression
   if (m_currentItem) {
     QQuickItem *parent = m_currentItem->parentItem();
 
@@ -351,16 +419,26 @@ void QuickInspector::renderScene()
 
 void QuickInspector::slotSceneChanged()
 {
-  if (!m_clientConnected || !m_window) {
+  if (!m_clientViewActive || !m_window) {
+    return;
+  }
+
+  if (!m_needsNewFrame) {
+    emit sceneChanged();
     return;
   }
 
   const QSGTextureProvider *provider = m_source->textureProvider();
   Q_ASSERT(provider);
 
+#if QT_VERSION < QT_VERSION_CHECK(5, 4, 0)
   const QQuickShaderEffectTexture *texture =
     qobject_cast<QQuickShaderEffectTexture*>(provider->texture());
   Q_ASSERT(texture);
+#else
+  const QSGLayer *texture = qobject_cast<QSGLayer*>(provider->texture());
+  Q_ASSERT(texture);
+#endif
 
   QOpenGLContext *ctx =
     QQuickItemPrivate::get(m_source)->sceneGraphRenderContext()->openglContext();
@@ -368,13 +446,14 @@ void QuickInspector::slotSceneChanged()
     m_currentFrame = texture->toImage();
   }
 
-  emit sceneChanged();
+  m_needsNewFrame = false;
+  QMetaObject::invokeMethod(this, "sendRenderedScene", Qt::AutoConnection); // we are in the render thread here
 }
 
 void QuickInspector::sendKeyEvent(int type, int key, int modifiers, const QString &text,
                                   bool autorep, ushort count)
 {
-  if (!m_clientConnected || !m_window) {
+  if (!m_window) {
     return;
   }
 
@@ -390,7 +469,7 @@ void QuickInspector::sendKeyEvent(int type, int key, int modifiers, const QStrin
 void QuickInspector::sendMouseEvent(int type, const QPointF &localPos, int button,
                                     int buttons, int modifiers)
 {
-  if (!m_clientConnected || !m_window) {
+  if (!m_window) {
     return;
   }
 
@@ -405,7 +484,7 @@ void QuickInspector::sendMouseEvent(int type, const QPointF &localPos, int butto
 void QuickInspector::sendWheelEvent(const QPointF &localPos, QPoint pixelDelta, QPoint angleDelta,
                                     int buttons, int modifiers)
 {
-  if (!m_clientConnected || !m_window) {
+  if (!m_window) {
     return;
   }
 
@@ -500,11 +579,21 @@ void QuickInspector::sgNodeDeleted(QSGNode *node)
 
 void QuickInspector::clientConnectedChanged(bool connected)
 {
-  m_clientConnected = connected;
+  if (!connected)
+    setSceneViewActive(false);
+}
 
-  if (connected && m_window) {
+void QuickInspector::setSceneViewActive(bool active)
+{
+  m_clientViewActive = active;
+
+  if (active && m_window) {
+    if (m_source)
+      setupPreviewSource();
     m_window->update();
   }
+  if (!active && m_source)
+    m_source->setSourceItem(0); // no need to render the screenshot as well if nobody is watching
 }
 
 QQuickItem *QuickInspector::recursiveChiltAt(QQuickItem *parent, const QPointF &pos) const
@@ -553,10 +642,23 @@ void QuickInspector::registerMetaTypes()
   MO_ADD_PROPERTY_RO(QQuickView, QQmlContext *, rootContext);
   MO_ADD_PROPERTY_RO(QQuickView, QQuickItem *, rootObject);
 
+  MO_ADD_METAOBJECT1(QSGTexture, QObject);
+  MO_ADD_PROPERTY   (QSGTexture, QSGTexture::Filtering, filtering, setFiltering);
+  MO_ADD_PROPERTY_RO(QSGTexture, bool, hasAlphaChannel);
+  MO_ADD_PROPERTY_RO(QSGTexture, bool, hasMipmaps);
+  MO_ADD_PROPERTY   (QSGTexture, QSGTexture::WrapMode, horizontalWrapMode, setHorizontalWrapMode);
+  MO_ADD_PROPERTY_RO(QSGTexture, bool, isAtlasTexture);
+  MO_ADD_PROPERTY   (QSGTexture, QSGTexture::Filtering, mipmapFiltering, setMipmapFiltering);
+  MO_ADD_PROPERTY_RO(QSGTexture, QRectF, normalizedTextureSubRect);
+  MO_ADD_PROPERTY_RO(QSGTexture, int, textureId);
+  MO_ADD_PROPERTY_RO(QSGTexture, QSize, textureSize);
+  MO_ADD_PROPERTY   (QSGTexture, QSGTexture::WrapMode, verticalWrapMode, setVerticalWrapMode);
+
   MO_ADD_METAOBJECT0(QSGNode);
   MO_ADD_PROPERTY_RO(QSGNode, QSGNode *, parent);
   MO_ADD_PROPERTY_RO(QSGNode, int, childCount);
   MO_ADD_PROPERTY_RO(QSGNode, QSGNode::Flags, flags);
+  MO_ADD_PROPERTY_RO(QSGNode, bool, isSubtreeBlocked);
   MO_ADD_PROPERTY   (QSGNode, QSGNode::DirtyState, dirtyState, markDirty);
 
   MO_ADD_METAOBJECT1(QSGBasicGeometryNode, QSGNode);
@@ -578,15 +680,30 @@ void QuickInspector::registerMetaTypes()
   MO_ADD_PROPERTY_RO(QSGClipNode, const QSGClipNode *, clipList);
 
   MO_ADD_METAOBJECT1(QSGTransformNode, QSGNode);
-//  MO_ADD_PROPERTY   (QSGTransformNode, const QMatrix4x4&, matrix, setMatrix);
-//  MO_ADD_PROPERTY   (QSGTransformNode, const QMatrix4x4&, combinedMatrix, setCombinedMatrix);
+  MO_ADD_PROPERTY   (QSGTransformNode, const QMatrix4x4&, matrix, setMatrix);
+  MO_ADD_PROPERTY   (QSGTransformNode, const QMatrix4x4&, combinedMatrix, setCombinedMatrix);
 
   MO_ADD_METAOBJECT1(QSGRootNode, QSGNode);
 
   MO_ADD_METAOBJECT1(QSGOpacityNode, QSGNode);
   MO_ADD_PROPERTY   (QSGOpacityNode, qreal, opacity, setOpacity);
   MO_ADD_PROPERTY   (QSGOpacityNode, qreal, combinedOpacity, setCombinedOpacity);
-  MO_ADD_PROPERTY_RO(QSGOpacityNode, bool, isSubtreeBlocked);
+
+  MO_ADD_METAOBJECT0(QSGMaterial);
+  MO_ADD_PROPERTY_RO(QSGMaterial, QSGMaterial::Flags, flags);
+
+  MO_ADD_METAOBJECT1(QSGFlatColorMaterial, QSGMaterial);
+  MO_ADD_PROPERTY   (QSGFlatColorMaterial, const QColor&, color, setColor);
+
+  MO_ADD_METAOBJECT1(QSGOpaqueTextureMaterial, QSGMaterial);
+  MO_ADD_PROPERTY   (QSGOpaqueTextureMaterial, QSGTexture::Filtering, filtering, setFiltering);
+  MO_ADD_PROPERTY   (QSGOpaqueTextureMaterial, QSGTexture::WrapMode, horizontalWrapMode, setHorizontalWrapMode);
+  MO_ADD_PROPERTY   (QSGOpaqueTextureMaterial, QSGTexture::Filtering, mipmapFiltering, setMipmapFiltering);
+  MO_ADD_PROPERTY   (QSGOpaqueTextureMaterial, QSGTexture*, texture, setTexture);
+  MO_ADD_PROPERTY   (QSGOpaqueTextureMaterial, QSGTexture::WrapMode, verticalWrapMode, setVerticalWrapMode);
+  MO_ADD_METAOBJECT1(QSGTextureMaterial, QSGOpaqueTextureMaterial);
+
+  MO_ADD_METAOBJECT1(QSGVertexColorMaterial, QSGMaterial);
 }
 
 void QuickInspector::registerVariantHandlers()
@@ -595,11 +712,19 @@ void QuickInspector::registerVariantHandlers()
   VariantHandler::registerStringConverter<QSGBasicGeometryNode*>(Util::addressToString);
   VariantHandler::registerStringConverter<QSGGeometryNode*>(Util::addressToString);
   VariantHandler::registerStringConverter<QSGClipNode*>(Util::addressToString);
+  VariantHandler::registerStringConverter<const QSGClipNode*>(Util::addressToString);
   VariantHandler::registerStringConverter<QSGTransformNode*>(Util::addressToString);
   VariantHandler::registerStringConverter<QSGRootNode*>(Util::addressToString);
   VariantHandler::registerStringConverter<QSGOpacityNode*>(Util::addressToString);
   VariantHandler::registerStringConverter<QSGNode::Flags>(qSGNodeFlagsToString);
   VariantHandler::registerStringConverter<QSGNode::DirtyState>(qSGNodeDirtyStateToString);
+  VariantHandler::registerStringConverter<const QSGClipNode*>(Util::addressToString);
+  VariantHandler::registerStringConverter<QSGGeometry*>(Util::addressToString);
+  VariantHandler::registerStringConverter<const QSGGeometry*>(Util::addressToString);
+  VariantHandler::registerStringConverter<QSGMaterial*>(Util::addressToString);
+  VariantHandler::registerStringConverter<QSGMaterial::Flags>(qsgMaterialFlagsToString);
+  VariantHandler::registerStringConverter<QSGTexture::Filtering>(qsgTextureFilteringToString);
+  VariantHandler::registerStringConverter<QSGTexture::WrapMode>(qsgTextureWrapModeToString);
 }
 
 void QuickInspector::registerPCExtensions()

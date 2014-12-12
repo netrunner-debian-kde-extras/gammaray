@@ -57,6 +57,8 @@ void MethodsTab::setObjectBaseName(const QString &baseName)
   QSortFilterProxyModel *proxy = new QSortFilterProxyModel(this);
   proxy->setDynamicSortFilter(true);
   proxy->setSourceModel(ObjectBroker::model(baseName + '.' + "methods"));
+  proxy->setSortCaseSensitivity(Qt::CaseInsensitive);
+  proxy->setSortRole(ObjectMethodModelRole::MethodSignature);
   m_ui->methodView->setModel(proxy);
   m_ui->methodView->sortByColumn(0, Qt::AscendingOrder);
   m_ui->methodView->setSelectionModel(ObjectBroker::selectionModel(proxy));
@@ -79,14 +81,10 @@ void MethodsTab::methodActivated(const QModelIndex &index)
   }
   m_interface->activateMethod();
 
-  const QMetaMethod::MethodType methodType =
-    index.data(ObjectMethodModelRole::MetaMethodType).value<QMetaMethod::MethodType>();
-  if (methodType == QMetaMethod::Slot || methodType == QMetaMethod::Method) {
-    MethodInvocationDialog dlg(this);
-    dlg.setArgumentModel(ObjectBroker::model(m_objectBaseName + '.' + "methodArguments"));
-    if (dlg.exec()) {
-      m_interface->invokeMethod(dlg.connectionType());
-    }
+  MethodInvocationDialog dlg(this);
+  dlg.setArgumentModel(ObjectBroker::model(m_objectBaseName + '.' + "methodArguments"));
+  if (dlg.exec()) {
+    m_interface->invokeMethod(dlg.connectionType());
   }
 }
 
@@ -100,15 +98,20 @@ void MethodsTab::methodContextMenu(const QPoint &pos)
   const QMetaMethod::MethodType methodType =
     index.data(ObjectMethodModelRole::MetaMethodType).value<QMetaMethod::MethodType>();
   QMenu contextMenu;
+  QAction *invokeAction = 0, *connectToAction = 0;
   if (methodType == QMetaMethod::Slot || methodType == QMetaMethod::Method) {
-    contextMenu.addAction(tr("Invoke"));
+    invokeAction = contextMenu.addAction(tr("Invoke"));
   } else if (methodType == QMetaMethod::Signal) {
-    contextMenu.addAction(tr("Connect to"));
+    connectToAction = contextMenu.addAction(tr("Connect to"));
+    invokeAction = contextMenu.addAction(tr("Emit"));
   } else {
     return; // Can't do any action, so don't try to show an empty context menu.
   }
 
-  if (contextMenu.exec(m_ui->methodView->viewport()->mapToGlobal(pos))) {
+  QAction *action = contextMenu.exec(m_ui->methodView->viewport()->mapToGlobal(pos));
+  if (action == invokeAction) {
     methodActivated(index);
+  } else if (action == connectToAction) {
+    m_interface->connectToSignal();
   }
 }

@@ -18,6 +18,10 @@ target_link_libraries(gammaray_timertop_plugin
   gammaray_core
 )
 
+if (LINUX)
+  target_link_libraries(pthread)
+endif()
+
 if(NOT WIN32 AND NOT APPLE)
   target_link_libraries(gammaray_timertop_plugin rt)
 endif()
@@ -43,7 +47,7 @@ if((Qt5Widgets_FOUND OR QT_QTGUI_FOUND) AND NOT GAMMARAY_PROBE_ONLY_BUILD)
   target_link_libraries(gammaray_timertop_ui_plugin
     ${QT_QTCORE_LIBRARIES}
     ${QT_QTGUI_LIBRARIES}
-    gammaray_common
+    gammaray_ui
   )
 
 endif()

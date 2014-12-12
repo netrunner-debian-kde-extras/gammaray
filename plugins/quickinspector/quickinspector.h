@@ -60,27 +60,30 @@ class QuickInspector : public QuickInspectorInterface
 
   public slots:
     void selectWindow(int index) Q_DECL_OVERRIDE;
-    void renderScene();
+    void renderScene() Q_DECL_OVERRIDE;
 
     void sendKeyEvent(int type, int key, int modifiers,
                       const QString &text = QString(), bool autorep = false,
-                      ushort count = 1);
+                      ushort count = 1) Q_DECL_OVERRIDE;
 
     void sendMouseEvent(int type, const QPointF &localPos,
-                        int button, int buttons, int modifiers);
+                        int button, int buttons, int modifiers) Q_DECL_OVERRIDE;
 
     void sendWheelEvent(const QPointF &localPos, QPoint pixelDelta,
-                        QPoint angleDelta, int buttons, int modifiers);
+                        QPoint angleDelta, int buttons, int modifiers) Q_DECL_OVERRIDE;
 
-    void setCustomRenderMode(GammaRay::QuickInspectorInterface::RenderMode customRenderMode);
+    void setCustomRenderMode(GammaRay::QuickInspectorInterface::RenderMode customRenderMode) Q_DECL_OVERRIDE;
 
-    void checkFeatures();
+    void checkFeatures() Q_DECL_OVERRIDE;
+
+    void setSceneViewActive(bool active) Q_DECL_OVERRIDE;
 
   protected:
     bool eventFilter(QObject *receiver, QEvent *event) Q_DECL_OVERRIDE;
 
   private slots:
     void slotSceneChanged();
+    void sendRenderedScene();
     void itemSelectionChanged(const QItemSelection &selection);
     void sgSelectionChanged(const QItemSelection &selection);
     void clientConnectedChanged(bool connected);
@@ -96,6 +99,7 @@ class QuickInspector : public QuickInspectorInterface
     void registerVariantHandlers();
     void registerPCExtensions();
     QString findSGNodeType(QSGNode *node) const;
+    void setupPreviewSource();
 
     QQuickItem *recursiveChiltAt(QQuickItem *parent, const QPointF &pos) const;
 
@@ -111,8 +115,9 @@ class QuickInspector : public QuickInspectorInterface
     QItemSelectionModel *m_sgSelectionModel;
     PropertyController *m_itemPropertyController;
     PropertyController *m_sgPropertyController;
-    bool m_clientConnected;
     QImage m_currentFrame;
+    bool m_clientViewActive;
+    bool m_needsNewFrame;
 };
 
 class QuickInspectorFactory : public QObject,

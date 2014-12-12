@@ -27,6 +27,8 @@
 #include "gammaray_ui_export.h"
 #include <QStyledItemDelegate>
 
+class QMatrix4x4;
+
 namespace GammaRay {
 
 class GAMMARAY_UI_EXPORT PropertyEditorDelegate : public QStyledItemDelegate
@@ -37,6 +39,16 @@ public:
     ~PropertyEditorDelegate();
 
     /*override*/ void setEditorData(QWidget* editor, const QModelIndex& index) const;
+    void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const;
+    QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const;
+
+private:
+    template <typename Matrix>
+    void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex &index, const Matrix &matrix) const;
+    template <typename Matrix>
+    QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex &index, const Matrix &matrix) const;
+    template <typename Matrix>
+    int columnWidth(const QStyleOptionViewItem& option, const Matrix& matrix, int column) const;
 };
 
 }

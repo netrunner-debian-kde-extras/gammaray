@@ -21,6 +21,8 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "config-gammaray.h"
+
 #include "util.h"
 #include <common/metatypedeclarations.h>
 #include "varianthandler.h"
@@ -32,6 +34,11 @@
 #include <QMetaObject>
 #include <QObject>
 #include <QPainter>
+
+#ifdef HAVE_PRIVATE_QT_HEADERS
+#include <private/qobject_p.h>
+#include <private/qmetaobject_p.h>
+#endif
 
 #include <iostream>
 
@@ -54,10 +61,19 @@ QString Util::displayString(const QObject *object)
     return "QObject(0x0)";
   }
   if (object->objectName().isEmpty()) {
-    return QString::fromLatin1("%1 (%2)").
-      arg(addressToString(object)).
-      arg(object->metaObject()->className());
+    return QString::fromLatin1("%1[this=%2]").
+      arg(object->metaObject()->className()).
+      arg(addressToString(object));
   }
+  return object->objectName();
+}
+
+QString Util::shortDisplayString(const QObject* object)
+{
+  if (!object)
+    return "0x0";
+  if (object->objectName().isEmpty())
+    return addressToString(object);
   return object->objectName();
 }
 
@@ -66,7 +82,7 @@ QString Util::addressToString(const void *p)
   return (QLatin1String("0x") + QString::number(reinterpret_cast<qlonglong>(p), 16));
 }
 
-QString Util::enumToString(const QVariant &value, const char *typeName, QObject *object)
+QString Util::enumToString(const QVariant &value, const char *typeName, const QObject *object)
 {
   QByteArray enumTypeName(typeName);
   if (enumTypeName.isEmpty()) {
@@ -96,6 +112,28 @@ QString Util::enumToString(const QVariant &value, const char *typeName, QObject 
   return me.valueToKeys(value.toInt());
 }
 
+QString Util::prettyMethodSignature(const QMetaMethod& method)
+{
+#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
+  return method.signature();
+#else
+  QString signature = method.typeName();
+  signature += ' ' + method.name() + '(';
+  QStringList args;
+  args.reserve(method.parameterCount());
+  const QList<QByteArray> paramTypes = method.parameterTypes();
+  const QList<QByteArray> paramNames = method.parameterNames();
+  for (int i = 0; i < method.parameterCount(); ++i) {
+    QString arg = paramTypes.at(i);
+    if (!paramNames.at(i).isEmpty())
+      arg += ' ' + paramNames.at(i);
+    args.push_back(arg);
+  }
+  signature += args.join(", ") + ')';
+  return signature;
+#endif
+}
+
 bool Util::descendantOf(const QObject *ascendant, const QObject *obj)
 {
   QObject *parent = obj->parent();
@@ -109,7 +147,7 @@ bool Util::descendantOf(const QObject *ascendant, const QObject *obj)
 }
 
 namespace GammaRay {
-static QString stringifyProperty(QObject *obj, const QString &propName)
+static QString stringifyProperty(const QObject *obj, const QString &propName)
 {
   const QVariant value = obj->property(propName.toLatin1());
   const QMetaProperty mp =
@@ -184,7 +222,7 @@ static IconDatabase readIconData()
   return data;
 }
 
-static QVariant iconForObject(const QMetaObject *mo, QObject *obj)
+static QVariant iconForObject(const QMetaObject *mo, const QObject *obj)
 {
   static const IconDatabase iconDataBase = readIconData();
   // stupid Qt convention to use int for sizes... the static cast shuts down warnings about conversion from size_t to int.
@@ -216,12 +254,22 @@ static QVariant iconForObject(const QMetaObject *mo, QObject *obj)
 
 }
 
-QVariant Util::iconForObject(QObject *obj)
+QVariant Util::iconForObject(const QObject *obj)
 {
   if (obj) {
     return GammaRay::iconForObject(obj->metaObject(), obj);
   }
   return QVariant();
+}
+
+QString Util::tooltipForObject(const QObject* object)
+{
+  return QObject::tr("<p style='white-space:pre'>Object name: %1\nType: %2\nParent: %3 (Address: %4)\nNumber of children: %5</p>").
+    arg(object->objectName().isEmpty() ? "&lt;Not set&gt;" : object->objectName()).
+    arg(object->metaObject()->className()).
+    arg(object->parent() ? object->parent()->metaObject()->className() : "<No parent>").
+    arg(Util::addressToString(object->parent())).
+    arg(object->children().size());
 }
 
 void Util::drawTransparencyPattern(QPainter *painter, const QRect &rect, int squareSize)
@@ -235,4 +283,46 @@ void Util::drawTransparencyPattern(QPainter *painter, const QRect &rect, int squ
   QBrush bgBrush;
   bgBrush.setTexture(bgPattern);
   painter->fillRect(rect, bgBrush);
+}
+
+#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0) && defined(HAVE_PRIVATE_QT_HEADERS)
+// from Qt4's qobject.cpp
+static void computeOffsets(const QMetaObject *mo, int *signalOffset, int *methodOffset)
+{
+  *signalOffset = *methodOffset = 0;
+  const QMetaObject *m = mo->superClass();
+  while (m) {
+    const QMetaObjectPrivate *d = QMetaObjectPrivate::get(m);
+    *methodOffset += d->methodCount;
+    *signalOffset += d->signalCount;
+    m = m->superClass();
+  }
+}
+#endif
+
+int Util::signalIndexToMethodIndex(const QMetaObject* metaObject, int signalIndex)
+{
+#ifdef HAVE_PRIVATE_QT_HEADERS
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+  return QMetaObjectPrivate::signal(metaObject, signalIndex).methodIndex();
+#else
+
+  if (signalIndex < 0)
+    return signalIndex;
+  Q_ASSERT(metaObject);
+
+  int signalOffset, methodOffset;
+  computeOffsets(metaObject, &signalOffset, &methodOffset);
+  while (signalOffset > signalIndex) {
+    metaObject = metaObject->superClass();
+    computeOffsets(metaObject, &signalOffset, &methodOffset);
+  }
+  const int offset = methodOffset - signalOffset;
+  return metaObject->method(signalIndex + offset).methodIndex();
+#endif
+#else
+  Q_UNUSED(metaObject);
+  Q_UNUSED(signalIndex);
+  return -1;
+#endif
 }

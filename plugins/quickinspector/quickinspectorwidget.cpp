@@ -31,6 +31,7 @@
 #include "materialextension/materialtab.h"
 #include "annotatedscenepreview.h"
 #include "quickitemdelegate.h"
+#include "transferimage.h"
 #include "ui_quickinspectorwidget.h"
 
 #include <common/objectbroker.h>
@@ -39,6 +40,7 @@
 #include <kde/krecursivefilterproxymodel.h>
 #include <client/remotemodel.h>
 
+#include <QEvent>
 #include <QLabel>
 #include <QTimer>
 #include <qmath.h>
@@ -179,7 +181,6 @@ QuickInspectorWidget::QuickInspectorWidget(QWidget *parent)
           this, SLOT(setFeatures(GammaRay::QuickInspectorInterface::Features)));
 
   m_interface->checkFeatures();
-  m_interface->renderScene();
 }
 
 QuickInspectorWidget::~QuickInspectorWidget()
@@ -206,7 +207,11 @@ void QuickInspectorWidget::sceneRendered(const QVariantMap &previewData)
   m_waitingForImage = false;
 
   if (m_rootItem) {
-    m_rootItem->setProperty("previewData", previewData);
+    QVariantMap data(previewData);
+    const TransferImage transfer = data.value("rawImage").value<TransferImage>();
+    data.remove("rawImage");
+    data.insert("image", QVariant::fromValue(transfer.image())); // unwrap for usage in QML
+    m_rootItem->setProperty("previewData", data);
   }
 
   if (m_sceneChangedSinceLastRequest) {
@@ -268,7 +273,7 @@ void QuickInspectorUiFactory::initUi()
   ObjectBroker::registerClientObjectFactoryCallback<MaterialExtensionInterface*>(
     createMaterialExtension);
 
-  PropertyWidget::registerTab<MaterialTab>("material", QObject::tr("Shaders"));
+  PropertyWidget::registerTab<MaterialTab>("material", QObject::tr("Material"));
 
   ObjectBroker::registerClientObjectFactoryCallback<SGGeometryExtensionInterface*>(
     createSGGeometryExtension);
@@ -276,6 +281,16 @@ void QuickInspectorUiFactory::initUi()
   PropertyWidget::registerTab<SGGeometryTab>("sgGeometry", QObject::tr("Geometry"));
 }
 
-#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
-Q_EXPORT_PLUGIN(QuickInspectorUiFactory)
-#endif
+void QuickInspectorWidget::showEvent(QShowEvent* event)
+{
+  QWidget::showEvent(event);
+  m_waitingForImage = false;
+  m_sceneChangedSinceLastRequest = true;
+  m_interface->setSceneViewActive(true);
+}
+
+void QuickInspectorWidget::hideEvent(QHideEvent* event)
+{
+  m_interface->setSceneViewActive(false);
+  QWidget::hideEvent(event);
+}

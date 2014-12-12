@@ -23,6 +23,7 @@
 #include "timermodel.h"
 
 #include <core/probeinterface.h>
+#include <common/objectmodel.h>
 
 #include <private/qobject_p.h> //krazy:exclude=camelcase
 
@@ -78,8 +79,13 @@ TimerModel::TimerModel(QObject *parent)
   : QAbstractTableModel(parent),
     m_sourceModel(0),
     m_probe(0),
-    m_timeoutIndex(QTimer::staticMetaObject.indexOfSignal("timeout()"))
+    m_pendingChanedRowsTimer(new QTimer(this)),
+    m_timeoutIndex(QTimer::staticMetaObject.indexOfSignal("timeout()")),
+    m_qmlTimerTriggeredIndex(-1)
 {
+  m_pendingChanedRowsTimer->setInterval(5000);
+  m_pendingChanedRowsTimer->setSingleShot(true);
+  connect(m_pendingChanedRowsTimer, SIGNAL(timeout()), this, SLOT(flushEmitPendingChangedRows()));
 }
 
 TimerModel::~TimerModel()
@@ -118,7 +124,7 @@ TimerInfoPtr TimerModel::findOrCreateFreeTimerInfo(int timerId)
   return timerInfo;
 }
 
-TimerInfoPtr TimerModel::findOrCreateQTimerTimerInfo(QTimer *timer)
+TimerInfoPtr TimerModel::findOrCreateQTimerTimerInfo(QObject *timer)
 {
   if (!timer) {
     return TimerInfoPtr();
@@ -126,13 +132,17 @@ TimerInfoPtr TimerModel::findOrCreateQTimerTimerInfo(QTimer *timer)
 
   QVariant timerInfoVariant = timer->property(timerInfoPropertyName);
   if (!timerInfoVariant.isValid()) {
-    timerInfoVariant.setValue(TimerInfoPtr(new TimerInfo(timer)));
+    const TimerInfoPtr info = TimerInfoPtr(new TimerInfo(timer));
+    if (m_qmlTimerTriggeredIndex < 0 && info->type() == TimerInfo::QQmlTimerType) {
+      m_qmlTimerTriggeredIndex = timer->metaObject()->indexOfMethod("triggered()");
+    }
+    timerInfoVariant.setValue(info);
     if (timer->thread() == QThread::currentThread()) // ### FIXME: we shouldn't use setProperty() in the first place...
       timer->setProperty(timerInfoPropertyName, timerInfoVariant);
   }
 
   const TimerInfoPtr timerInfo = timerInfoVariant.value<TimerInfoPtr>();
-  Q_ASSERT(timerInfo->timer() == timer);
+  Q_ASSERT(timerInfo->timerObject() == timer);
   return timerInfo;
 }
 
@@ -155,7 +165,7 @@ TimerInfoPtr TimerModel::findOrCreateTimerInfo(const QModelIndex &index)
   if (index.row() < m_sourceModel->rowCount()){
     const QModelIndex sourceIndex = m_sourceModel->index(index.row(), 0);
     QObject *const timerObject = sourceIndex.data(ObjectModel::ObjectRole).value<QObject*>();
-    return findOrCreateQTimerTimerInfo(qobject_cast<QTimer*>(timerObject));
+    return findOrCreateQTimerTimerInfo(timerObject);
   } else {
     const int freeListIndex = index.row() - m_sourceModel->rowCount();
     Q_ASSERT(freeListIndex >= 0);
@@ -166,11 +176,11 @@ TimerInfoPtr TimerModel::findOrCreateTimerInfo(const QModelIndex &index)
   return TimerInfoPtr();
 }
 
-int TimerModel::rowFor(QTimer *timer)
+int TimerModel::rowFor(QObject *timer)
 {
   for (int i = 0; i < rowCount(); i++) {
     const TimerInfoPtr timerInfo = findOrCreateTimerInfo(index(i, 0));
-    if (timerInfo && timerInfo->timer() == timer) {
+    if (timerInfo && timerInfo->timerObject() == timer) {
       return i;
     }
   }
@@ -179,16 +189,13 @@ int TimerModel::rowFor(QTimer *timer)
 
 void TimerModel::preSignalActivate(QObject *caller, int methodIndex)
 {
-  if (methodIndex != m_timeoutIndex) {
+  if (!(methodIndex == m_timeoutIndex && qobject_cast<QTimer*>(caller)) &&
+      !(methodIndex == m_qmlTimerTriggeredIndex && caller->inherits("QQmlTimer")))
+  {
     return;
   }
 
-  QTimer *timer = qobject_cast<QTimer*>(caller);
-  if (!timer || timer->objectName().toLower().startsWith(QLatin1String("gammaray"))) {
-    return;
-  }
-
-  const TimerInfoPtr timerInfo = findOrCreateQTimerTimerInfo(timer);
+  const TimerInfoPtr timerInfo = findOrCreateQTimerTimerInfo(caller);
 
   if (!timerInfo) {
     // Ok, likely a GammaRay timer
@@ -199,7 +206,7 @@ void TimerModel::preSignalActivate(QObject *caller, int methodIndex)
 
   if (!timerInfo->functionCallTimer()->start()) {
     cout << "TimerModel::preSignalActivate(): Recursive timeout for timer "
-         << (void*)timer << " (" << timer->objectName().toStdString() << ")!" << endl;
+         << (void*)caller << " (" << caller->objectName().toStdString() << ")!" << endl;
     return;
   }
 
@@ -209,28 +216,31 @@ void TimerModel::preSignalActivate(QObject *caller, int methodIndex)
 
 void TimerModel::postSignalActivate(QObject *caller, int methodIndex)
 {
-  if (methodIndex != m_timeoutIndex) {
-    return;
-  }
   QHash<QObject*, TimerInfoPtr>::iterator it = m_currentSignals.find(caller);
   if (it == m_currentSignals.end()) {
     // Ok, likely a GammaRay timer
-    //cout << "TimerModel::postSignalActivate(): Unable to find timer "
-    //     << (void*)timer << " (" << timer->objectName().toStdString() << ")!" << endl;
+    // cout << "TimerModel::postSignalActivate(): Unable to find timer "
+    //      << (void*)caller << " (" << caller->objectName().toStdString() << ")!" << endl;
     return;
   }
 
   const TimerInfoPtr timerInfo = *it;
   Q_ASSERT(timerInfo);
 
+  if (!(timerInfo->type() == TimerInfo::QTimerType && methodIndex == m_timeoutIndex) &&
+      !(timerInfo->type() == TimerInfo::QQmlTimerType && methodIndex == m_qmlTimerTriggeredIndex))
+  {
+    return;
+  }
+
   m_currentSignals.erase(it);
 
-  if (!timerInfo->timer()) {
+  if (!timerInfo->timerObject()) {
     // timer got killed in a slot
     return;
   }
 
-  Q_ASSERT(static_cast<QTimer*>(caller) == timerInfo->timer());
+  Q_ASSERT(caller == timerInfo->timerObject());
 
   if (!timerInfo->functionCallTimer()->active()) {
     cout << "TimerModel::postSignalActivate(): Timer not active: "
@@ -242,22 +252,13 @@ void TimerModel::postSignalActivate(QObject *caller, int methodIndex)
   event.timeStamp = QTime::currentTime();
   event.executionTime = timerInfo->functionCallTimer()->stop();
   timerInfo->addEvent(event);
-  const int row = rowFor(timerInfo->timer());
-  if (row != -1) {
-    emit dataChanged(index(row, 0), index(row, columnCount() - 1));
-  }
+  const int row = rowFor(timerInfo->timerObject());
+  emitTimerObjectChanged(row);
 }
 
 void TimerModel::setProbe(ProbeInterface *probe)
 {
   m_probe = probe;
-}
-
-void TimerModel::setSourceModel(ObjectTypeFilterProxyModel<QTimer> *sourceModel)
-{
-  Q_ASSERT(!m_sourceModel);
-  m_sourceModel = sourceModel;
-  qApp->installEventFilter(this);
 
   QSignalSpyCallbackSet callbacks;
   callbacks.slot_begin_callback = 0;
@@ -265,7 +266,14 @@ void TimerModel::setSourceModel(ObjectTypeFilterProxyModel<QTimer> *sourceModel)
   callbacks.signal_begin_callback = signal_begin_callback;
   callbacks.signal_end_callback = signal_end_callback;
 
-  qt_register_signal_spy_callbacks(callbacks);
+  probe->registerSignalSpyCallbackSet(callbacks);
+}
+
+void TimerModel::setSourceModel(QAbstractItemModel *sourceModel)
+{
+  Q_ASSERT(!m_sourceModel);
+  m_sourceModel = sourceModel;
+  qApp->installEventFilter(this);
 
   connect(m_sourceModel, SIGNAL(rowsAboutToBeInserted(QModelIndex,int,int)),
           this, SLOT(slotBeginInsertRows(QModelIndex,int,int)));
@@ -370,6 +378,7 @@ bool TimerModel::eventFilter(QObject *watched, QEvent *event)
     timerInfo->addEvent(timeoutEvent);
 
     timerInfo->setLastReceiver(watched);
+    emitFreeTimerChanged(m_freeTimers.indexOf(timerInfo));
   }
   return false;
 }
@@ -377,6 +386,7 @@ bool TimerModel::eventFilter(QObject *watched, QEvent *event)
 void TimerModel::slotBeginRemoveRows(const QModelIndex &parent, int start, int end)
 {
   Q_UNUSED(parent);
+  flushEmitPendingChangedRows();
   beginRemoveRows(QModelIndex(), start, end);
 }
 
@@ -388,6 +398,7 @@ void TimerModel::slotEndRemoveRows()
 void TimerModel::slotBeginInsertRows(const QModelIndex &parent, int start, int end)
 {
   Q_UNUSED(parent);
+  flushEmitPendingChangedRows();
   beginInsertRows(QModelIndex(), start, end);
 }
 
@@ -398,10 +409,45 @@ void TimerModel::slotEndInsertRows()
 
 void TimerModel::slotBeginReset()
 {
+  m_pendingChangedTimerObjects.clear();
+  m_pendingChangedFreeTimers.clear();
   beginResetModel();
 }
 
 void TimerModel::slotEndReset()
 {
   endResetModel();
+}
+
+void TimerModel::emitTimerObjectChanged(int row)
+{
+  if (row < 0 || row >= rowCount())
+    return;
+
+  m_pendingChangedTimerObjects.insert(row);
+  if (!m_pendingChanedRowsTimer->isActive())
+    m_pendingChanedRowsTimer->start();
+}
+
+void TimerModel::emitFreeTimerChanged(int row)
+{
+  if (row < 0 || row >= m_freeTimers.count())
+    return;
+
+  m_pendingChangedFreeTimers.insert(row);
+  if (!m_pendingChanedRowsTimer->isActive())
+    m_pendingChanedRowsTimer->start();
+}
+
+void TimerModel::flushEmitPendingChangedRows()
+{
+  foreach (int row, m_pendingChangedTimerObjects) {
+    emit dataChanged(index(row, 0), index(row, LastRole - FirstRole - 2));
+  }
+  m_pendingChangedTimerObjects.clear();
+
+  foreach (int row, m_pendingChangedFreeTimers) {
+    emit dataChanged(index(m_sourceModel->rowCount() + row, 0), index(m_sourceModel->rowCount() + row, LastRole - FirstRole - 2));
+  }
+  m_pendingChangedFreeTimers.clear();
 }

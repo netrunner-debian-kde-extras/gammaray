@@ -1,11 +1,11 @@
 /*
-  propertywidgettest.cpp
+  signalmonitorclient.cpp
 
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2012-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
-  Author: Kevin Funk <kevin.funk@kdab.com>
+  Copyright (C) 2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -21,23 +21,21 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "ui/propertywidget.h"
+#include "signalmonitorclient.h"
 
-#include <QApplication>
-#include <QTreeView>
-#include <QGraphicsItem>
+#include <common/endpoint.h>
 
 using namespace GammaRay;
 
-int main(int argc, char **argv)
+SignalMonitorClient::SignalMonitorClient(QObject* parent): SignalMonitorInterface(parent)
 {
-  QApplication app(argc, argv);
+}
 
-  PropertyWidget widget;
-  //widget.setMetaObject((new QTreeView())->metaObject());
-  //widget.setObject(new QTreeView());
-  //widget.setObject(new QGraphicsRectItem, "QGraphicsRectItem");
-  widget.show();
+SignalMonitorClient::~SignalMonitorClient()
+{
+}
 
-  return app.exec();
+void SignalMonitorClient::sendClockUpdates(bool enabled)
+{
+  Endpoint::instance()->invokeObject(objectName(), "sendClockUpdates", QVariantList() << QVariant::fromValue(enabled));
 }

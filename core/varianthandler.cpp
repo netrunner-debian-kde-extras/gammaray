@@ -35,6 +35,7 @@
 #include <QDebug>
 #include <QDir>
 #include <QIcon>
+#include <QMatrix4x4>
 #include <QMetaEnum>
 #include <QMetaObject>
 #include <QObject>
@@ -45,6 +46,9 @@
 #include <QSize>
 #include <QStringList>
 #include <QTextFormat>
+#include <QVector2D>
+#include <QVector3D>
+#include <QVector4D>
 
 using namespace GammaRay;
 
@@ -54,7 +58,59 @@ namespace GammaRay
 struct VariantHandlerRepository
 {
   QHash<int, VariantHandler::Converter<QString>*> stringConverters;
+  QVector<VariantHandler::GenericStringConverter> genericStringConverters;
 };
+
+static QString displayMatrix4x4(const QMatrix4x4 &matrix)
+{
+  QStringList rows;
+  for (int i = 0; i < 4; ++i) {
+    QStringList cols;
+    for (int j = 0; j < 4; ++j) {
+      cols.push_back(QString::number(matrix(i, j)));
+    }
+    rows.push_back(cols.join(" "));
+  }
+  return '[' + rows.join(", ") + ']';
+}
+
+static QString displayMatrix4x4(const QMatrix4x4 *matrix)
+{
+  if (matrix) {
+    return displayMatrix4x4(*matrix);
+  }
+  return "<null>";
+}
+
+template <int Dim, typename T>
+static QString displayVector(const T &vector)
+{
+  QStringList v;
+  for (int i = 0; i < Dim; ++i)
+    v.push_back(QString::number(vector[i]));
+  return '[' + v.join(", ") + ']';
+}
+
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+static QString displayShaderType(const QOpenGLShader::ShaderType type)
+{
+  QStringList types;
+#define ST(t) if (type & QOpenGLShader::t) types.push_back(#t);
+  ST(Vertex)
+  ST(Fragment)
+#if QT_VERSION >= QT_VERSION_CHECK(5, 1, 0)
+  ST(Geometry)
+  ST(TessellationControl)
+  ST(TessellationEvaluation)
+  ST(Compute)
+#endif
+#undef ST
+
+  if (types.isEmpty())
+    return "<none>";
+  return types.join(" | ");
+}
+#endif
 
 }
 
@@ -84,13 +140,13 @@ QString VariantHandler::displayString(const QVariant &value)
   }
   case QVariant::Line:
     return
-      QString::fromUtf8("%1 x %2 → %3 x %4").
+      QString::fromUtf8("%1, %2 → %3, %4").
         arg(value.toLine().x1()).arg(value.toLine().y1()).
         arg(value.toLine().x2()).arg(value.toLine().y2());
 
   case QVariant::LineF:
     return
-      QString::fromUtf8("%1 x %2 → %3 x %4").
+      QString::fromUtf8("%1, %2 → %3, %4").
         arg(value.toLineF().x1()).arg(value.toLineF().y1()).
         arg(value.toLineF().x2()).arg(value.toLineF().y2());
 
@@ -99,19 +155,19 @@ QString VariantHandler::displayString(const QVariant &value)
 
   case QVariant::Point:
     return
-      QString::fromLatin1("%1x%2").
+      QString::fromLatin1("%1, %2").
         arg(value.toPoint().x()).
         arg(value.toPoint().y());
 
   case QVariant::PointF:
     return
-      QString::fromLatin1("%1x%2").
+      QString::fromLatin1("%1, %2").
         arg(value.toPointF().x()).
         arg(value.toPointF().y());
 
   case QVariant::Rect:
     return
-      QString::fromLatin1("%1x%2 %3x%4").
+      QString::fromLatin1("%1, %2 %3 x %4").
         arg(value.toRect().x()).
         arg(value.toRect().y()).
         arg(value.toRect().width()).
@@ -119,7 +175,7 @@ QString VariantHandler::displayString(const QVariant &value)
 
   case QVariant::RectF:
     return
-      QString::fromLatin1("%1x%2 %3x%4").
+      QString::fromLatin1("%1, %2 %3 x %4").
         arg(value.toRectF().x()).
         arg(value.toRectF().y()).
         arg(value.toRectF().width()).
@@ -149,13 +205,13 @@ QString VariantHandler::displayString(const QVariant &value)
 
   case QVariant::Size:
     return
-      QString::fromLatin1("%1x%2").
+      QString::fromLatin1("%1 x %2").
         arg(value.toSize().width()).
         arg(value.toSize().height());
 
   case QVariant::SizeF:
     return
-      QString::fromLatin1("%1x%2").
+      QString::fromLatin1("%1 x %2").
         arg(value.toSizeF().width()).
         arg(value.toSizeF().height());
 
@@ -211,6 +267,23 @@ QString VariantHandler::displayString(const QVariant &value)
   if (value.canConvert<QObject*>()) {
     return Util::displayString(value.value<QObject*>());
   }
+
+  if (value.userType() == qMetaTypeId<QMatrix4x4>()) {
+    return displayMatrix4x4(value.value<QMatrix4x4>());
+  }
+
+  if (value.userType() == qMetaTypeId<const QMatrix4x4*>()) {
+    return displayMatrix4x4(value.value<const QMatrix4x4*>());
+  }
+
+#if QT_VERSION >= QT_VERSION_CHECK(5, 2, 0)
+  if (value.userType() == qMetaTypeId<QVector2D>())
+    return displayVector<2>(value.value<QVector2D>());
+  if (value.userType() == qMetaTypeId<QVector3D>())
+    return displayVector<3>(value.value<QVector3D>());
+  if (value.userType() == qMetaTypeId<QVector4D>())
+    return displayVector<4>(value.value<QVector4D>());
+#endif
 
 #if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
   if (value.userType() == qMetaTypeId<QSet<QByteArray> >()) {
@@ -303,7 +376,10 @@ QString VariantHandler::displayString(const QVariant &value)
     }
   }
 
-#endif
+  if (value.userType() == qMetaTypeId<QOpenGLShader::ShaderType>())
+    return displayShaderType(value.value<QOpenGLShader::ShaderType>());
+
+#endif // Qt5
 
   // enums
   const QString enumStr = Util::enumToString(value);
@@ -326,17 +402,30 @@ QString VariantHandler::displayString(const QVariant &value)
     int emptyStrings = 0;
     foreach (const QVariant &v, it) {
       s.push_back(displayString(v));
-      if (s.last().isEmpty())
+      if (s.last().isEmpty()) {
         ++emptyStrings;
+      }
     }
-    if (it.size() == 0)
+    if (it.size() == 0) {
       return QObject::tr("<empty>");
-    else if (it.size() == emptyStrings) // we don't know the content either
+    } else if (it.size() == emptyStrings) { // we don't know the content either
       return QObject::tr("%1 entries").arg(emptyStrings);
-    else
+    } else {
       return s.join(", ");
+    }
   }
 #endif
+
+  // generic converters
+  QVector<VariantHandler::GenericStringConverter> genStrConverters =
+    s_variantHandlerRepository()->genericStringConverters;
+  foreach (const GenericStringConverter &converter, genStrConverters) {
+    bool ok = false;
+    const QString s = converter(value, &ok);
+    if (ok) {
+      return s;
+    }
+  }
 
   return value.toString();
 }
@@ -414,4 +503,10 @@ QVariant VariantHandler::decoration(const QVariant &value)
 void VariantHandler::registerStringConverter(int type, Converter<QString> *converter)
 {
   s_variantHandlerRepository()->stringConverters.insert(type, converter);
+}
+
+void VariantHandler::registerGenericStringConverter(
+  VariantHandler::GenericStringConverter converter)
+{
+  s_variantHandlerRepository()->genericStringConverters.push_back(converter);
 }

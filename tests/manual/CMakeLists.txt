@@ -1,16 +1,4 @@
 if(Qt5Widgets_FOUND OR QT_QTGUI_FOUND)
-  add_executable(propertywidgettest
-    propertywidgettest.cpp
-    )
-
-  target_link_libraries(propertywidgettest
-    ${QT_QTCORE_LIBRARIES}
-    ${QT_QTGUI_LIBRARIES}
-    gammaray_ui
-    gammaray_core
-    gammaray_common
-  )
-
   set(gammaray_messagemodeltest_srcs
     messagemodeltest.cpp
   )
@@ -51,8 +39,14 @@ if(Qt5WebKit_FOUND)
   target_link_libraries(wk2application Qt5::Quick)
 endif()
 
+add_executable(signalmonitortest signalmonitortest.cpp)
+
+target_link_libraries(signalmonitortest
+  ${QT_QTCORE_LIBRARIES}
+  ${QT_QTGUI_LIBRARIES}
+)
+
 if(QNXNTO)
-  target_link_libraries(propertywidgettest cpp)
   target_link_libraries(messagemodeltest cpp)
 endif()
 
@@ -61,6 +55,5 @@ if(Qt5Widgets_FOUND AND NOT Qt5Widgets_VERSION VERSION_LESS 5.2.0)
     variantinspector.cpp
     variantinspectorapplication.cpp
   )
-  set_property(TARGET variantinspectortest PROPERTY AUTOMOC TRUE)
   target_link_libraries(variantinspectortest Qt5::Widgets)
 endif()

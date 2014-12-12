@@ -33,6 +33,7 @@
 #include "probesettings.h"
 #include "probecontroller.h"
 #include "toolpluginmodel.h"
+#include "util.h"
 
 #include "tools/modelinspector/modeltest.h"
 
@@ -56,6 +57,7 @@
 #include <QThread>
 #include <QTimer>
 
+#include <algorithm>
 #include <iostream>
 #include <cstdio>
 
@@ -93,7 +95,49 @@ static bool probeDisconnectCallback(void ** args)
 
 #endif // QT_VERSION
 
-static QItemSelectionModel* selectionModelFactory(QAbstractItemModel* model)
+static void signal_begin_callback(QObject *caller, int method_index, void **argv)
+{
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+  method_index = Util::signalIndexToMethodIndex(caller->metaObject(), method_index);
+#endif
+  Probe::executeSignalCallback([=](const QSignalSpyCallbackSet &qt_signal_spy_callback_set) {
+    if (qt_signal_spy_callback_set.signal_begin_callback) {
+      qt_signal_spy_callback_set.signal_begin_callback(caller, method_index, argv);
+    }
+  });
+}
+
+static void signal_end_callback(QObject *caller, int method_index)
+{
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+  method_index = Util::signalIndexToMethodIndex(caller->metaObject(), method_index);
+#endif
+  Probe::executeSignalCallback([=](const QSignalSpyCallbackSet &qt_signal_spy_callback_set) {
+    if (qt_signal_spy_callback_set.signal_end_callback) {
+      qt_signal_spy_callback_set.signal_end_callback(caller, method_index);
+    }
+  });
+}
+
+static void slot_begin_callback(QObject *caller, int method_index, void **argv)
+{
+  Probe::executeSignalCallback([=](const QSignalSpyCallbackSet &qt_signal_spy_callback_set) {
+    if (qt_signal_spy_callback_set.slot_begin_callback) {
+      qt_signal_spy_callback_set.slot_begin_callback(caller, method_index, argv);
+    }
+  });
+}
+
+static void slot_end_callback(QObject *caller, int method_index)
+{
+  Probe::executeSignalCallback([=](const QSignalSpyCallbackSet &qt_signal_spy_callback_set) {
+    if (qt_signal_spy_callback_set.slot_end_callback) {
+      qt_signal_spy_callback_set.slot_end_callback(caller, method_index);
+    }
+  });
+}
+
+static QItemSelectionModel *selectionModelFactory(QAbstractItemModel *model)
 {
   return new SelectionModelServer(model->objectName() + ".selection", model, Probe::instance());
 }
@@ -148,7 +192,6 @@ class ObjectLock : public QReadWriteLock
 };
 Q_GLOBAL_STATIC(ObjectLock, s_lock)
 
-
 Probe::Probe(QObject *parent):
   QObject(parent),
   m_objectListModel(new ObjectListModel(this)),
@@ -182,7 +225,8 @@ Probe::Probe(QObject *parent):
 
   ToolPluginModel *toolPluginModel = new ToolPluginModel(m_toolModel->plugins(), this);
   registerModel(QLatin1String("com.kdab.GammaRay.ToolPluginModel"), toolPluginModel);
-  ToolPluginErrorModel *toolPluginErrorModel = new ToolPluginErrorModel(m_toolModel->pluginErrors(), this);
+  ToolPluginErrorModel *toolPluginErrorModel =
+    new ToolPluginErrorModel(m_toolModel->pluginErrors(), this);
   registerModel(QLatin1String("com.kdab.GammaRay.ToolPluginErrorModel"), toolPluginErrorModel);
 
   if (qgetenv("GAMMARAY_MODELTEST") == "1") {
@@ -201,11 +245,27 @@ Probe::Probe(QObject *parent):
   m_queueTimer->setInterval(0);
   connect(m_queueTimer, SIGNAL(timeout()),
           this, SLOT(queuedObjectsFullyConstructed()));
+
+  QSignalSpyCallbackSet callbacks;
+  callbacks.signal_begin_callback = signal_begin_callback;
+  callbacks.signal_end_callback = signal_end_callback;
+  callbacks.slot_begin_callback = slot_begin_callback;
+  callbacks.slot_end_callback = slot_end_callback;
+  m_previousSignalSpyCallbackSet = qt_signal_spy_callback_set;
+  if (qt_signal_spy_callback_set.signal_begin_callback ||
+      qt_signal_spy_callback_set.signal_end_callback ||
+      qt_signal_spy_callback_set.slot_begin_callback ||
+      qt_signal_spy_callback_set.slot_end_callback) {
+    m_signalSpyCallbacks.push_back(qt_signal_spy_callback_set); // daisy-chain existing callbacks
+  }
+  qt_register_signal_spy_callbacks(callbacks);
 }
 
 Probe::~Probe()
 {
   IF_DEBUG(cerr << "detaching GammaRay probe" << endl;)
+
+  qt_register_signal_spy_callbacks(m_previousSignalSpyCallbackSet);
 
 #if (QT_VERSION < QT_VERSION_CHECK(5, 0, 0))
   QInternal::unregisterCallback(QInternal::ConnectCallback, &GammaRay::probeConnectCallback);
@@ -217,7 +277,7 @@ Probe::~Probe()
   s_instance = QAtomicPointer<Probe>(0);
 }
 
-QThread* Probe::filteredThread()
+QThread *Probe::filteredThread()
 {
   return s_listener()->filterThread;
 }
@@ -227,7 +287,7 @@ void Probe::setWindow(QObject *window)
   m_window = window;
 }
 
-QObject* Probe::window() const
+QObject *Probe::window() const
 {
   return m_window;
 }
@@ -328,8 +388,9 @@ void Probe::delayedInit()
   }
   Server::instance()->setLabel(appName);
 
-  if (ProbeSettings::value("InProcessUi", false).toBool())
+  if (ProbeSettings::value("InProcessUi", false).toBool()) {
     showInProcessUi();
+  }
 }
 
 void Probe::showInProcessUi()
@@ -343,19 +404,24 @@ void Probe::showInProcessUi()
   s_listener()->filterThread = QThread::currentThread();
 
   QString path = Paths::currentProbePath();
-  if (!path.isEmpty())
+  if (!path.isEmpty()) {
     path += QDir::separator();
+  }
   path += "gammaray_inprocessui";
   QLibrary lib;
   lib.setFileName(path);
   if (!lib.load()) {
-    std::cerr << "Failed to load in-process UI module: " << qPrintable(lib.errorString()) << std::endl;
+    std::cerr << "Failed to load in-process UI module: "
+              << qPrintable(lib.errorString())
+              << std::endl;
   } else {
-    void(*factory)() = reinterpret_cast<void(*)()>(lib.resolve("gammaray_create_inprocess_mainwindow"));
-    if (!factory)
+    void(*factory)() =
+      reinterpret_cast<void(*)()>(lib.resolve("gammaray_create_inprocess_mainwindow"));
+    if (!factory) {
       std::cerr << Q_FUNC_INFO << ' ' << qPrintable(lib.errorString()) << endl;
-    else
+    } else {
       factory();
+    }
   }
 
   s_listener()->filterThread = 0;
@@ -373,7 +439,7 @@ bool Probe::filterObject(QObject *obj) const
           Util::descendantOf(window(), obj);
 }
 
-void Probe::registerModel(const QString& objectName, QAbstractItemModel* model)
+void Probe::registerModel(const QString &objectName, QAbstractItemModel *model)
 {
   RemoteModelServer *ms = new RemoteModelServer(objectName, model);
   ms->setModel(model);
@@ -544,9 +610,12 @@ void Probe::objectFullyConstructed(QObject *obj)
 
   IF_DEBUG(cout << "fully constructed: " << hex << obj << endl;)
 
-  // ensure we know the parent already
-  if (obj->parent() && !m_validObjects.contains(obj->parent())) {
-    objectAdded(obj->parent());
+  // ensure we know all our ancestors already
+  for (QObject *parent = obj->parent(); parent; parent = parent->parent()) {
+    if (!m_validObjects.contains(parent)) {
+      objectAdded(parent); // will also handle any further ancestors
+      break;
+    }
   }
   Q_ASSERT(!obj->parent() || m_validObjects.contains(obj->parent()));
 
@@ -557,7 +626,6 @@ void Probe::objectFullyConstructed(QObject *obj)
     connect(obj, SIGNAL(parentChanged(QQuickItem*)), this, SLOT(objectParentChanged()));
   }
 
-  m_objectListModel->objectAdded(obj);
   m_metaObjectTreeModel->objectAdded(obj);
 
   m_toolModel->objectAdded(obj);
@@ -575,8 +643,9 @@ void Probe::objectRemoved(QObject *obj)
              << hex << obj
              << " have statics: " << s_listener() << endl;)
 
-    if (!s_listener())
+    if (!s_listener()) {
       return;
+    }
 
     QVector<QObject*> &addedBefore = s_listener()->addedBeforeProbeInstance;
     for (QVector<QObject*>::iterator it = addedBefore.begin(); it != addedBefore.end();) {
@@ -598,8 +667,6 @@ void Probe::objectRemoved(QObject *obj)
   }
 
   instance()->m_queuedObjects.removeOne(obj);
-
-  instance()->m_objectListModel->objectRemoved(obj);
 
   instance()->connectionRemoved(obj, 0, 0, 0);
   instance()->connectionRemoved(0, 0, obj, 0);
@@ -693,7 +760,8 @@ bool Probe::eventFilter(QObject *receiver, QEvent *event)
   // we have no preloading hooks, so recover all objects we see
   if (!hasReliableObjectTracking() && event->type() != QEvent::ChildAdded &&
       event->type() != QEvent::ChildRemoved && // already handled above
-      event->type() != QEvent::Destroy && event->type() != QEvent::WinIdChange  && // unsafe since emitted from dtors
+      event->type() != QEvent::Destroy &&
+      event->type() != QEvent::WinIdChange && // unsafe since emitted from dtors
       !filterObject(receiver)) {
     QWriteLocker lock(s_lock());
     const bool tracked = m_validObjects.contains(receiver);
@@ -704,8 +772,9 @@ bool Probe::eventFilter(QObject *receiver, QEvent *event)
 
   // filters provided by plugins
   if (!filterObject(receiver)) {
-    foreach (QObject *filter, m_globalEventFilters)
+    foreach (QObject *filter, m_globalEventFilters) {
       filter->eventFilter(receiver, event);
+    }
   }
 
   return QObject::eventFilter(receiver, event);
@@ -716,15 +785,16 @@ void Probe::findExistingObjects()
   discoverObject(QCoreApplication::instance());
 }
 
-void Probe::discoverObject(QObject* obj)
+void Probe::discoverObject(QObject *obj)
 {
   if (!obj) {
     return;
   }
 
   QWriteLocker lock(s_lock());
-  if (m_validObjects.contains(obj))
+  if (m_validObjects.contains(obj)) {
     return;
+  }
 
   objectAdded(obj);
   foreach (QObject *child, obj->children()) {
@@ -732,7 +802,7 @@ void Probe::discoverObject(QObject* obj)
   }
 }
 
-void Probe::installGlobalEventFilter(QObject* filter)
+void Probe::installGlobalEventFilter(QObject *filter)
 {
   Q_ASSERT(!m_globalEventFilters.contains(filter));
   m_globalEventFilters.push_back(filter);
@@ -743,20 +813,39 @@ bool Probe::hasReliableObjectTracking() const
   return !s_listener()->trackDestroyed;
 }
 
-void Probe::selectObject(QObject* object, const QPoint& pos)
+void Probe::selectObject(QObject *object, const QPoint &pos)
 {
   emit objectSelected(object, pos);
 
-  m_toolSelectionModel->select( m_toolModel->toolForObject(object), QItemSelectionModel::Select | QItemSelectionModel::Clear |
-    QItemSelectionModel::Rows | QItemSelectionModel::Current);
+  m_toolSelectionModel->select(m_toolModel->toolForObject(object),
+                               QItemSelectionModel::Select |
+                               QItemSelectionModel::Clear |
+                               QItemSelectionModel::Rows |
+                               QItemSelectionModel::Current);
 }
 
-void Probe::selectObject(void* object, const QString& typeName)
+void Probe::selectObject(void *object, const QString &typeName)
 {
   emit nonQObjectSelected(object, typeName);
 
-  m_toolSelectionModel->select( m_toolModel->toolForObject(object, typeName), QItemSelectionModel::Select | QItemSelectionModel::Clear |
-    QItemSelectionModel::Rows | QItemSelectionModel::Current);
+  m_toolSelectionModel->select(m_toolModel->toolForObject(object, typeName),
+                               QItemSelectionModel::Select |
+                               QItemSelectionModel::Clear |
+                               QItemSelectionModel::Rows |
+                               QItemSelectionModel::Current);
+}
+
+void Probe::registerSignalSpyCallbackSet(const QSignalSpyCallbackSet &callbacks)
+{
+  m_signalSpyCallbacks.push_back(callbacks);
+}
+
+template <typename Func>
+void Probe::executeSignalCallback(const Func &func)
+{
+  std::for_each(instance()->m_signalSpyCallbacks.constBegin(),
+                instance()->m_signalSpyCallbacks.constEnd(),
+                func);
 }
 
 //BEGIN: SignalSlotsLocationStore

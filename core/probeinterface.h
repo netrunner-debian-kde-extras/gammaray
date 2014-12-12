@@ -38,6 +38,7 @@
 class QObject;
 class QAbstractItemModel;
 class QString;
+struct QSignalSpyCallbackSet;
 
 namespace GammaRay {
 
@@ -142,6 +143,15 @@ class ProbeInterface
      * @since 2.1
      */
     virtual void selectObject(void* object, const QString& typeName) = 0;
+
+    /**
+     * Register a signal spy callback set.
+     * Signal indexes provided as arguments are mapped to method indexes, ie. argument semantics
+     * are the same with Qt4 and Qt5.
+     *
+     * @since 2.2
+     */
+    virtual void registerSignalSpyCallbackSet(const QSignalSpyCallbackSet &callbacks) = 0;
 };
 
 }

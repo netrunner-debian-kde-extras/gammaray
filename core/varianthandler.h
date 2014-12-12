@@ -39,10 +39,18 @@ namespace VariantHandler
     virtual RetT operator() (const QVariant &v) = 0;
   };
 
-  template <typename RetT, typename InputT, typename FuncT> struct ConverterImpl : public Converter<RetT>
+  template <typename RetT, typename InputT, typename FuncT> struct ConverterImpl
+    : public Converter<RetT>
   {
-    explicit inline ConverterImpl(FuncT converter) : f(converter) {}
-    /*override*/ inline RetT operator() (const QVariant &v) { return f(v.value<InputT>()); }
+    explicit inline ConverterImpl(FuncT converter) : f(converter)
+    {
+    }
+
+    /*override*/
+    inline RetT operator() (const QVariant &v)
+    {
+      return f(v.value<InputT>());
+    }
     FuncT f;
   };
   ///@endcond
@@ -55,6 +63,15 @@ namespace VariantHandler
    * @return a QString containing the human readable string.
    */
   GAMMARAY_CORE_EXPORT QString displayString(const QVariant &value);
+
+  /**
+   * Returns a human readable string version of the given value.
+   * Thihs is a convenience overload of the QVariant-based version above.
+   *
+   * @return a QString containing the human readable string.
+   */
+  template <typename T>
+  inline QString displayString(T value) { return displayString(QVariant::fromValue<T>(value)); }
 
   /**
    * Returns a value representing @p value in a itemview decoration role.
@@ -80,6 +97,17 @@ namespace VariantHandler
     Converter<QString> *converter = new ConverterImpl<QString, T, FuncT>(f);
     registerStringConverter(qMetaTypeId<T>(), converter);
   }
+
+  typedef QString(*GenericStringConverter)(const QVariant &value, bool *ok);
+  /**
+   * Register a generic string conversion function for various variant types.
+   * This can be used when you have a converter that can dynamically check if
+   * it can handle a given variant, and the types it can handle aren't known
+   * at compile time (example: QQmlListProperty).
+   * @param converter The converter function. It's second parameter is used to
+   * indicate if the value could be handled.
+   */
+  GAMMARAY_CORE_EXPORT void registerGenericStringConverter(GenericStringConverter converter);
 }
 
 }

@@ -24,13 +24,8 @@
 
 project(GammaRay)
 
-if(WIN32)
-  # needed for automoc and QtMain to work correctly
-  cmake_minimum_required(VERSION 2.8.11)
-  cmake_policy(SET CMP0020 NEW)
-else()
-  cmake_minimum_required(VERSION 2.8.9)
-endif()
+cmake_minimum_required(VERSION 2.8.11)
+cmake_policy(SET CMP0020 NEW)
 
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/ ${CMAKE_MODULE_PATH})
 set(CMAKE_AUTOMOC ON)
@@ -48,16 +43,35 @@ include(GammaRayMacros)
 include(GammaRayMacrosInternal)
 include(FeatureSummary)
 
+# Exit for blacklisted compilers (those that don't support C++11 very well)
+#  MSVC++ 8.0  _MSC_VER == 1400 (Visual Studio 2005)
+#  Clang 3.0
+set(BAD_CXX_MESSAGE "")
+if(MSVC)
+  if(MSVC_VERSION LESS 1500)
+    set(BAD_CXX_MESSAGE "MSVC 2008 or higher")
+  endif()
+endif()
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+  if(${CMAKE_CXX_COMPILER_VERSION} VERSION_LESS 3.1.0)
+    set(BAD_CXX_MESSAGE "Clang v3.1.0 or higher")
+  endif()
+endif()
+if(BAD_CXX_MESSAGE)
+  message(FATAL_ERROR "\nSorry, ${BAD_CXX_MESSAGE} is required to build this software. Please retry using a modern compiler that supports C++11 lambdas.")
+endif()
+
+# Enable the test harness
 enable_testing()
 
 # Version setup
 set(GAMMARAY_VERSION_MAJOR "2")
-set(GAMMARAY_VERSION_MINOR "1")
+set(GAMMARAY_VERSION_MINOR "2")
 set(GAMMARAY_VERSION_PATCH "0")
 set(GAMMARAY_VERSION "${GAMMARAY_VERSION_MAJOR}.${GAMMARAY_VERSION_MINOR}.${GAMMARAY_VERSION_PATCH}")
 set(GAMMARAY_VERSION_STRING "${GAMMARAY_VERSION}")
-set(GAMMARAY_SOVERSION "2.1.0")
-set(GAMMARAY_PLUGIN_VERSION "2.1")
+set(GAMMARAY_SOVERSION "2.2.0")
+set(GAMMARAY_PLUGIN_VERSION "2.2")
 
 if(EXISTS "${CMAKE_SOURCE_DIR}/.git")
   find_package(Git)
@@ -85,7 +99,7 @@ message(STATUS "Building GammaRay ${GAMMARAY_VERSION_STRING} in ${CMAKE_BUILD_TY
 #
 option(
   GAMMARAY_ENFORCE_QT4_BUILD
-  "Enable if you want to enfore a build with Qt4"
+  "Enable if you want to enforce a build with Qt4"
   OFF
 )
 
@@ -107,21 +121,28 @@ option(
 # Compiler & linker settings
 #
 if(CMAKE_COMPILER_IS_GNUCXX OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-  check_cxx_compiler_flag(-Wunused-but-set-variable HAVE_GCC_UNUSED_BUT_SET)
-  check_cxx_compiler_flag(-Wlogical-op HAVE_GCC_LOGICAL_OP)
-  check_cxx_compiler_flag(-Wsizeof-pointer-memaccess HAVE_GCC_POINTER_MEMACCESS)
-  check_cxx_compiler_flag(-Wreorder HAVE_GCC_REORDER)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated -Wextra -Woverloaded-virtual -Winit-self -Wmissing-include-dirs -Wunused -Wno-div-by-zero -Wundef -Wpointer-arith -Wcast-qual -Wmissing-noreturn -Werror=return-type")
-  if(HAVE_GCC_UNUSED_BUT_SET)
+  check_cxx_compiler_flag(-Wunused-but-set-variable HAVE_GXX_UNUSED_BUT_SET)
+  check_cxx_compiler_flag(-Wlogical-op HAVE_GXX_LOGICAL_OP)
+  check_cxx_compiler_flag(-Wsizeof-pointer-memaccess HAVE_GXX_POINTER_MEMACCESS)
+  check_cxx_compiler_flag(-Wreorder HAVE_GXX_REORDER)
+  check_cxx_compiler_flag(-std=c++0x HAVE_GXX_CXX11)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated -Wextra -Woverloaded-virtual -Winit-self -Wmissing-include-dirs -Wunused -Wno-div-by-zero -Wundef -Wpointer-arith -Wmissing-noreturn -Werror=return-type")
+  if(APPLE)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++") # required in C++11 mode
+  endif()
+  if(HAVE_GXX_CXX11)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
+  endif()
+  if(HAVE_GXX_UNUSED_BUT_SET)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wunused-but-set-variable")
   endif()
-  if(HAVE_GCC_LOGICAL_OP)
+  if(HAVE_GXX_LOGICAL_OP)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wlogical-op")
   endif()
-  if(HAVE_GCC_POINTER_MEMACCESS)
+  if(HAVE_GXX_POINTER_MEMACCESS)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wsizeof-pointer-memaccess")
   endif()
-  if(HAVE_GCC_REORDER)
+  if(HAVE_GXX_REORDER)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wreorder")
   endif()
   if(MINGW)
@@ -163,7 +184,6 @@ if(Qt5Core_FOUND)
   find_package(Qt5 NO_MODULE QUIET OPTIONAL_COMPONENTS
     Concurrent
     Designer
-    Location # workaround for 5.1 webkit that tries to find a qtlocation with a matching version if none (with any version) has been found before...
     PrintSupport
     Qml
     Quick
@@ -368,20 +388,20 @@ find_path(VTK_DIR VTKConfig.cmake
   /usr/lib64/vtk /usr/lib/vtk /usr/local/lib64/vtk /usr/local/lib/vtk
 )
 find_package(VTK)
-set(VTK_MESSAGE "Needed for the object visualizer plugin.")
+set_package_properties(VTK PROPERTIES
+  TYPE OPTIONAL
+  DESCRIPTION "Visualization Toolkit"
+  PURPOSE "Needed for the object visualizer plugin."
+  URL "http://www.vtk.org"
+)
 if(VTK_FOUND)
   find_path(VTK_QT_INCLUDE_DIR NAMES QVTKWidget.h HINTS ${VTK_INCLUDE_DIRS})
   if(NOT VTK_QT_INCLUDE_DIR)
+    message(STATUS "Cannot locate QVTKWidget.h in ${VTK_INCLUDE_DIRS}")
     set(VTK_FOUND FALSE)
-    set(VTK_MESSAGE "Looks like VTK was not built with Qt (QVTKWidget is missing). Object visualizer plugin will not be built.")
+    add_feature_info("QVTKWidget header" VTK_FOUND "Object visualizer plugin requires QVTKWidget.h header.")
   endif()
 endif()
-set_package_properties(VTK PROPERTIES
-  TYPE OPTIONAL
-  DESCRIPTION "Visualization Toolkit."
-  PURPOSE ${VTK_MESSAGE}
-  URL "http://www.vtk.org"
-)
 set(HAVE_VTK ${VTK_FOUND})
 
 # ELF header for ABI detection
