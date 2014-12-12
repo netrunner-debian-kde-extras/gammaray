@@ -1,3 +1,9 @@
+gammaray (2.2.0-1) UNRELEASED; urgency=medium
+
+  * New upstream release.
+
+ -- Jakub Adam <jakub.adam@ktknet.cz>  Fri, 12 Dec 2014 21:56:04 +0100
+
 gammaray (2.1.0-4) unstable; urgency=medium
 
   [ Felix Geyer ]
