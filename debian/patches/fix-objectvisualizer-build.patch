@@ -1,0 +1,22 @@
+From: Jakub Adam <jakub.adam@ktknet.cz>
+Date: Sat, 13 Dec 2014 09:47:40 +0100
+Subject: fix-objectvisualizer-build
+
+---
+ plugins/objectvisualizer/CMakeLists.txt | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/plugins/objectvisualizer/CMakeLists.txt b/plugins/objectvisualizer/CMakeLists.txt
+index 94bef6d..e30506e 100644
+--- a/plugins/objectvisualizer/CMakeLists.txt
++++ b/plugins/objectvisualizer/CMakeLists.txt
+@@ -15,8 +15,7 @@ target_link_libraries(gammaray_objectvisualizer_plugin
+ )
+ 
+ ######## START VTK VISUALIZATION
+-# VTK includes QtGui/... stuff => breaks compilation with Qt5
+-if(VTK_FOUND AND NOT Qt5Core_FOUND AND NOT GAMMARAY_PROBE_ONLY_BUILD)
++if(VTK_FOUND AND NOT GAMMARAY_PROBE_ONLY_BUILD)
+ 
+ set(OPTIONAL_VTK_LIBRARIES
+ )
