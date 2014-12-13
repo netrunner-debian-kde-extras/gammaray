@@ -1,0 +1,20 @@
+From: Jakub Adam <jakub.adam@ktknet.cz>
+Date: Sat, 13 Dec 2014 11:47:50 +0100
+Subject: use-empty-rpath
+
+---
+ CMakeLists.txt | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 1e95302..cd44363 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -30,7 +30,6 @@ cmake_policy(SET CMP0020 NEW)
+ set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/ ${CMAKE_MODULE_PATH})
+ set(CMAKE_AUTOMOC ON)
+ set(CMAKE_INCLUDE_CURRENT_DIR ON)
+-set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+ 
+ if(NOT CMAKE_BUILD_TYPE)
+   set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)

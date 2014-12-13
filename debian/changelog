@@ -6,6 +6,8 @@ gammaray (2.2.0-1) UNRELEASED; urgency=medium
   * Update d/changelog with (re)moved files.
   * Re-enable objectvisualizer plugin since Qt5-compatible VTK has become
     available.
+  * Don't set RPATH in binaries; prevents binary-or-shlib-defines-rpath
+    lintian error.
 
  -- Jakub Adam <jakub.adam@ktknet.cz>  Fri, 12 Dec 2014 21:56:04 +0100
 

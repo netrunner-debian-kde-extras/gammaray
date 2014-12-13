@@ -1,2 +1,3 @@
 debian-archs-fix-build.patch
 fix-objectvisualizer-build.patch
+use-empty-rpath.patch
