@@ -23,7 +23,7 @@ target_link_libraries(gammaray_statemachineviewer_plugin
 )
 
 ############ BEGIN GRAPHVIZ GUI
-if(GRAPHVIZ_FOUND AND NOT GAMMARAY_PROBE_ONLY_BUILD)
+if(GRAPHVIZ_FOUND AND GAMMARAY_BUILD_UI)
 
 set(gammaray_statemachineviewer_ui_plugin_libs
   ${QT_QTCORE_LIBRARIES}
@@ -43,7 +43,12 @@ set(gammaray_statemachineviewer_ui_plugin_srcs
   gvgraph/gvutils.cpp
 )
 
-find_package(KDSME CONFIG)
+set_package_properties(KDSME PROPERTIES URL "https://github.com/KDAB/KDStateMachineEditor" DESCRIPTION "KDAB State Machine Editor framework" TYPE OPTIONAL PURPOSE "Provide Next-gen graphical state machine viewer for the statmeachineviewer plugin.")
+if (Qt5_FOUND)
+  find_package(KDSME CONFIG)
+else()
+  add_feature_info("KDAB Next-gen State Machine Editor" KDSME_FOUND "Requires Qt5. ")
+endif()
 if (KDSME_FOUND AND Qt5Quick_FOUND)
   list(APPEND gammaray_statemachineviewer_ui_plugin_srcs
     statemachineviewerwidgetng.cpp

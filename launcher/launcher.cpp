@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2013-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2013-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -83,7 +83,7 @@ public:
       if (m_options.isAttach()) {
         return InjectorFactory::defaultInjectorForAttach();
       } else {
-        return InjectorFactory::defaultInjectorForLaunch();
+        return InjectorFactory::defaultInjectorForLaunch(m_options.probeABI());
       }
     }
     return InjectorFactory::createInjector(m_options.injectorType());
@@ -122,7 +122,7 @@ public:
         errorMessage = tr("Failed to attach to target with PID %1.").arg(m_options.pid());
       if (!injector->errorString().isEmpty())
         errorMessage += tr("\nError: %1").arg(injector->errorString());
-      emit error(injector->exitCode(), errorMessage);
+      emit error(injector->exitCode() ? injector->exitCode() : 1, errorMessage);
     }
   }
 
@@ -301,12 +301,14 @@ void Launcher::semaphoreReleased()
 
 void Launcher::injectorFinished()
 {
-  m_state |= InjectorFinished;
+  if ((m_state & InjectorFailed) == 0)
+    m_state |= InjectorFinished;
   checkDone();
 }
 
 void Launcher::injectorError(int exitCode, const QString& errorMessage)
 {
+  m_state |= InjectorFailed;
   std::cerr << qPrintable(errorMessage) << std::endl;
   std::cerr << "See <https://github.com/KDAB/GammaRay/wiki/Known-Issues> for troubleshooting" <<  std::endl;
   QCoreApplication::exit(exitCode);

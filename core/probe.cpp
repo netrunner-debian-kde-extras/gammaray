@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
   Author: Stephen Kelly <stephen.kelly@kdab.com>
 
@@ -39,6 +39,7 @@
 
 #include "remote/server.h"
 #include "remote/remotemodelserver.h"
+#include "remote/serverproxymodel.h"
 #include "remote/selectionmodelserver.h"
 #include "toolpluginerrormodel.h"
 #include "toolfactory.h"
@@ -97,6 +98,9 @@ static bool probeDisconnectCallback(void ** args)
 
 static void signal_begin_callback(QObject *caller, int method_index, void **argv)
 {
+  if (method_index == 0 || Probe::instance()->filterObject(caller))
+    return;
+
 #if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
   method_index = Util::signalIndexToMethodIndex(caller->metaObject(), method_index);
 #endif
@@ -109,6 +113,13 @@ static void signal_begin_callback(QObject *caller, int method_index, void **argv
 
 static void signal_end_callback(QObject *caller, int method_index)
 {
+  if (method_index == 0)
+    return;
+
+  ReadOrWriteLocker locker(Probe::objectLock());
+  if (!Probe::instance()->isValidObject(caller)) // implies filterObject()
+    return; // deleted in the slot
+
 #if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
   method_index = Util::signalIndexToMethodIndex(caller->metaObject(), method_index);
 #endif
@@ -121,6 +132,9 @@ static void signal_end_callback(QObject *caller, int method_index)
 
 static void slot_begin_callback(QObject *caller, int method_index, void **argv)
 {
+  if (method_index == 0 || Probe::instance()->filterObject(caller))
+    return;
+
   Probe::executeSignalCallback([=](const QSignalSpyCallbackSet &qt_signal_spy_callback_set) {
     if (qt_signal_spy_callback_set.slot_begin_callback) {
       qt_signal_spy_callback_set.slot_begin_callback(caller, method_index, argv);
@@ -130,6 +144,13 @@ static void slot_begin_callback(QObject *caller, int method_index, void **argv)
 
 static void slot_end_callback(QObject *caller, int method_index)
 {
+  if (method_index == 0)
+    return;
+
+  ReadOrWriteLocker locker(Probe::objectLock());
+  if (!Probe::instance()->isValidObject(caller)) // implies filterObject()
+    return; // deleted in the slot
+
   Probe::executeSignalCallback([=](const QSignalSpyCallbackSet &qt_signal_spy_callback_set) {
     if (qt_signal_spy_callback_set.slot_end_callback) {
       qt_signal_spy_callback_set.slot_end_callback(caller, method_index);
@@ -207,6 +228,10 @@ Probe::Probe(QObject *parent):
 
   ProbeSettings::receiveSettings();
   m_toolModel = new ToolModel(this);
+  auto sortedToolModel = new ServerProxyModel(this);
+  sortedToolModel->setSourceModel(m_toolModel);
+  sortedToolModel->setDynamicSortFilter(true);
+  sortedToolModel->sort(0);
 
   Server *server = new Server(this);
   ProbeSettings::sendPort(server->port());
@@ -218,7 +243,7 @@ Probe::Probe(QObject *parent):
   registerModel(QLatin1String("com.kdab.GammaRay.ObjectTree"), m_objectTreeModel);
   registerModel(QLatin1String("com.kdab.GammaRay.ObjectList"), m_objectListModel);
   registerModel(QLatin1String("com.kdab.GammaRay.MetaObjectModel"), m_metaObjectTreeModel);
-  registerModel(QLatin1String("com.kdab.GammaRay.ToolModel"), m_toolModel);
+  registerModel(QLatin1String("com.kdab.GammaRay.ToolModel"), sortedToolModel);
   registerModel(QLatin1String("com.kdab.GammaRay.ConnectionModel"), m_connectionModel);
 
   m_toolSelectionModel = ObjectBroker::selectionModel(m_toolModel);

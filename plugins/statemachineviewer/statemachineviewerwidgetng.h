@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2014-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Kevin Funk <kevin.funk@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -34,7 +34,6 @@ class State;
 class StateMachine;
 class StateMachineView;
 class Transition;
-class View;
 }
 
 namespace GammaRay {
@@ -72,7 +71,6 @@ private:
   QScopedPointer<Ui::StateMachineViewer> m_ui;
 
   KDSME::StateMachineView* m_stateMachineView;
-  KDSME::View* m_currentView;
   StateMachineViewerInterface *m_interface;
 
   QHash<StateId, KDSME::State*> m_idToStateMap;

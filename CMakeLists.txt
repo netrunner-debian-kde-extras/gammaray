@@ -7,8 +7,12 @@
 #  Force building against Qt4, even if Qt5 is found.
 #  Default=false
 #
+# -DGAMMARAY_BUILD_UI=[true|false]
+#  Build the client and in-process UI.
+#  Default=true
+#
 # -DGAMMARAY_PROBE_ONLY_BUILD=[true|false]
-#  Build only the probe, not the host tools (client, launcher, etc).
+#  Build only an additional probe configuration for an already existing launcher.
 #  Default=false
 #
 # -DGAMMARAY_UNKNOWN_CXX_MANGLED_NAMES=[true|false]
@@ -26,6 +30,9 @@ project(GammaRay)
 
 cmake_minimum_required(VERSION 2.8.11)
 cmake_policy(SET CMP0020 NEW)
+if(POLICY CMP0043)
+  cmake_policy(SET CMP0043 NEW)
+endif()
 
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/ ${CMAKE_MODULE_PATH})
 set(CMAKE_AUTOMOC ON)
@@ -67,10 +74,10 @@ enable_testing()
 # Version setup
 set(GAMMARAY_VERSION_MAJOR "2")
 set(GAMMARAY_VERSION_MINOR "2")
-set(GAMMARAY_VERSION_PATCH "0")
+set(GAMMARAY_VERSION_PATCH "1")
 set(GAMMARAY_VERSION "${GAMMARAY_VERSION_MAJOR}.${GAMMARAY_VERSION_MINOR}.${GAMMARAY_VERSION_PATCH}")
 set(GAMMARAY_VERSION_STRING "${GAMMARAY_VERSION}")
-set(GAMMARAY_SOVERSION "2.2.0")
+set(GAMMARAY_SOVERSION "2.2.1")
 set(GAMMARAY_PLUGIN_VERSION "2.2")
 
 if(EXISTS "${CMAKE_SOURCE_DIR}/.git")
@@ -104,8 +111,14 @@ option(
 )
 
 option(
+  GAMMARAY_BUILD_UI
+  "Build the GammaRay client and in-process UI."
+  ON
+)
+
+option(
   GAMMARAY_PROBE_ONLY_BUILD
-  "Build only the probe, not the host tools (client, launcher, etc)."
+  "Build only an additional probe configuration for an already existing launcher."
   OFF
 )
 
@@ -171,11 +184,13 @@ endif()
 # Finding Qt
 #
 
-set(QT_MIN_VERSION "4.7.0")
+set(QT_MIN_VERSION "4.8.0")
 
 # try Qt5 first, and prefer that (if found), but only if not disabled via option
 if(NOT GAMMARAY_ENFORCE_QT4_BUILD)
   find_package(Qt5Core 5.1 QUIET)
+else()
+  set(Qt5Core_FOUND FALSE)
 endif()
 
 if(Qt5Core_FOUND)
@@ -192,7 +207,11 @@ if(Qt5Core_FOUND)
     ScriptTools
     Test
     WebKitWidgets
-    Widgets)
+    Widgets
+  )
+  if(GAMMARAY_BUILD_UI) # widgets are required for the UI
+    find_package(Qt5 NO_MODULE REQUIRED COMPONENTS Widgets)
+  endif()
 
   #HACK: CMake with broken Qt5Qml_PRIVATE_INCLUDE_DIRS, Qt5Quick_PRIVATE_INCLUDE_DIRS
   if(${Qt5Qml_FOUND})
@@ -235,6 +254,11 @@ if(Qt5Core_FOUND)
   find_path(QT_PRIVATE_INCLUDE_DIR private/qobject_p.h PATHS ${Qt5Core_PRIVATE_INCLUDE_DIRS})
   if(QT_PRIVATE_INCLUDE_DIR)
     set(HAVE_PRIVATE_QT_HEADERS true)
+  endif()
+
+  find_path(_Qt5Quick_PRIVATE_INCLUDE_DIR private/qquickitem_p.h PATHS ${Qt5Quick_PRIVATE_INCLUDE_DIRS})
+  if(_Qt5Quick_PRIVATE_INCLUDE_DIR)
+    set(HAVE_PRIVATE_Qt5Quick_HEADERS true)
   endif()
 
   set_package_properties(Qt5 PROPERTIES URL "http://qt-project.org/")
@@ -420,7 +444,6 @@ configure_file(
   ${CMAKE_CURRENT_SOURCE_DIR}/config-gammaray.h.cmake
   ${CMAKE_CURRENT_BINARY_DIR}/config-gammaray.h
 )
-
 include_directories(
   ${CMAKE_SOURCE_DIR}
   ${CMAKE_SOURCE_DIR}/3rdparty
@@ -437,8 +460,10 @@ if(NOT GAMMARAY_PROBE_ONLY_BUILD)
 endif()
 if(Qt5Widgets_FOUND OR QT_QTGUI_FOUND)
   add_subdirectory(ui)
-  add_subdirectory(inprocessui)
-  if(NOT GAMMARAY_PROBE_ONLY_BUILD)
+  if(GAMMARAY_BUILD_UI)
+    add_subdirectory(inprocessui)
+  endif()
+  if(GAMMARAY_BUILD_UI AND NOT GAMMARAY_PROBE_ONLY_BUILD)
     add_subdirectory(client)
   endif()
 endif()
@@ -449,7 +474,7 @@ add_subdirectory(plugins)
 add_subdirectory(resources)
 
 if(NOT APPLE AND NOT GAMMARAY_PROBE_ONLY_BUILD)
-  if(UNIX)
+  if(UNIX AND GAMMARAY_BUILD_UI)
     install(FILES GammaRay.desktop DESTINATION ${XDG_APPS_INSTALL_DIR})
     install(FILES GammaRay.appdata.xml DESTINATION ${APPDATA_INSTALL_DIR})
   endif()

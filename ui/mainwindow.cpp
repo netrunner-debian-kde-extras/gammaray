@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -96,13 +96,11 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent), ui(new Ui::MainWin
   setWindowIcon(QIcon(":gammaray/GammaRay-128x128.png"));
 
   QAbstractItemModel *model = ObjectBroker::model("com.kdab.GammaRay.ToolModel");
-  ClientToolModel *proxyModel = new ClientToolModel(this);
-  proxyModel->setData(QModelIndex(), QVariant::fromValue<QWidget*>(this), ToolModelRole::ToolWidgetParent);
-  proxyModel->setDynamicSortFilter(true);
-  proxyModel->setSourceModel(model);
-  proxyModel->sort(0);
-  ui->toolSelector->setModel(proxyModel);
-  QItemSelectionModel *selectionModel = ObjectBroker::selectionModel(proxyModel);
+  ClientToolModel *toolModel = new ClientToolModel(this);
+  toolModel->setData(QModelIndex(), QVariant::fromValue<QWidget*>(this), ToolModelRole::ToolWidgetParent);
+  toolModel->setSourceModel(model);
+  ui->toolSelector->setModel(toolModel);
+  QItemSelectionModel *selectionModel = ObjectBroker::selectionModel(toolModel);
   ui->toolSelector->setSelectionModel(selectionModel);
   ui->toolSelector->resize(ui->toolSelector->minimumSize());
   connect(selectionModel, SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
