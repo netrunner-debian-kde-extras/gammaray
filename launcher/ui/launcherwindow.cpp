@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2011-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2011-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -42,6 +42,8 @@ LauncherWindow::LauncherWindow(QWidget *parent)
   connect(ui->launchPage, SIGNAL(updateButtonState()), SLOT(tabChanged()));
   connect(ui->connectPage, SIGNAL(updateButtonState()), SLOT(tabChanged()));
   connect(ui->attachPage, SIGNAL(activate()),
+          ui->buttonBox->button(QDialogButtonBox::Ok), SLOT(click()));
+  connect(ui->connectPage, SIGNAL(activate()),
           ui->buttonBox->button(QDialogButtonBox::Ok), SLOT(click()));
 
   setWindowTitle(tr("GammaRay Launcher"));

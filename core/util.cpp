@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -27,6 +27,7 @@
 #include <common/metatypedeclarations.h>
 #include "varianthandler.h"
 
+#include <QCoreApplication>
 #include <QDebug>
 #include <QDir>
 #include <QIcon>
@@ -181,6 +182,9 @@ typedef QHash<QByteArray, IconCacheEntry> IconDatabase;
 static IconDatabase readIconData()
 {
   IconDatabase data;
+  // we can't load icons due to their QPixmap dependency in a QCoreApplication
+  if (!qApp->inherits("QGuiApplication") && !qApp->inherits("QApplication"))
+    return data;
 
   const QString basePath = QLatin1String(":/gammaray/classes/");
   QDir dir(basePath);

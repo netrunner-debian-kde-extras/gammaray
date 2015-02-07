@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2013-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2013-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -69,7 +69,8 @@ private:
   enum State {
     Initial = 0,
     InjectorFinished = 1,
-    ClientStarted = 2,
+    InjectorFailed = 2,
+    ClientStarted = 4,
     Complete = InjectorFinished | ClientStarted
   };
   int m_state;

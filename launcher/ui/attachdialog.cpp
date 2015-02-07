@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Milian Wolff <milian.wolff@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -79,10 +79,6 @@ AttachDialog::AttachDialog(QWidget *parent, Qt::WindowFlags f)
   setWindowTitle(tr("GammaRay - Attach to Process"));
   setWindowIcon(QIcon(":gammaray/GammaRay-128x128.png"));
 
-  m_timer = new QTimer(this);
-  connect(m_timer, SIGNAL(timeout()), this, SLOT(updateProcesses()));
-  m_timer->start(1000);
-
   ui.stackedWidget->setCurrentWidget(ui.loadingLabel);
   emit updateButtonState();
   updateProcesses();
@@ -147,6 +143,8 @@ void AttachDialog::updateProcessesFinished()
     ui.view->setCurrentIndex(QModelIndex());
   }
   watcher->deleteLater();
+
+  QTimer::singleShot(1000, this, SLOT(updateProcesses()));
 }
 
 void AttachDialog::selectABI(const QModelIndex& processIndex)

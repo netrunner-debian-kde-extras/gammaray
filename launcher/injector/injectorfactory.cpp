@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2010-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2010-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -28,6 +28,8 @@
 #include "preloadinjector.h"
 #include "styleinjector.h"
 #include "windllinjector.h"
+
+#include <common/probeabi.h>
 
 #include <QString>
 
@@ -70,13 +72,17 @@ static AbstractInjector::Ptr findFirstWorkingInjector(const QStringList &types)
   return AbstractInjector::Ptr(0);
 }
 
-AbstractInjector::Ptr defaultInjectorForLaunch()
+AbstractInjector::Ptr defaultInjectorForLaunch(const ProbeABI &abi)
 {
 #if defined(Q_OS_MAC)
+  if (abi.majorQtVersion() >= 5 && abi.minorQtVersion() >= 4)
+    return createInjector(QLatin1String("preload"));
   return findFirstWorkingInjector(QStringList() << QLatin1String("gdb") << QLatin1String("lldb"));
 #elif defined(Q_OS_UNIX)
+  Q_UNUSED(abi);
   return createInjector(QLatin1String("preload"));
 #else
+  Q_UNUSED(abi);
   return createInjector(QLatin1String("windll"));
 #endif
 }

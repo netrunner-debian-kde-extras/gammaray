@@ -4,7 +4,7 @@
   This file is part of GammaRay, the Qt application inspection and
   manipulation tool.
 
-  Copyright (C) 2013-2014 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+  Copyright (C) 2013-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
   This program is free software; you can redistribute it and/or modify
@@ -186,6 +186,10 @@ QMap<int, QVariant> RemoteModelServer::filterItemData(const QMap< int, QVariant 
       if (!icon.isNull())
         it.value() = icon.pixmap(QSize(16, 16));
       ++it;
+    } else if (qstrcmp(it.value().typeName(), "QJSValue") == 0) {
+      // QJSValue tries to serialize nested elements and asserts if that fails
+      // too bad it can contain QObject* as nested element, which obviously can't be serialized...
+      it = itemData.erase(it);
     } else if (canSerialize(it.value())) {
       ++it;
     } else {
