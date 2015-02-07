@@ -1,0 +1,23 @@
+From: Jakub Adam <jakub.adam@ktknet.cz>
+Date: Sat, 7 Feb 2015 13:48:20 +0100
+Subject: disable-qt4-objectvisualizer
+
+---
+ plugins/CMakeLists.txt | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/plugins/CMakeLists.txt b/plugins/CMakeLists.txt
+index c48d194..dd72f79 100644
+--- a/plugins/CMakeLists.txt
++++ b/plugins/CMakeLists.txt
+@@ -1,7 +1,9 @@
+ add_subdirectory(codecbrowser)
+ add_subdirectory(fontbrowser)
+ add_subdirectory(kjobtracker)
+-add_subdirectory(objectvisualizer)
++if (Qt5Core_FOUND)
++  add_subdirectory(objectvisualizer)
++endif()
+ add_subdirectory(quickinspector)
+ add_subdirectory(selectionmodelinspector)
+ add_subdirectory(signalmonitor)
