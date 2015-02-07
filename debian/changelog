@@ -1,7 +1,7 @@
 gammaray (2.2.1-1) UNRELEASED; urgency=medium
 
   * New upstream release.
-  * Refresh d/patches/debian-archs-fix-build.patch.
+  * Refresh debian-archs-fix-build.patch and fix-objectvisualizer-build.patch.
   * Install new signalmonitor and translatorinspector plugins.
   * Update d/changelog with (re)moved files.
   * Re-enable objectvisualizer plugin since Qt5-compatible VTK has become

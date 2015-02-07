@@ -7,7 +7,7 @@ Subject: fix-objectvisualizer-build
  1 file changed, 1 insertion(+), 2 deletions(-)
 
 diff --git a/plugins/objectvisualizer/CMakeLists.txt b/plugins/objectvisualizer/CMakeLists.txt
-index 94bef6d..e30506e 100644
+index 56c19c9..99c30ec 100644
 --- a/plugins/objectvisualizer/CMakeLists.txt
 +++ b/plugins/objectvisualizer/CMakeLists.txt
 @@ -15,8 +15,7 @@ target_link_libraries(gammaray_objectvisualizer_plugin
@@ -15,8 +15,8 @@ index 94bef6d..e30506e 100644
  
  ######## START VTK VISUALIZATION
 -# VTK includes QtGui/... stuff => breaks compilation with Qt5
--if(VTK_FOUND AND NOT Qt5Core_FOUND AND NOT GAMMARAY_PROBE_ONLY_BUILD)
-+if(VTK_FOUND AND NOT GAMMARAY_PROBE_ONLY_BUILD)
+-if(VTK_FOUND AND NOT Qt5Core_FOUND AND GAMMARAY_BUILD_UI)
++if(VTK_FOUND AND GAMMARAY_BUILD_UI)
  
  set(OPTIONAL_VTK_LIBRARIES
  )
