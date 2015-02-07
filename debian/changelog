@@ -1,4 +1,4 @@
-gammaray (2.2.0-1) UNRELEASED; urgency=medium
+gammaray (2.2.1-1) UNRELEASED; urgency=medium
 
   * New upstream release.
   * Refresh d/patches/debian-archs-fix-build.patch.
@@ -9,7 +9,7 @@ gammaray (2.2.0-1) UNRELEASED; urgency=medium
   * Don't set RPATH in binaries; prevents binary-or-shlib-defines-rpath
     lintian error.
 
- -- Jakub Adam <jakub.adam@ktknet.cz>  Fri, 12 Dec 2014 21:56:04 +0100
+ -- Jakub Adam <jakub.adam@ktknet.cz>  Sat, 07 Feb 2015 12:00:17 +0100
 
 gammaray (2.1.0-4) unstable; urgency=medium
 
