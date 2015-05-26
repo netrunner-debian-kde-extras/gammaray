@@ -1,2 +1,2 @@
 version=3
-http://githubredir.debian.net/github/KDAB/GammaRay /v(.*).tar.gz
+https://github.com/KDAB/GammaRay/releases /KDAB/GammaRay/releases/download/v?\d\S*/gammaray-(\d\S*).tar.gz
