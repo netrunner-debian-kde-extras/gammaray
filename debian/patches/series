@@ -1,1 +1,3 @@
 debian-archs-fix-build.patch
+qsglayer.patch
+gldouble.patch

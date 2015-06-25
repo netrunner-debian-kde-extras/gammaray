@@ -1,3 +1,11 @@
+gammaray (2.1.0-5) unstable; urgency=medium
+
+  * Apply changes from 2.1.0-3.1ubuntu2 by Dmitry Shachnev:
+    - Backport one more upstream patch, to fix build on armhf.
+    - Adapt to Qt 5.4 API changes (LP: #1395646).
+
+ -- Felix Geyer <fgeyer@debian.org>  Thu, 25 Jun 2015 19:32:55 +0200
+
 gammaray (2.1.0-4) unstable; urgency=medium
 
   [ Felix Geyer ]
