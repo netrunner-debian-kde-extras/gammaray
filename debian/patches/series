@@ -3,3 +3,5 @@ fix-objectvisualizer-build.patch
 use-empty-rpath.patch
 disable-qt4-objectvisualizer.patch
 disable-qt4-webinspector.patch
+qsglayer.patch
+gldouble.patch
