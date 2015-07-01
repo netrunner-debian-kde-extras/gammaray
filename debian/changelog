@@ -10,6 +10,9 @@ gammaray (2.2.1-1) UNRELEASED; urgency=medium
     lintian error.
   * Disable build of Qt4 web inspector plugin since qtwebkit is to be removed
     from the repository (Closes: #784466).
+  * Remove patches included upstream:
+    - gldouble.patch
+    - qsglayer.patch.
 
  -- Jakub Adam <jakub.adam@ktknet.cz>  Sat, 07 Feb 2015 12:00:17 +0100
 
