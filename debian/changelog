@@ -8,6 +8,8 @@ gammaray (2.2.1-1) UNRELEASED; urgency=medium
     available.
   * Don't set RPATH in binaries; prevents binary-or-shlib-defines-rpath
     lintian error.
+  * Disable build of Qt4 web inspector plugin since qtwebkit is to be removed
+    from the repository (Closes: #784466).
 
  -- Jakub Adam <jakub.adam@ktknet.cz>  Sat, 07 Feb 2015 12:00:17 +0100
 

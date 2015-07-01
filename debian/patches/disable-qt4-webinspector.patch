@@ -1,0 +1,23 @@
+From: Jakub Adam <jakub.adam@ktknet.cz>
+Date: Wed, 1 Jul 2015 19:55:52 +0200
+Subject: disable-qt4-webinspector
+
+---
+ plugins/CMakeLists.txt | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/plugins/CMakeLists.txt b/plugins/CMakeLists.txt
+index dd72f79..90b4df5 100644
+--- a/plugins/CMakeLists.txt
++++ b/plugins/CMakeLists.txt
+@@ -9,7 +9,9 @@ add_subdirectory(selectionmodelinspector)
+ add_subdirectory(signalmonitor)
+ add_subdirectory(statemachineviewer)
+ add_subdirectory(timertop)
+-add_subdirectory(webinspector)
++if (Qt5Core_FOUND)
++  add_subdirectory(webinspector)
++endif()
+ 
+ if(Qt5Core_FOUND)
+   add_subdirectory(translatorinspector)

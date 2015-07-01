@@ -21,8 +21,6 @@ usr/lib/gammaray/*/qt4*/gammaray_styleinspector.desktop
 usr/lib/gammaray/*/qt4*/gammaray_styleinspector_plugin.so
 usr/lib/gammaray/*/qt4*/gammaray_timertop.desktop
 usr/lib/gammaray/*/qt4*/gammaray_timertop_plugin.so
-usr/lib/gammaray/*/qt4*/gammaray_webinspector.desktop
-usr/lib/gammaray/*/qt4*/gammaray_webinspector_plugin.so
 usr/lib/gammaray/*/qt4*/gammaray_widgetinspector.desktop
 usr/lib/gammaray/*/qt4*/gammaray_widgetinspector_plugin.so
 usr/lib/gammaray/*/qt4*/libgammaray_widget_export_actions.so

@@ -2,3 +2,4 @@ debian-archs-fix-build.patch
 fix-objectvisualizer-build.patch
 use-empty-rpath.patch
 disable-qt4-objectvisualizer.patch
+disable-qt4-webinspector.patch
