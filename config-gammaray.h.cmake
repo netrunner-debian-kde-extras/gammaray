@@ -1,5 +1,11 @@
+#include <qglobal.h>
+
 // relative install dirs
-#define GAMMARAY_PLUGIN_INSTALL_DIR "${PLUGIN_INSTALL_DIR}"
+#ifdef Q_OS_ANDROID
+# define GAMMARAY_PLUGIN_INSTALL_DIR "lib"
+#else
+# define GAMMARAY_PLUGIN_INSTALL_DIR "${PLUGIN_INSTALL_DIR}"
+#endif
 #define GAMMARAY_LIBEXEC_INSTALL_DIR "${LIBEXEC_INSTALL_DIR}"
 #define GAMMARAY_BIN_INSTALL_DIR "${BIN_INSTALL_DIR}"
 
@@ -10,6 +16,13 @@
 #define GAMMARAY_INVERSE_BIN_DIR "${GAMMARAY_INVERSE_BIN_DIR}"
 #define GAMMARAY_INVERSE_PROBE_DIR "${GAMMARAY_INVERSE_PROBE_DIR}"
 #define GAMMARAY_INVERSE_LIBEXEC_DIR "${GAMMARAY_INVERSE_LIBEXEC_DIR}"
+
+// probe name
+#ifdef Q_OS_ANDROID
+#define GAMMARAY_PROBE_NAME "libgammaray_probe"
+#else
+#define GAMMARAY_PROBE_NAME "gammaray_probe"
+#endif
 
 // build options
 #cmakedefine BUILD_TIMER_PLUGIN
@@ -28,8 +41,7 @@
 #cmakedefine HAVE_GRAPHVIZ
 #cmakedefine HAVE_ELF_H
 
-#include <qglobal.h>
-#if !defined(QT_NO_SHAREDMEMORY) && !defined(QT_NO_SYSTEMSEMAPHORE)
+#if !defined(QT_NO_SHAREDMEMORY) && !defined(QT_NO_SYSTEMSEMAPHORE) && !defined(Q_OS_ANDROID)
 #define HAVE_SHM
 #endif
 

@@ -7,6 +7,11 @@
   Copyright (C) 2013-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Anton Kreuzkamp <anton.kreuzkamp@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  acuordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -32,11 +37,18 @@ namespace GammaRay {
 class MethodsExtensionInterface : public QObject
 {
   Q_OBJECT
+  Q_PROPERTY(bool hasObject READ hasObject WRITE setHasObject NOTIFY hasObjectChanged)
   public:
     explicit MethodsExtensionInterface(const QString &name, QObject *parent = 0);
     virtual ~MethodsExtensionInterface();
 
     const QString &name() const;
+
+    bool hasObject() const;
+    void setHasObject(bool hasObject);
+
+  signals:
+    void hasObjectChanged();
 
   public slots:
     virtual void activateMethod() = 0;
@@ -45,6 +57,7 @@ class MethodsExtensionInterface : public QObject
 
   private:
     QString m_name;
+    bool m_hasObject;
 };
 
 }

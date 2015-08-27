@@ -7,6 +7,11 @@
   Copyright (C) 2010-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -25,10 +30,20 @@
 
 #include "core/varianthandler.h"
 
+#include <QAbstractProxyModel>
+
 using namespace GammaRay;
 
 ModelCellModel::ModelCellModel(QObject *parent) : QAbstractTableModel(parent)
 {
+}
+
+static bool sourceIsQQmlListModel(const QAbstractItemModel* model)
+{
+  Q_ASSERT(model);
+  while (auto proxy = qobject_cast<const QAbstractProxyModel*>(model))
+    model = proxy->sourceModel();
+  return model->inherits("QQmlListModel");
 }
 
 void ModelCellModel::setModelIndex(const QModelIndex &index)
@@ -37,29 +52,32 @@ void ModelCellModel::setModelIndex(const QModelIndex &index)
   m_index = index;
 
   m_roles.clear();
+
+
   if (index.isValid()) {
 
     // add built-in roles
-    #define R(x) qMakePair<int, QString>(x, QLatin1String(#x))
-    m_roles << R(Qt::DisplayRole)
-            << R(Qt::DecorationRole)
-            << R(Qt::EditRole)
-            << R(Qt::ToolTipRole)
-            << R(Qt::StatusTipRole)
-            << R(Qt::WhatsThisRole)
-            << R(Qt::FontRole)
-            << R(Qt::TextAlignmentRole)
-            << R(Qt::BackgroundRole)
-            << R(Qt::ForegroundRole)
-            << R(Qt::CheckStateRole)
-            << R(Qt::AccessibleTextRole)
-            << R(Qt::AccessibleDescriptionRole)
-            << R(Qt::SizeHintRole)
-#if QT_VERSION >= QT_VERSION_CHECK(4,8,0)
-            << R(Qt::InitialSortOrderRole)
-#endif
-            ;
-    #undef R
+    const auto hasDefaultRoles = !sourceIsQQmlListModel(index.model());
+    if (hasDefaultRoles) {
+      #define R(x) qMakePair<int, QString>(x, QLatin1String(#x))
+      m_roles << R(Qt::DisplayRole)
+              << R(Qt::DecorationRole)
+              << R(Qt::EditRole)
+              << R(Qt::ToolTipRole)
+              << R(Qt::StatusTipRole)
+              << R(Qt::WhatsThisRole)
+              << R(Qt::FontRole)
+              << R(Qt::TextAlignmentRole)
+              << R(Qt::BackgroundRole)
+              << R(Qt::ForegroundRole)
+              << R(Qt::CheckStateRole)
+              << R(Qt::AccessibleTextRole)
+              << R(Qt::AccessibleDescriptionRole)
+              << R(Qt::SizeHintRole)
+              << R(Qt::InitialSortOrderRole)
+              ;
+      #undef R
+    }
 
     // add custom roles
     QHash<int, QByteArray> roleNames = index.model()->roleNames();

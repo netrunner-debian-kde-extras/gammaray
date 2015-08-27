@@ -8,6 +8,7 @@ set(gammaray_srcs
   metaproperty.cpp
   metapropertymodel.cpp
   probe.cpp
+  probeguard.cpp
   probesettings.cpp
   probecontroller.cpp
 #  proxydetacher.cpp
@@ -23,6 +24,7 @@ set(gammaray_srcs
   connectionfilterproxymodel.cpp
   methodargumentmodel.cpp
   multisignalmapper.cpp
+  signalspycallbackset.cpp
   toolmodel.cpp
   toolpluginmodel.cpp
   toolpluginerrormodel.cpp
@@ -49,6 +51,7 @@ set(gammaray_srcs
   tools/metaobjectbrowser/metaobjectbrowser.cpp
   tools/metatypebrowser/metatypebrowser.cpp
   tools/modelinspector/modelinspector.cpp
+  tools/modelinspector/safetyfilterproxymodel.cpp
   tools/objectinspector/objectinspector.cpp
   tools/objectinspector/propertiesextension.cpp
   tools/objectinspector/methodsextension.cpp
@@ -65,6 +68,9 @@ set(gammaray_srcs
   remote/server.cpp
   remote/remotemodelserver.cpp
   remote/selectionmodelserver.cpp
+  remote/serverdevice.cpp
+  remote/tcpserverdevice.cpp
+  remote/localserverdevice.cpp
   remote/serverproxymodel.cpp
 )
 
@@ -85,10 +91,10 @@ elseif(MINGW)
 else()
   set(gammaray_srcs ${gammaray_srcs}
     tools/messagehandler/backtrace_win.cpp
-    tools/messagehandler/StackWalker.cpp)
+    ${CMAKE_SOURCE_DIR}/3rdparty/StackWalker/StackWalker.cpp)
 endif()
 
-qt4_wrap_cpp(gammaray_srcs tools/modelinspector/modeltest.h)
+qt4_wrap_cpp(gammaray_srcs ${CMAKE_SOURCE_DIR}/3rdparty/qt/modeltest.h)
 qt4_add_resources(gammaray_srcs ${CMAKE_SOURCE_DIR}/resources/gammaray.qrc)
 
 add_definitions(-DMAKE_GAMMARAY_CORE_LIB)
@@ -103,8 +109,7 @@ target_link_libraries(gammaray_core
   LINK_PRIVATE gammaray_common_internal
 )
 set_target_properties(gammaray_core PROPERTIES
-  SOVERSION ${GAMMARAY_SOVERSION}
-  VERSION ${GAMMARAY_SOVERSION}
+  ${GAMMARAY_DEFAULT_LIBRARY_PROPERTIES}
   OUTPUT_NAME gammaray_core-${GAMMARAY_PROBE_ABI}
 )
 
@@ -129,8 +134,18 @@ gammaray_install_headers(
   probeinterface.h
   propertycontroller.h
   propertycontrollerextension.h
+  signalspycallbackset.h
   singlecolumnobjectproxymodel.h
   toolfactory.h
   util.h
   varianthandler.h
 )
+
+ecm_generate_pri_file(BASE_NAME GammaRayCore
+                      LIB_NAME gammaray_core-${GAMMARAY_PROBE_ABI}
+                      DEPS "core gui GammaRayCommon"
+                      FILENAME_VAR PRI_FILENAME
+                      INCLUDE_INSTALL_DIR ${INCLUDE_INSTALL_DIR}/..
+)
+
+install(FILES ${PRI_FILENAME} DESTINATION ${ECM_MKSPECS_INSTALL_DIR})

@@ -7,6 +7,11 @@
   Copyright (C) 2013-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -26,6 +31,8 @@
 
 #include <QProcess>
 
+class QUrl;
+
 namespace GammaRay {
 
 /** Launching/monitoring of the GammaRay client for out-of-process use. */
@@ -35,15 +42,15 @@ public:
   ClientLauncher();
   ~ClientLauncher();
 
-  bool launch(const QString &hostName, quint16 port = 0);
+  bool launch(const QUrl &url);
   void terminate();
   void waitForFinished();
 
-  static void launchDetached(const QString &hostName, quint16 port = 0);
+  static void launchDetached(const QUrl &url);
 
 private:
   static QString clientPath();
-  static QStringList makeArgs(const QString &hostName, quint16 port);
+  static QStringList makeArgs(const QUrl &url);
 
 private:
   QProcess m_process;

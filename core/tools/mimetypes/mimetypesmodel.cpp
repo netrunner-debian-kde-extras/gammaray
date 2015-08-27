@@ -7,6 +7,11 @@
   Copyright (C) 2013-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -29,9 +34,9 @@
 using namespace GammaRay;
 
 MimeTypesModel::MimeTypesModel(QObject* parent):
-  QStandardItemModel(parent)
+  QStandardItemModel(parent),
+  m_modelFilled(false)
 {
-  fillModel();
 }
 
 MimeTypesModel::~MimeTypesModel()
@@ -72,6 +77,12 @@ QVariant MimeTypesModel::data(const QModelIndex& index, int role) const
 Qt::ItemFlags MimeTypesModel::flags(const QModelIndex& index) const
 {
   return QStandardItemModel::flags(index) & ~Qt::ItemIsEditable;
+}
+
+int MimeTypesModel::rowCount(const QModelIndex& parent) const
+{
+  const_cast<MimeTypesModel*>(this)->fillModel();
+  return QStandardItemModel::rowCount(parent);
 }
 
 QVector<QStandardItem*> MimeTypesModel::itemsForType(const QString &mimeTypeName)
@@ -154,7 +165,10 @@ QList<QStandardItem*> MimeTypesModel::makeRowForType(const QMimeType &mt)
 
 void MimeTypesModel::fillModel()
 {
-  clear();
+  if (m_modelFilled)
+    return;
+  m_modelFilled = true;
+
   setHorizontalHeaderLabels(QStringList() << tr("Name")
                                           << tr("Comment")
                                           << tr("Glob Patterns")

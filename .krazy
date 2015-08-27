@@ -12,7 +12,7 @@ STYLE_CPPSTYLE kde
 STYLE_OFFSET 2
 STYLE_LINEMAX 100
 
-#skip non-desktop, desktop files
+#skip over known invalid desktop files
 SKIP /plugins/.*/.*\.desktop$
 
 #no need to check 3rdparty stuff
@@ -28,4 +28,4 @@ SKIP /build-
 SKIP Doxyfile.cmake
 
 #skip the borrowed code in the cmake subdir
-SKIP /cmake/MacroLogFeature.cmake|/cmake/ECMQt4To5Porting.cmake|/cmake/FindGraphviz.cmake|/cmake/Toolchain-QNX65.cmake
+SKIP /cmake/MacroLogFeature.cmake|/cmake/ECMQt4To5Porting.cmake|/cmake/FindGraphviz.cmake|/cmake/Toolchain-QNX65.cmake|/cmake/Toolchain-android.cmake|/cmake/Toolchain-QNX66.cmake|/cmake/ECMGeneratePriFile.cmake|/cmake/ECMQueryQmake.cmake

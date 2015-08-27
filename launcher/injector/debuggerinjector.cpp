@@ -7,6 +7,11 @@
   Copyright (C) 2014-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -112,10 +117,7 @@ void DebuggerInjector::waitForMain()
 #else
   loadSymbols("Qt5Core");
 #endif
-  // either this
   addMethodBreakpoint("QCoreApplication::exec");
-  // or this for unit tests should hit
-  addMethodBreakpoint("QTest::qExec");
   execCmd("continue");
 }
 
@@ -132,6 +134,8 @@ int DebuggerInjector::injectAndDetach(const QString &probeDll, const QString &pr
     execCmd("detach");
     execCmd("quit");
   } else {
+    // delete all breakpoints before we continue, so we don't hit another one and abort there
+    execCmd("delete");
     execCmd("continue");
     // if we hit a crash or anything, print backtrace and quit
     execCmd("backtrace", false);

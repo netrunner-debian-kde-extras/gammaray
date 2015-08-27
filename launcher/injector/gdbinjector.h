@@ -7,6 +7,11 @@
   Copyright (C) 2010-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -36,20 +41,20 @@ class GdbInjector : public DebuggerInjector
     QString name() const {
       return QString("gdb");
     }
-    virtual bool launch(const QStringList &programAndArgs,
-                       const QString &probeDll, const QString &probeFunc);
-    virtual bool attach(int pid, const QString &probeDll, const QString &probeFunc);
+    bool launch(const QStringList &programAndArgs,
+                const QString &probeDll, const QString &probeFunc) Q_DECL_OVERRIDE;
+    bool attach(int pid, const QString &probeDll, const QString &probeFunc) Q_DECL_OVERRIDE;
 
   protected:
-    QString debuggerExecutable() const;
-    void execCmd(const QByteArray &cmd, bool waitForWritten = true);
-    void addFunctionBreakpoint(const QByteArray& function);
-    void addMethodBreakpoint(const QByteArray& method);
-    void loadSymbols(const QByteArray& library);
+    QString debuggerExecutable() const Q_DECL_OVERRIDE;
+    void execCmd(const QByteArray &cmd, bool waitForWritten = true) Q_DECL_OVERRIDE;
+    void addFunctionBreakpoint(const QByteArray& function) Q_DECL_OVERRIDE;
+    void addMethodBreakpoint(const QByteArray& method) Q_DECL_OVERRIDE;
+    void loadSymbols(const QByteArray& library) Q_DECL_OVERRIDE;
 
   private slots:
-    void readyReadStandardError();
-    void readyReadStandardOutput();
+    void readyReadStandardError() Q_DECL_OVERRIDE;
+    void readyReadStandardOutput() Q_DECL_OVERRIDE;
 };
 
 }

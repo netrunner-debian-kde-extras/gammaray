@@ -7,6 +7,11 @@
   Copyright (C) 2010-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -35,11 +40,7 @@ ObjectMethodModel::ObjectMethodModel(QObject *parent)
 int GammaRay::ObjectMethodModel::columnCount(const QModelIndex &parent) const
 {
   Q_UNUSED(parent);
-#if QT_VERSION < QT_VERSION_CHECK(5, 1, 0)
-  return 5;
-#else
-  return 6;
-#endif
+  return 4;
 }
 
 QVariant ObjectMethodModel::metaData(const QModelIndex &index,
@@ -75,14 +76,13 @@ QVariant ObjectMethodModel::metaData(const QModelIndex &index,
         return tr("Unknown");
       }
     }
-    if (index.column() == 3) {
-      return method.tag();
-    }
+  } else if (role == Qt::ToolTipRole) {
+    QString tt = Util::prettyMethodSignature(method);
+    tt += tr("\nTag: %1\n").arg(qstrlen(method.tag()) > 0 ? method.tag() : "<none>");
 #if QT_VERSION >= QT_VERSION_CHECK(5, 1, 0)
-    if (index.column() == 4) {
-      return QString::number(method.revision());
-    }
+    tt += tr("Revision: %1").arg(method.revision());
 #endif
+    return tt;
   } else if (role == ObjectMethodModelRole::MetaMethod) {
     return QVariant::fromValue(method);
   } else if (role == ObjectMethodModelRole::MetaMethodType) {
@@ -106,10 +106,6 @@ QString GammaRay::ObjectMethodModel::columnHeader(int index) const
     return tr("Type");
   case 2:
     return tr("Access");
-  case 3:
-    return tr("Tag");
-  case 4:
-    return tr("Revision");
   }
   return QString();
 }

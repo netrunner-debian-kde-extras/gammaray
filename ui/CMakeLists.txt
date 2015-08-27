@@ -5,13 +5,16 @@ set(gammaray_ui_srcs
   ${CMAKE_SOURCE_DIR}/3rdparty/kde/krecursivefilterproxymodel.cpp
   ${CMAKE_SOURCE_DIR}/3rdparty/kde/kfilterproxysearchline.cpp
 
-  ${CMAKE_SOURCE_DIR}/3rdparty/other/modelutils.cpp
-
   aboutdata.cpp
-  palettemodel.cpp
-  propertywidget.cpp
+  clienttoolmodel.cpp
   deferredresizemodesetter.cpp
   deferredtreeviewconfiguration.cpp
+  editabletypesmodel.cpp
+  methodinvocationdialog.cpp
+  palettemodel.cpp
+  propertybinder.cpp
+  propertywidget.cpp
+  proxytooluifactory.cpp
   splashscreen.cpp
 
   propertyeditor/propertycoloreditor.cpp
@@ -23,39 +26,6 @@ set(gammaray_ui_srcs
   propertyeditor/propertypaletteeditor.cpp
   propertyeditor/palettedialog.cpp
   propertyeditor/propertyeditordelegate.cpp
-)
-
-qt4_wrap_ui(gammaray_ui_srcs
-  propertyeditor/propertydoublepaireditor.ui
-  propertyeditor/propertyextendededitor.ui
-  propertyeditor/propertyintpaireditor.ui
-  propertyeditor/palettedialog.ui
-)
-
-add_library(gammaray_ui SHARED ${gammaray_ui_srcs})
-set_target_properties(gammaray_ui PROPERTIES
-  DEFINE_SYMBOL MAKE_GAMMARAY_UI_LIB
-  SOVERSION ${GAMMARAY_SOVERSION}
-  VERSION ${GAMMARAY_SOVERSION}
-  OUTPUT_NAME gammaray_ui-${GAMMARAY_PROBE_ABI}
-)
-
-target_link_libraries(gammaray_ui
-  LINK_PUBLIC ${QT_QTCORE_LIBRARIES} ${QT_QTGUI_LIBRARIES} gammaray_common
-  LINK_PRIVATE gammaray_common_internal
-)
-
-install(TARGETS gammaray_ui EXPORT GammaRayTargets ${INSTALL_TARGETS_DEFAULT_ARGS})
-
-set(gammaray_ui_internal_srcs
-  sidepane.cpp
-  aboutpluginsdialog.cpp
-  mainwindow.cpp
-  aboutdialog.cpp
-  proxytooluifactory.cpp
-  clienttoolmodel.cpp
-  editabletypesmodel.cpp
-  methodinvocationdialog.cpp
 
   tools/connectioninspector/connectioninspectorwidget.cpp
   tools/localeinspector/localeinspectorwidget.cpp
@@ -86,16 +56,13 @@ set(gammaray_ui_internal_srcs
   tools/textdocumentinspector/textdocumentcontentview.cpp
 )
 
-if(NOT Qt5Core_VERSION VERSION_LESS 5.2.0)
-  list(APPEND gammaray_ui_internal_srcs
-    variantcontainermodel.cpp
-  )
-endif()
-
-qt4_wrap_ui(gammaray_ui_internal_srcs
-  mainwindow.ui
-  aboutdialog.ui
+qt4_wrap_ui(gammaray_ui_srcs
   methodinvocationdialog.ui
+
+  propertyeditor/propertydoublepaireditor.ui
+  propertyeditor/propertyextendededitor.ui
+  propertyeditor/propertyintpaireditor.ui
+  propertyeditor/palettedialog.ui
 
   tools/connectioninspector/connectioninspectorwidget.ui
   tools/localeinspector/localeinspectorwidget.ui
@@ -114,6 +81,37 @@ qt4_wrap_ui(gammaray_ui_internal_srcs
   tools/standardpaths/standardpathswidget.ui
   tools/textdocumentinspector/textdocumentinspectorwidget.ui
 )
+if(NOT Qt5Core_VERSION VERSION_LESS 5.2.0)
+  list(APPEND gammaray_ui_srcs
+    variantcontainermodel.cpp
+  )
+endif()
+
+add_library(gammaray_ui SHARED ${gammaray_ui_srcs})
+set_target_properties(gammaray_ui PROPERTIES
+  ${GAMMARAY_DEFAULT_LIBRARY_PROPERTIES}
+  DEFINE_SYMBOL MAKE_GAMMARAY_UI_LIB
+  OUTPUT_NAME gammaray_ui-${GAMMARAY_PROBE_ABI}
+)
+
+target_link_libraries(gammaray_ui
+  LINK_PUBLIC ${QT_QTCORE_LIBRARIES} ${QT_QTGUI_LIBRARIES} gammaray_common
+  LINK_PRIVATE gammaray_common_internal
+)
+
+install(TARGETS gammaray_ui EXPORT GammaRayTargets ${INSTALL_TARGETS_DEFAULT_ARGS})
+
+set(gammaray_ui_internal_srcs
+  sidepane.cpp
+  aboutpluginsdialog.cpp
+  mainwindow.cpp
+  aboutdialog.cpp
+)
+
+qt4_wrap_ui(gammaray_ui_internal_srcs
+  mainwindow.ui
+  aboutdialog.ui
+)
 
 add_library(gammaray_ui_internal STATIC ${gammaray_ui_internal_srcs})
 set_target_properties(gammaray_ui_internal PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -127,10 +125,19 @@ target_link_libraries(gammaray_ui_internal
 
 gammaray_install_headers(
   gammaray_ui_export.h
+  clienttoolmodel.h
   deferredresizemodesetter.h
   deferredtreeviewconfiguration.h
-  palettemodel.h
   propertywidget.h
   propertywidgettab.h
   tooluifactory.h
 )
+
+ecm_generate_pri_file(BASE_NAME GammaRayUi
+                      LIB_NAME gammaray_ui-${GAMMARAY_PROBE_ABI}
+                      DEPS "core gui widgets GammaRayCommon"
+                      FILENAME_VAR PRI_FILENAME
+                      INCLUDE_INSTALL_DIR ${INCLUDE_INSTALL_DIR}/..
+)
+
+install(FILES ${PRI_FILENAME} DESTINATION ${ECM_MKSPECS_INSTALL_DIR})

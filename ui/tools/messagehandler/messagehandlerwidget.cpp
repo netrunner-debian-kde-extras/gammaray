@@ -7,6 +7,11 @@
   Copyright (C) 2010-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Milian Wolff <milian.wolff@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -34,6 +39,10 @@
 #include <QLabel>
 #include <QListWidget>
 #include <QTime>
+#include <QPushButton>
+#include <QClipboard>
+#include <QApplication>
+#include <QSignalMapper>
 
 using namespace GammaRay;
 
@@ -94,15 +103,25 @@ void MessageHandlerWidget::fatalMessageReceived(const QString &app, const QStrin
   errorLabel->setText(message);
   layout->addWidget(errorLabel, 0, 1);
 
+  QDialogButtonBox *buttons = new QDialogButtonBox;
+
   if (!backtrace.isEmpty()) {
     QListWidget *backtraceWidget = new QListWidget;
     foreach (const QString &frame, backtrace) {
       backtraceWidget->addItem(frame);
     }
     layout->addWidget(backtraceWidget, 1, 0, 1, 2);
+
+    QPushButton *copyBacktraceButton = new QPushButton(tr("Copy Backtrace"));
+    buttons->addButton(copyBacktraceButton, QDialogButtonBox::ActionRole);
+
+    QSignalMapper *mapper = new QSignalMapper(this);
+    mapper->setMapping(copyBacktraceButton, backtrace.join(QLatin1String("\n")));
+
+    connect(copyBacktraceButton, SIGNAL(clicked()), mapper, SLOT(map()));
+    connect(mapper, SIGNAL(mapped(QString)), this, SLOT(copyToClipboard(QString)));
   }
 
-  QDialogButtonBox *buttons = new QDialogButtonBox;
   buttons->addButton(QDialogButtonBox::Close);
   QObject::connect(buttons, SIGNAL(accepted()),
                     &dlg, SLOT(accept()));
@@ -113,5 +132,10 @@ void MessageHandlerWidget::fatalMessageReceived(const QString &app, const QStrin
   dlg.setLayout(layout);
   dlg.adjustSize();
   dlg.exec();
+}
+
+void MessageHandlerWidget::copyToClipboard(const QString &message)
+{
+    QApplication::clipboard()->setText(message);
 }
 

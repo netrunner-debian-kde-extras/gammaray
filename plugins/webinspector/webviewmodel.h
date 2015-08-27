@@ -7,6 +7,11 @@
   Copyright (C) 2013-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -39,9 +44,9 @@ public:
       WebKitVersionRole = ObjectModel::UserRole
     };
 
-    QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const;
-    QMap< int, QVariant > itemData(const QModelIndex& index) const;
-    bool filterAcceptsObject(QObject* object) const;
+    QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const Q_DECL_OVERRIDE;
+    QMap< int, QVariant > itemData(const QModelIndex& index) const Q_DECL_OVERRIDE;
+    bool filterAcceptsObject(QObject* object) const Q_DECL_OVERRIDE;
 };
 
 }

@@ -7,6 +7,11 @@
   Copyright (C) 2013-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -64,8 +69,10 @@ struct VariantHandlerRepository
 static QString displayMatrix4x4(const QMatrix4x4 &matrix)
 {
   QStringList rows;
+  rows.reserve(4);
   for (int i = 0; i < 4; ++i) {
     QStringList cols;
+    cols.reserve(4);
     for (int j = 0; j < 4; ++j) {
       cols.push_back(QString::number(matrix(i, j)));
     }
@@ -132,8 +139,10 @@ QString VariantHandler::displayString(const QVariant &value)
     if (icon.isNull()) {
       return QObject::tr("<no icon>");
     }
+    const auto sizes = icon.availableSizes();
     QStringList l;
-    foreach (const QSize &size, icon.availableSizes()) {
+    l.reserve(sizes.size());
+    foreach (const QSize &size, sizes) {
       l.push_back(displayString(size));
     }
     return l.join(QLatin1String(", "));
@@ -151,7 +160,7 @@ QString VariantHandler::displayString(const QVariant &value)
         arg(value.toLineF().x2()).arg(value.toLineF().y2());
 
   case QVariant::Locale:
-    return value.value<QLocale>().name();
+    return value.toLocale().name();
 
   case QVariant::Point:
     return
@@ -188,7 +197,7 @@ QString VariantHandler::displayString(const QVariant &value)
       return QLatin1String("<empty>");
     }
     if (region.rectCount() == 1) {
-      return displayString(region.rects().first());
+      return displayString(region.rects().at(0));
     } else {
       return QString::fromLatin1("<%1 rects>").arg(region.rectCount());
     }
@@ -289,6 +298,7 @@ QString VariantHandler::displayString(const QVariant &value)
   if (value.userType() == qMetaTypeId<QSet<QByteArray> >()) {
     const QSet<QByteArray> set = value.value<QSet<QByteArray> >();
     QStringList l;
+    l.reserve(set.size());
     foreach (const QByteArray &b, set) {
       l.push_back(QString::fromUtf8(b));
     }
@@ -399,6 +409,7 @@ QString VariantHandler::displayString(const QVariant &value)
   if (value.canConvert<QVariantList>()) {
     QStringList s;
     QSequentialIterable it = value.value<QSequentialIterable>();
+    s.reserve(it.size());
     int emptyStrings = 0;
     foreach (const QVariant &v, it) {
       s.push_back(displayString(v));
@@ -509,4 +520,16 @@ void VariantHandler::registerGenericStringConverter(
   VariantHandler::GenericStringConverter converter)
 {
   s_variantHandlerRepository()->genericStringConverters.push_back(converter);
+}
+
+QVariant VariantHandler::serializableVariant(const QVariant& value)
+{
+  if (value.userType() == qMetaTypeId<const QMatrix4x4*>()) {
+    const QMatrix4x4 *m = value.value<const QMatrix4x4*>();
+    if (!m)
+      return QVariant();
+    return QVariant::fromValue(QMatrix4x4(*m));
+  }
+
+  return value;
 }

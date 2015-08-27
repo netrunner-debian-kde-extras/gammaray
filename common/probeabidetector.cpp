@@ -7,6 +7,11 @@
   Copyright (C) 2014-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  acuordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -21,12 +26,15 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "config-gammaray.h"
+#include <config-gammaray.h>
 
 #include "probeabidetector.h"
 
 #include <QFileInfo>
 #include <QProcess>
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+#include <QStandardPaths>
+#endif
 
 using namespace GammaRay;
 
@@ -55,10 +63,20 @@ ProbeABI ProbeABIDetector::abiForQtCore(const QString& path) const
 
 QString ProbeABIDetector::qtCoreFromLsof(qint64 pid) const
 {
+  QString lsofExe;
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+  lsofExe = QStandardPaths::findExecutable("lsof");
+  // on OSX it's in sbin, which usually but not always is in PATH...
+  if (lsofExe.isEmpty())
+    lsofExe = QStandardPaths::findExecutable("lsof", QStringList() << "/usr/sbin" << "/sbin");
+#endif
+  if (lsofExe.isEmpty())
+    lsofExe = "lsof"; // maybe QProcess has more luck
+
   QProcess proc;
   proc.setProcessChannelMode(QProcess::SeparateChannels);
   proc.setReadChannel(QProcess::StandardOutput);
-  proc.start("lsof", QStringList() << "-Fn" << "-n" << "-p" << QString::number(pid));
+  proc.start(lsofExe, QStringList() << "-Fn" << "-n" << "-p" << QString::number(pid));
   proc.waitForFinished();
 
   forever {

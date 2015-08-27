@@ -7,6 +7,11 @@
   Copyright (C) 2010-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -46,7 +51,7 @@ QString findProbe(const QString &baseName, const ProbeABI &probeAbi)
     Paths::probePath(probeAbi.id()) %
     QDir::separator() %
     baseName %
-    fileExtension();
+    Paths::libraryExtension();
 
   const QFileInfo fi(probePath);
   const QString canonicalPath = fi.canonicalFilePath();
@@ -89,17 +94,6 @@ QVector<ProbeABI> listProbeABIs()
       abis.push_back(abi);
   }
   return abis;
-}
-
-QString fileExtension()
-{
-#ifdef Q_OS_WIN
-  return QLatin1String(".dll");
-#elif defined(Q_OS_MAC)
-  return QLatin1String(".dylib");
-#else
-  return QLatin1String(".so");
-#endif
 }
 
 }

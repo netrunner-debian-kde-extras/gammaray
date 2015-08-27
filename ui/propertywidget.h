@@ -7,6 +7,11 @@
   Copyright (C) 2010-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -61,16 +66,19 @@ class GAMMARAY_UI_EXPORT PropertyWidget : public QTabWidget
 
   private:
     void createWidgets();
+    bool extensionAvailable(PropertyWidgetTabFactoryBase *factory) const;
 
   private slots:
-    void updateShownTabs(const QStringList& availableExtensions);
+    void updateShownTabs();
 
 
   private:
     QString m_objectBaseName;
 
-    // Contains all tab widgets
-    QHash<PropertyWidgetTabFactoryBase*, QWidget*> m_tabWidgets;
+    // Contains all tab widgets we have instantiated and their corresponding factories
+    // order matters, therefore these are two vectors rather than a hash or map
+    QVector<PropertyWidgetTabFactoryBase*> m_usedFactories;
+    QVector<QWidget*> m_tabWidgets;
 
     PropertyControllerInterface *m_controller;
 

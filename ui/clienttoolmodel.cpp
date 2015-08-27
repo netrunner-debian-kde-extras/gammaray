@@ -7,6 +7,11 @@
   Copyright (C) 2013-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -46,7 +51,6 @@
 
 using namespace GammaRay;
 
-
 #define MAKE_FACTORY(type, remote) \
 class type ## Factory : public ToolUiFactory { \
 public: \
@@ -66,30 +70,56 @@ MAKE_FACTORY(ResourceBrowser, true);
 MAKE_FACTORY(StandardPaths, true);
 MAKE_FACTORY(TextDocumentInspector, true);
 
+struct PluginRepository {
+    ~PluginRepository() {
+        qDeleteAll(factories.values());
+    }
+
+    // ToolId -> ToolUiFactory
+    QHash<QString, ToolUiFactory*> factories;
+    // so far unused tools that yet have to be loaded/initialized
+    QSet<ToolUiFactory*> inactiveTools;
+};
+
+Q_GLOBAL_STATIC(PluginRepository, s_pluginRepository)
+
+static void insertFactory(ToolUiFactory* factory)
+{
+    s_pluginRepository()->factories.insert(factory->id(), factory);
+    s_pluginRepository()->inactiveTools.insert(factory);
+}
+
+static void initPluginRepository()
+{
+    if (!s_pluginRepository()->factories.isEmpty())
+        return;
+
+    insertFactory(new ConnectionInspectorFactory);
+    insertFactory(new LocaleInspectorFactory);
+    insertFactory(new MessageHandlerFactory);
+    insertFactory(new MetaObjectBrowserFactory);
+    insertFactory(new MetaTypeBrowserFactory);
+    insertFactory(new MimeTypesFactory);
+    insertFactory(new ModelInspectorFactory);
+    insertFactory(new ObjectInspectorFactory);
+    insertFactory(new ResourceBrowserFactory);
+    insertFactory(new StandardPathsFactory);
+    insertFactory(new TextDocumentInspectorFactory);
+
+    PluginManager<ToolUiFactory, ProxyToolUiFactory> pm;
+    foreach(ToolUiFactory* factory, pm.plugins())
+        insertFactory(factory);
+}
+
+
 ClientToolModel::ClientToolModel(QObject* parent) : QSortFilterProxyModel(parent)
 {
-  insertFactory(new ConnectionInspectorFactory);
-  insertFactory(new LocaleInspectorFactory);
-  insertFactory(new MessageHandlerFactory);
-  insertFactory(new MetaObjectBrowserFactory);
-  insertFactory(new MetaTypeBrowserFactory);
-  insertFactory(new MimeTypesFactory);
-  insertFactory(new ModelInspectorFactory);
-  insertFactory(new ObjectInspectorFactory);
-  insertFactory(new ResourceBrowserFactory);
-  insertFactory(new StandardPathsFactory);
-  insertFactory(new TextDocumentInspectorFactory);
-
-  PluginManager<ToolUiFactory, ProxyToolUiFactory> pm;
-  foreach(ToolUiFactory* factory, pm.plugins())
-    insertFactory(factory);
-
+  initPluginRepository();
   connect(this, SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(updateToolInitialization(QModelIndex,QModelIndex)));
 }
 
 ClientToolModel::~ClientToolModel()
 {
-  qDeleteAll(m_factories.values());
 }
 
 QVariant ClientToolModel::data(const QModelIndex& index, int role) const
@@ -100,24 +130,24 @@ QVariant ClientToolModel::data(const QModelIndex& index, int role) const
       return QVariant();
 
     if (role == ToolModelRole::ToolFactory)
-      return QVariant::fromValue(m_factories.value(toolId));
+      return QVariant::fromValue(s_pluginRepository()->factories.value(toolId));
     if (role == ToolModelRole::ToolWidget) {
-      const QHash<QString, QWidget*>::const_iterator it = m_widgets.constFind(toolId);
-      if (it != m_widgets.constEnd())
-        return QVariant::fromValue(it.value());
-      ToolUiFactory *factory = m_factories.value(toolId);
+      const WidgetsHash::const_iterator it = m_widgets.constFind(toolId);
+      if (it != m_widgets.constEnd() && it.value())
+        return QVariant::fromValue<QWidget*>(it.value());
+      ToolUiFactory *factory = s_pluginRepository()->factories.value(toolId);
       if (!factory)
         return QVariant();
-      if (m_inactiveTools.contains(factory)) {
+      if (s_pluginRepository()->inactiveTools.contains(factory)) {
         factory->initUi();
-        m_inactiveTools.remove(factory);
+        s_pluginRepository()->inactiveTools.remove(factory);
       }
       QWidget *widget = factory->createWidget(m_parentWidget);
       m_widgets.insert(toolId, widget);
       return QVariant::fromValue(widget);
     }
     if (role == Qt::ToolTipRole) {
-      ToolUiFactory *factory = m_factories.value(toolId);
+      ToolUiFactory *factory = s_pluginRepository()->factories.value(toolId);
       if (factory && (!factory->remotingSupported() && Endpoint::instance()->isRemoteClient()))
         return tr("This tool does not work in out-of-process mode.");
     }
@@ -146,7 +176,7 @@ Qt::ItemFlags ClientToolModel::flags(const QModelIndex &index) const
 {
   Qt::ItemFlags ret = QSortFilterProxyModel::flags(index);
   const QString toolId = QSortFilterProxyModel::data(index, ToolModelRole::ToolId).toString();
-  ToolUiFactory *factory = m_factories.value(toolId);
+  ToolUiFactory *factory = s_pluginRepository()->factories.value(toolId);
   if (!factory || (!factory->remotingSupported() && Endpoint::instance()->isRemoteClient())) {
     ret &= ~Qt::ItemIsEnabled;
   }
@@ -160,20 +190,12 @@ void ClientToolModel::updateToolInitialization(const QModelIndex& topLeft, const
 
     if (QSortFilterProxyModel::data(index, ToolModelRole::ToolEnabled).toBool()) {
       const QString toolId = QSortFilterProxyModel::data(index, ToolModelRole::ToolId).toString();
-      ToolUiFactory *factory = m_factories.value(toolId);
+      ToolUiFactory *factory = s_pluginRepository()->factories.value(toolId);
 
-      if (factory && (factory->remotingSupported() || !Endpoint::instance()->isRemoteClient()) && m_inactiveTools.contains(factory)) {
+      if (factory && (factory->remotingSupported() || !Endpoint::instance()->isRemoteClient()) && s_pluginRepository()->inactiveTools.contains(factory)) {
         factory->initUi();
-        m_inactiveTools.remove(factory);
+        s_pluginRepository()->inactiveTools.remove(factory);
       }
     }
   }
 }
-
-void ClientToolModel::insertFactory(ToolUiFactory* factory)
-{
-  m_factories.insert(factory->id(), factory);
-  m_inactiveTools.insert(factory);
-}
-
-

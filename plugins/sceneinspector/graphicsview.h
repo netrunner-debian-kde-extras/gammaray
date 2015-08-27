@@ -8,6 +8,11 @@
   Author: Volker Krause <volker.krause@kdab.com>
   Author: Milian Wolff <milian.wolff@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -43,9 +48,9 @@ class GraphicsView : public QGraphicsView
     void transformChanged();
 
   protected:
-    void keyPressEvent(QKeyEvent *event);
-    void mouseMoveEvent(QMouseEvent *event);
-    void drawForeground(QPainter *painter, const QRectF &rect);
+    void keyPressEvent(QKeyEvent *event) Q_DECL_OVERRIDE;
+    void mouseMoveEvent(QMouseEvent *event) Q_DECL_OVERRIDE;
+    void drawForeground(QPainter *painter, const QRectF &rect) Q_DECL_OVERRIDE;
 
   private:
     QGraphicsItem *m_currentItem;

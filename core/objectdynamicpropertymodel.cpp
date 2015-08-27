@@ -7,6 +7,11 @@
   Copyright (C) 2010-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -125,6 +130,31 @@ int ObjectDynamicPropertyModel::rowCount(const QModelIndex &parent) const
     return 0;
   }
   return m_obj.data()->dynamicPropertyNames().size();
+}
+
+int ObjectDynamicPropertyModel::columnCount(const QModelIndex& parent) const
+{
+  if (parent.isValid()) {
+    return 0;
+  }
+  return 4;
+}
+
+QVariant ObjectDynamicPropertyModel::headerData(int section, Qt::Orientation orientation, int role) const
+{
+  if (orientation == Qt::Horizontal && role == Qt::DisplayRole) {
+    switch (section) {
+      case 0:
+        return tr("Property");
+      case 1:
+        return tr("Value");
+      case 2:
+        return tr("Type");
+      case 3:
+        return tr("Class");
+    }
+  }
+  return QAbstractItemModel::headerData(section, orientation, role);
 }
 
 void ObjectDynamicPropertyModel::monitorObject(QObject* obj)

@@ -7,6 +7,11 @@
  * Copyright (C) 2013-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
  * Author: Milian Wolff <milian.wolff@kdab.com>
  *
+ * Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+ * accordance with GammaRay Commercial License Agreement provided with the Software.
+ *
+ * Contact info@kdab.com if any conditions of this licensing are not clear to you.
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 2 of the License, or
@@ -39,12 +44,12 @@ class WidgetInspectorClient : public WidgetInspectorInterface
     ~WidgetInspectorClient();
 
   private:
-    virtual void saveAsImage(const QString &fileName);
-    virtual void saveAsSvg(const QString &fileName);
-    virtual void saveAsPdf(const QString &fileName);
-    virtual void saveAsUiFile(const QString &fileName);
-    virtual void analyzePainting();
-    virtual void checkFeatures();
+    void saveAsImage(const QString &fileName) Q_DECL_OVERRIDE;
+    void saveAsSvg(const QString &fileName) Q_DECL_OVERRIDE;
+    void saveAsPdf(const QString &fileName) Q_DECL_OVERRIDE;
+    void saveAsUiFile(const QString &fileName) Q_DECL_OVERRIDE;
+    void analyzePainting() Q_DECL_OVERRIDE;
+    void checkFeatures() Q_DECL_OVERRIDE;
 };
 }
 

@@ -38,14 +38,14 @@ if(QNXNTO)
   target_link_libraries(attachhelper cpp)
 endif()
 
-if(UNIX AND NOT APPLE)
+if(UNIX)
   add_test(connectiontest-preload
-    ${PROJECT_BINARY_DIR}/bin/gammaray --inprocess -unittest -i preload
-    ${PROJECT_BINARY_DIR}/bin/connectiontest
+    ${PROJECT_BINARY_DIR}/${BIN_INSTALL_DIR}/gammaray --inprocess -unittest -i preload
+    ${PROJECT_BINARY_DIR}/${BIN_INSTALL_DIR}/connectiontest
   )
   add_test(connectiontest-style
-    ${PROJECT_BINARY_DIR}/bin/gammaray --inprocess -unittest -i style
-    ${PROJECT_BINARY_DIR}/bin/connectiontest
+    ${PROJECT_BINARY_DIR}/${BIN_INSTALL_DIR}/gammaray --inprocess -unittest -i style
+    ${PROJECT_BINARY_DIR}/${BIN_INSTALL_DIR}/connectiontest
   )
 
   set(RUN_FILTER_TESTS OFF
@@ -53,33 +53,33 @@ if(UNIX AND NOT APPLE)
   )
   if(RUN_FILTER_TESTS)
     add_test(connectiontest-preload-filter
-      ${PROJECT_BINARY_DIR}/bin/gammaray -unittest -filtertest -i preload
-      ${PROJECT_BINARY_DIR}/bin/connectiontest
+      ${PROJECT_BINARY_DIR}/${BIN_INSTALL_DIR}/gammaray -unittest -filtertest -i preload
+      ${PROJECT_BINARY_DIR}/${BIN_INSTALL_DIR}/connectiontest
     )
     add_test(connectiontest-preload-filter-modeltest
-      ${PROJECT_BINARY_DIR}/bin/gammaray -unittest -modeltest -filtertest -i preload
-      ${PROJECT_BINARY_DIR}/bin/connectiontest
+      ${PROJECT_BINARY_DIR}/${BIN_INSTALL_DIR}/gammaray -unittest -modeltest -filtertest -i preload
+      ${PROJECT_BINARY_DIR}/${BIN_INSTALL_DIR}/connectiontest
     )
     add_test(connectiontest-style-filter
-      ${PROJECT_BINARY_DIR}/bin/gammaray -unittest -filtertest -i style
-      ${PROJECT_BINARY_DIR}/bin/connectiontest
+      ${PROJECT_BINARY_DIR}/${BIN_INSTALL_DIR}/gammaray -unittest -filtertest -i style
+      ${PROJECT_BINARY_DIR}/${BIN_INSTALL_DIR}/connectiontest
     )
   endif()
 
   find_program(GDB_EXECUTABLE gdb)
   if(GDB_EXECUTABLE)
     add_test(connectiontest-gdb
-      ${PROJECT_BINARY_DIR}/bin/gammaray --inprocess -unittest -i gdb
-      ${PROJECT_BINARY_DIR}/bin/connectiontest
+      ${PROJECT_BINARY_DIR}/${BIN_INSTALL_DIR}/gammaray --inprocess -unittest -i gdb
+      ${PROJECT_BINARY_DIR}/${BIN_INSTALL_DIR}/connectiontest
     )
     add_test(attachtest-gdb
-      ${PROJECT_BINARY_DIR}/bin/attachhelper ${PROJECT_BINARY_DIR}/bin/gammaray gdb
-      ${PROJECT_BINARY_DIR}/bin/connectiontest
+      ${PROJECT_BINARY_DIR}/${BIN_INSTALL_DIR}/attachhelper ${PROJECT_BINARY_DIR}/${BIN_INSTALL_DIR}/gammaray gdb
+      ${PROJECT_BINARY_DIR}/${BIN_INSTALL_DIR}/connectiontest
     )
     if(RUN_FILTER_TESTS)
       add_test(connectiontest-gdb-filter
-        ${PROJECT_BINARY_DIR}/bin/gammaray --inprocess -unittest -filtertest -i gdb
-        ${PROJECT_BINARY_DIR}/bin/connectiontest
+        ${PROJECT_BINARY_DIR}/${BIN_INSTALL_DIR}/gammaray --inprocess -unittest -filtertest -i gdb
+        ${PROJECT_BINARY_DIR}/${BIN_INSTALL_DIR}/connectiontest
       )
     endif()
   endif()
@@ -105,6 +105,18 @@ add_executable(probeabidetectortest probeabidetectortest.cpp)
 target_link_libraries(probeabidetectortest gammaray_common_internal ${QT_QTTEST_LIBRARIES})
 add_test(probeabidetectortest ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/probeabidetectortest)
 
+### Remote model tests
+
+if(GAMMARAY_BUILD_UI AND NOT GAMMARAY_PROBE_ONLY_BUILD)
+  add_executable(remotemodeltest
+    remotemodeltest.cpp
+    ${CMAKE_SOURCE_DIR}/3rdparty/qt/modeltest.cpp
+    ../core/remote/remotemodelserver.cpp
+  )
+  target_link_libraries(remotemodeltest gammaray_core gammaray_client ${QT_QTGUI_LIBRARIES} ${QT_QTTEST_LIBRARIES} ${QT_QTNETWORK_LIBRARIES})
+  add_test(NAME remotemodeltest COMMAND remotemodeltest)
+endif()
+
 ### QSignalSpyCallback tests
 
 add_executable(signalspycallbacktest
@@ -113,6 +125,39 @@ add_executable(signalspycallbacktest
 )
 target_link_libraries(signalspycallbacktest gammaray_core ${QT_QTTEST_LIBRARIES})
 add_test(NAME signalspycallbacktest COMMAND signalspycallbacktest)
+
+### QAction test
+
+if(Qt5Core_FOUND AND NOT Qt5Core_VERSION_MINOR LESS 4) # requires QHooks
+add_executable(actiontest
+  actiontest.cpp
+  ../hooking/probecreator.cpp
+  ../hooking/hooks.cpp
+)
+target_link_libraries(actiontest gammaray_core ${QT_QTTEST_LIBRARIES} ${QT_QTGUI_LIBRARIES})
+
+add_test(NAME actiontest COMMAND actiontest)
+endif()
+
+### MetaObject test
+
+add_executable(metaobjecttest metaobjecttest.cpp)
+target_link_libraries(metaobjecttest gammaray_core ${QT_QTTEST_LIBRARIES})
+add_test(NAME metaobjecttest COMMAND metaobjecttest)
+
+### PropertySyncer test
+
+add_executable(propertysyncertest propertysyncertest.cpp)
+target_link_libraries(propertysyncertest gammaray_common ${QT_QTGUI_LIBRARIES} ${QT_QTTEST_LIBRARIES})
+add_test(NAME propertysyncertest COMMAND propertysyncertest)
+
+### PropertyBinder test
+
+if(GAMMARAY_BUILD_UI)
+add_executable(propertybindertest propertybindertest.cpp)
+target_link_libraries(propertybindertest gammaray_ui ${QT_QTTEST_LIBRARIES})
+add_test(NAME propertybindertest COMMAND propertybindertest)
+endif()
 
 
 add_subdirectory(manual)

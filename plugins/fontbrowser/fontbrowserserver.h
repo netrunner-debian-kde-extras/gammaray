@@ -8,6 +8,11 @@
   Author: Stephen Kelly <stephen.kelly@kdab.com>
   Author: Milian Wolff <milian.wolff@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -44,12 +49,12 @@ class FontBrowserServer : public FontBrowserInterface
   private slots:
     void updateFonts();
 
-    virtual void setPointSize(int size);
-    virtual void toggleBoldFont(bool bold);
-    virtual void toggleItalicFont(bool italic);
-    virtual void toggleUnderlineFont(bool underline);
-    virtual void updateText(const QString &text);
-    virtual void setColors(const QColor &foreground, const QColor &background);
+    void setPointSize(int size) Q_DECL_OVERRIDE;
+    void toggleBoldFont(bool bold) Q_DECL_OVERRIDE;
+    void toggleItalicFont(bool italic) Q_DECL_OVERRIDE;
+    void toggleUnderlineFont(bool underline) Q_DECL_OVERRIDE;
+    void updateText(const QString &text) Q_DECL_OVERRIDE;
+    void setColors(const QColor &foreground, const QColor &background) Q_DECL_OVERRIDE;
 
   private:
     FontModel *m_selectedFontModel;

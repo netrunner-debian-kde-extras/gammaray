@@ -7,6 +7,11 @@
   Copyright (C) 2010-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Kevin Funk <kevin.funk@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  acuordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -23,6 +28,8 @@
 
 #ifndef GAMMARAY_PLUGINMANAGER_H
 #define GAMMARAY_PLUGINMANAGER_H
+
+#include "plugininfo.h"
 
 #include <QVector>
 #include <QList>
@@ -70,10 +77,11 @@ class PluginManagerBase
     }
 
   protected:
-    virtual bool createProxyFactory(const QString& desktopFilePath, QObject* parent) = 0;
+    virtual bool createProxyFactory(const PluginInfo& pluginInfo, QObject* parent) = 0;
 
     void scan(const QString& serviceType);
     QStringList pluginPaths() const;
+    QStringList pluginFilter() const;
 
     QList<PluginLoadError> m_errors;
     QObject *m_parent;
@@ -99,12 +107,12 @@ public:
     }
 
 protected:
-    bool createProxyFactory(const QString& desktopFilePath, QObject* parent)
+    bool createProxyFactory(const PluginInfo& pluginInfo, QObject* parent)
     {
-      Proxy *proxy = new Proxy(desktopFilePath, parent);
+      Proxy *proxy = new Proxy(pluginInfo, parent);
       if (!proxy->isValid()) {
-        m_errors << PluginLoadError(desktopFilePath, QObject::tr("Failed to load plugin: %1").arg(proxy->errorString()));
-        std::cerr << "invalid plugin " << qPrintable(desktopFilePath) << std::endl;
+        m_errors << PluginLoadError(pluginInfo.path(), QObject::tr("Failed to load plugin: %1").arg(proxy->errorString()));
+        std::cerr << "invalid plugin " << qPrintable(pluginInfo.path()) << std::endl;
         delete proxy;
       } else {
         m_plugins.push_back(proxy);

@@ -7,6 +7,11 @@
   Copyright (C) 2010-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Milian Wolff <milian.wolff@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -25,6 +30,8 @@
 #include "messagemodel.h"
 
 #include "backtrace.h"
+
+#include <core/probeguard.h>
 
 #include "common/objectbroker.h"
 #include "common/endpoint.h"
@@ -69,7 +76,7 @@ static void handleMessage(QtMsgType type, const QMessageLogContext &context, con
   message.message = msg;
   message.time = QTime::currentTime();
 
-  if (type == QtCriticalMsg || type == QtFatalMsg || type == QtWarningMsg) {
+  if (type == QtCriticalMsg || type == QtFatalMsg || (type == QtWarningMsg && !ProbeGuard::insideProbe())) {
     message.backtrace = getBacktrace(50);
     // remove trailing internal functions
     // be a bit careful and first make sure that we find this function...

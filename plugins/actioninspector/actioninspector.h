@@ -5,6 +5,11 @@
   Copyright (C) 2010-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Kevin Funk <kevin.funk@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -23,7 +28,6 @@
 #define GAMMARAY_ACTIONINSPECTOR_ACTIONINSPECTOR_H
 
 #include <core/toolfactory.h>
-#include "actioninspectorwidget.h"
 
 #include <QAction>
 
@@ -39,14 +43,16 @@ class ActionInspector : public QObject
 
   public Q_SLOTS:
     void triggerAction(int row);
+
+  private:
+    void registerMetaTypes();
 };
 
-class ActionInspectorFactory : public QObject,
-    public StandardToolFactory2<QAction, ActionInspector, ActionInspectorWidget>
+class ActionInspectorFactory : public QObject, public StandardToolFactory<QAction, ActionInspector>
 {
   Q_OBJECT
-  Q_INTERFACES(GammaRay::ToolFactory GammaRay::ToolUiFactory)
-  Q_PLUGIN_METADATA(IID "com.kdab.gammaray.ActionInspector")
+  Q_INTERFACES(GammaRay::ToolFactory)
+  Q_PLUGIN_METADATA(IID "com.kdab.GammaRay.ToolFactory" FILE "gammaray_actioninspector.json")
 
   public:
     explicit ActionInspectorFactory(QObject *parent = 0) : QObject(parent)

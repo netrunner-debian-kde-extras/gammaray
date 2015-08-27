@@ -7,6 +7,11 @@
   Copyright (C) 2010-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -23,10 +28,10 @@
 
 #include "objecttreemodel.h"
 
-#include "readorwritelocker.h"
 #include "probe.h"
 
 #include <QEvent>
+#include <QMutex>
 #include <QThread>
 
 #include <algorithm>
@@ -57,14 +62,10 @@ static inline QObject *parentObject(QObject *obj)
 
 void ObjectTreeModel::objectAdded(QObject *obj)
 {
-  // slot, hence should always land in main thread due to auto connection
+  // see Probe::objectCreated, that promises a valid object in the main thread here
   Q_ASSERT(thread() == QThread::currentThread());
+  Q_ASSERT(Probe::instance()->isValidObject(obj));
 
-  ReadOrWriteLocker objectLock(Probe::instance()->objectLock());
-  if (!Probe::instance()->isValidObject(obj)) {
-    IF_DEBUG(cout << "tree invalid obj added: " << hex << obj << endl;)
-    return;
-  }
   IF_DEBUG(cout << "tree obj added: " << hex << obj << " p: " << parentObject(obj) << endl;)
   Q_ASSERT(!obj->parent() || Probe::instance()->isValidObject(parentObject(obj)));
 
@@ -147,13 +148,45 @@ void ObjectTreeModel::objectReparented(QObject *obj)
 {
   // slot, hence should always land in main thread due to auto connection
   Q_ASSERT(thread() == QThread::currentThread());
+  IF_DEBUG(cout << "object reparented: " << hex << obj << dec << endl;)
 
-  ReadOrWriteLocker objectLock(Probe::instance()->objectLock());
-  if (Probe::instance()->isValidObject(obj)) {
-    objectAdded(obj);
+  QMutexLocker objectLock(Probe::objectLock());
+  if (!Probe::instance()->isValidObject(obj)) {
+    objectRemoved(obj);
+    return;
   }
 
-  objectRemoved(obj);
+  // we didn't know obj yet
+  if (!m_childParentMap.contains(obj)) {
+    Q_ASSERT(!m_parentChildMap.contains(obj));
+    objectAdded(obj);
+    return;
+  }
+
+  QObject *oldParent = m_childParentMap.value(obj);
+  const auto sourceParent = indexForObject(oldParent);
+  if ((oldParent && !sourceParent.isValid()) || (oldParent == parentObject(obj)))
+    return;
+
+  QVector<QObject*> &oldSiblings = m_parentChildMap[oldParent];
+  QVector<QObject*>::iterator oldIt = std::lower_bound(oldSiblings.begin(), oldSiblings.end(), obj);
+  if (oldIt == oldSiblings.end() || *oldIt != obj)
+    return;
+  const int sourceRow = std::distance(oldSiblings.begin(), oldIt);
+
+  IF_DEBUG(cout << "actually reparenting! " << hex << obj << " old parent: " << oldParent << " new parent: " << parentObject(obj) << dec << endl;)
+  const auto destParent = indexForObject(parentObject(obj));
+  Q_ASSERT(destParent.isValid() || !parentObject(obj));
+
+  QVector<QObject*> &newSiblings = m_parentChildMap[parentObject(obj)];
+  QVector<QObject*>::iterator newIt = std::lower_bound(newSiblings.begin(), newSiblings.end(), obj);
+  const int destRow = std::distance(newSiblings.begin(), newIt);
+
+  beginMoveRows(sourceParent, sourceRow, sourceRow, destParent, destRow);
+  oldSiblings.erase(oldIt);
+  newSiblings.insert(newIt, obj);
+  m_childParentMap.insert(obj, parentObject(obj));
+  endMoveRows();
 }
 
 QVariant ObjectTreeModel::data(const QModelIndex &index, int role) const
@@ -164,7 +197,7 @@ QVariant ObjectTreeModel::data(const QModelIndex &index, int role) const
 
   QObject *obj = reinterpret_cast<QObject*>(index.internalPointer());
 
-  ReadOrWriteLocker lock(Probe::instance()->objectLock());
+  QMutexLocker lock(Probe::objectLock());
   if (Probe::instance()->isValidObject(obj)) {
     return dataForObject(obj, index, role);
   } else if (role == Qt::DisplayRole) {
@@ -222,4 +255,3 @@ QModelIndex ObjectTreeModel::indexForObject(QObject *object) const
   const int row = std::distance(siblings.constBegin(), it);
   return index(row, 0, parentIndex);
 }
-

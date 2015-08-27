@@ -7,6 +7,11 @@
   Copyright (C) 2013-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -35,7 +40,7 @@ using namespace GammaRay;
 
 bool NetworkDiscoveryModel::ServerInfo::operator==(const NetworkDiscoveryModel::ServerInfo& other)
 {
-  return host == other.host && port == other.port;
+  return url == other.url;
 }
 
 NetworkDiscoveryModel::NetworkDiscoveryModel(QObject* parent):
@@ -70,7 +75,7 @@ void NetworkDiscoveryModel::processPendingDatagrams()
       continue;
 
     ServerInfo info;
-    stream >> info.version >> info.host >> info.port >> info.label;
+    stream >> info.version >> info.url >> info.label;
     info.lastSeen = QDateTime::currentDateTime();
 
     QVector<ServerInfo>::iterator it = std::find(m_data.begin(), m_data.end(), info);
@@ -108,15 +113,15 @@ QVariant NetworkDiscoveryModel::data(const QModelIndex& index, int role) const
   if (role == Qt::DisplayRole) {
     switch (index.column()) {
       case 0: return info.label;
-      case 1: return QVariant(info.host + QLatin1Char(':') + QString::number(info.port));
+      case 1: return info.url.toString();
     }
   } else if (role == Qt::ToolTipRole) {
     if (info.version != Protocol::version())
       return tr("Incompatible GammaRay version.");
   } else if (role == HostNameRole) {
-    return info.host;
+    return info.url.host();
   } else if (role == PortRole) {
-    return info.port;
+    return info.url.port();
   }
 
   return QVariant();

@@ -5,6 +5,11 @@
   Copyright (C) 2011-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  acuordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -21,52 +26,27 @@
 
 #include "proxyfactorybase.h"
 
-#include <QDir>
-#include <QFileInfo>
-#include <QLibrary>
 #include <QPluginLoader>
 
 #include <iostream>
 
 using namespace GammaRay;
 
-ProxyFactoryBase::ProxyFactoryBase(const QString& desktopFilePath, QObject* parent):
+ProxyFactoryBase::ProxyFactoryBase(const PluginInfo& pluginInfo, QObject* parent):
   QObject(parent),
   m_factory(0),
-  m_desktopFile(0)
+  m_pluginInfo(pluginInfo)
 {
-  const QFileInfo pluginInfo(desktopFilePath);
-  m_desktopFile = new QSettings(desktopFilePath, QSettings::IniFormat);
-  m_desktopFile->beginGroup(QLatin1String("Desktop Entry"));
-
-  m_id = value("X-GammaRay-Id", pluginInfo.baseName()).toString();
-
-  const QString dllBaseName = value(QLatin1String("Exec")).toString();
-  if (dllBaseName.isEmpty()) {
-    m_errorString = tr("Invalid 'Exec' line in plugin spec file");
-    return;
-  }
-
-  foreach (const QString &entry, pluginInfo.dir().entryList(QStringList(dllBaseName + QLatin1Char('*')), QDir::Files)) {
-    const QString path = pluginInfo.dir().absoluteFilePath(entry);
-    if (QLibrary::isLibrary(path)) {
-      m_pluginPath = path;
-      break;
-    }
-  }
-
 }
 
 ProxyFactoryBase::~ProxyFactoryBase()
 {
-
 }
 
-QVariant ProxyFactoryBase::value(const QString& key, const QVariant &defaultValue) const
+PluginInfo ProxyFactoryBase::pluginInfo() const
 {
-  return m_desktopFile->value(key, defaultValue);
+    return m_pluginInfo;
 }
-
 
 QString ProxyFactoryBase::errorString() const
 {
@@ -77,13 +57,13 @@ void ProxyFactoryBase::loadPlugin()
 {
   if (m_factory)
     return;
-  QPluginLoader loader(m_pluginPath, this);
+  QPluginLoader loader(pluginInfo().path(), this);
   m_factory = loader.instance();
   if (m_factory) {
     m_factory->setParent(this);
   } else {
     m_errorString = loader.errorString();
-    std::cerr << "error loading plugin " << qPrintable(m_pluginPath)
+    std::cerr << "error loading plugin " << qPrintable(pluginInfo().path())
               << ": " << qPrintable(loader.errorString()) << std::endl;
   }
 }

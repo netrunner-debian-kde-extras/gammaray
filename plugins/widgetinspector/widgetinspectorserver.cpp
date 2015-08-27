@@ -8,6 +8,11 @@
   Author: Volker Krause <volker.krause@kdab.com>
   Author: Milian Wolff <milian.wolff@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -22,29 +27,30 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <config-gammaray.h>
+
 #include "widgetinspectorserver.h"
 
-#include "config-gammaray.h"
 #include "overlaywidget.h"
 #include "paintbufferviewer.h"
 #include "widgettreemodel.h"
 #include "paintbuffermodel.h"
+#include "modelutils.h"
 
-#include <core/propertycontroller.h>
-#include <core/metaobject.h>
-#include <core/metaobjectrepository.h>
-#include <core/varianthandler.h>
-#include <core/probesettings.h>
-#include <core/objecttypefilterproxymodel.h>
-#include <core/probeinterface.h>
+#include "core/propertycontroller.h"
+#include "core/metaobject.h"
+#include "core/metaobjectrepository.h"
+#include "core/varianthandler.h"
+#include "core/probesettings.h"
+#include "core/objecttypefilterproxymodel.h"
+#include "core/probeinterface.h"
+#include "core/probeguard.h"
 
-#include <common/objectbroker.h>
-#include <common/settempvalue.h>
-#include <common/metatypedeclarations.h>
-#include <common/objectmodel.h>
-#include <common/paths.h>
-
-#include "other/modelutils.h"
+#include "common/objectbroker.h"
+#include "common/settempvalue.h"
+#include "common/metatypedeclarations.h"
+#include "common/objectmodel.h"
+#include "common/paths.h"
 
 #include <QAbstractItemView>
 #include <QApplication>
@@ -63,7 +69,7 @@
 #include <iostream>
 
 #ifdef HAVE_PRIVATE_QT_HEADERS
-#include <private/qpaintbuffer_p.h> //krazy:exclude=camelcase
+#include <private/qpaintbuffer_p.h>
 #endif
 
 Q_DECLARE_METATYPE(const QStyle *)
@@ -145,6 +151,8 @@ void WidgetInspectorServer::selectDefaultItem()
 
 void WidgetInspectorServer::widgetSelected(const QItemSelection &selection)
 {
+  ProbeGuard guard;
+
   m_propertyController->setObject(0);
 
   if (selection.isEmpty())
@@ -172,6 +180,10 @@ void WidgetInspectorServer::widgetSelected(const QItemSelection &selection)
       (qobject_cast<QDesktopWidget*>(m_selectedWidget) ||
       m_selectedWidget->inherits("QDesktopScreenWidget"))) {
     m_overlayWidget->placeOn(0);
+    return;
+  }
+  if (m_selectedWidget == m_overlayWidget) {
+    // this should not happen, but apparently our object recovery is slightly too good sometimes ;)
     return;
   }
 
@@ -247,6 +259,7 @@ QPixmap WidgetInspectorServer::pixmapForWidget(QWidget *widget)
 
 void WidgetInspectorServer::recreateOverlayWidget()
 {
+  ProbeGuard guard;
   m_overlayWidget = new OverlayWidget;
   m_overlayWidget->hide();
 
@@ -421,6 +434,17 @@ void WidgetInspectorServer::registerWidgetMetaTypes()
   MO_ADD_METAOBJECT1(QStyle, QObject);
   MO_ADD_PROPERTY_RO(QStyle, const QStyle*, proxy);
   MO_ADD_PROPERTY_RO(QStyle, QPalette, standardPalette);
+
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+  MO_ADD_METAOBJECT1(QApplication, QGuiApplication);
+  MO_ADD_PROPERTY_ST(QApplication, QWidget*, activeModalWidget);
+  MO_ADD_PROPERTY_ST(QApplication, QWidget*, activePopupWidget);
+  MO_ADD_PROPERTY_ST(QApplication, QWidget*, activeWindow);
+  MO_ADD_PROPERTY_ST(QApplication, int, colorSpec);
+  MO_ADD_PROPERTY_ST(QApplication, QDesktopWidget*, desktop);
+  MO_ADD_PROPERTY_ST(QApplication, QWidget*, focusWidget);
+  MO_ADD_PROPERTY_ST(QApplication, QStyle*, style);
+#endif
 }
 
 static QString sizePolicyPolicyToString(QSizePolicy::Policy policy)

@@ -7,6 +7,11 @@
   Copyright (C) 2010-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Kevin Funk <kevin.funk@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  acuordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -28,9 +33,7 @@
 #include <QStringList>
 #include <QDebug>
 #include <QDir>
-#include <QLibrary>
 #include <QPluginLoader>
-#include <QSettings>
 
 #include <iostream>
 
@@ -54,6 +57,19 @@ QStringList PluginManagerBase::pluginPaths() const
   return pluginPaths;
 }
 
+QStringList PluginManagerBase::pluginFilter() const
+{
+  QStringList filter;
+#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
+  filter.push_back("*.desktop");
+#elif defined(Q_OS_ANDROID)
+  filter.push_back(QLatin1String("libplugins_gammaray_gammaray_*") + Paths::pluginExtension());
+#else
+  filter.push_back(QLatin1String("*") + Paths::pluginExtension());
+#endif
+  return filter;
+}
+
 void PluginManagerBase::scan(const QString &serviceType)
 {
   m_errors.clear();
@@ -62,25 +78,21 @@ void PluginManagerBase::scan(const QString &serviceType)
   foreach (const QString &pluginPath, pluginPaths()) {
     const QDir dir(pluginPath);
     IF_DEBUG(cout << "checking plugin path: " << qPrintable(dir.absolutePath()) << endl);
-    foreach (const QString &plugin, dir.entryList(QStringList() << "*.desktop", QDir::Files)) {
+    foreach (const QString &plugin, dir.entryList(pluginFilter(), QDir::Files)) {
       const QString pluginFile = dir.absoluteFilePath(plugin);
-      const QFileInfo pluginInfo(pluginFile);
-      const QString pluginName = pluginInfo.baseName();
+      const PluginInfo pluginInfo(pluginFile);
 
-      if (loadedPluginNames.contains(pluginName)) {
+      if (!pluginInfo.isValid() || loadedPluginNames.contains(pluginInfo.id())) {
         continue;
       }
 
-      QSettings desktopFile(pluginFile, QSettings::IniFormat);
-      desktopFile.beginGroup("Desktop Entry");
-      const QStringList serviceTypes = desktopFile.value("X-GammaRay-ServiceTypes", QString()).toString().split(';', QString::SkipEmptyParts);
-      if (!serviceTypes.contains(serviceType)) {
-        IF_DEBUG(qDebug() << Q_FUNC_INFO << "skipping" << pluginFile << "not supporting service type" << serviceType << "service types are: " << serviceTypes;)
+      if (pluginInfo.interface() != serviceType) {
+        IF_DEBUG(qDebug() << Q_FUNC_INFO << "skipping" << pluginFile << "not supporting service type" << serviceType << "service types are: " << pluginInfo.interface();)
         continue;
       }
 
-      if (createProxyFactory(pluginFile, m_parent))
-        loadedPluginNames.push_back(pluginName);
+      if (createProxyFactory(pluginInfo, m_parent))
+        loadedPluginNames.push_back(pluginInfo.id());
     }
   }
 }

@@ -7,6 +7,11 @@
   Copyright (C) 2010-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -61,16 +66,12 @@ void PropertyWidget::setObjectBaseName(const QString &baseName)
     return; // unknown property controller, likely disabled/not supported on the server
 
   if (m_controller) {
-    disconnect(m_controller,
-               SIGNAL(availableExtensionsChanged(QStringList)),
-               this, SLOT(updateShownTabs(QStringList)));
+    disconnect(m_controller, SIGNAL(availableExtensionsChanged()), this, SLOT(updateShownTabs()));
   }
-  m_controller =
-    ObjectBroker::object<PropertyControllerInterface*>(m_objectBaseName + ".controller");
-  connect(m_controller, SIGNAL(availableExtensionsChanged(QStringList)),
-          this, SLOT(updateShownTabs(QStringList)));
+  m_controller = ObjectBroker::object<PropertyControllerInterface*>(m_objectBaseName + ".controller");
+  connect(m_controller, SIGNAL(availableExtensionsChanged()), this, SLOT(updateShownTabs()));
 
-  createWidgets();
+  updateShownTabs();
 }
 
 void PropertyWidget::createWidgets()
@@ -78,28 +79,37 @@ void PropertyWidget::createWidgets()
   if (m_objectBaseName.isEmpty())
     return;
   foreach (PropertyWidgetTabFactoryBase *factory, s_tabFactories) {
-    if (!m_tabWidgets.contains(factory)) {
+    if (!m_usedFactories.contains(factory) && extensionAvailable(factory)) {
       QWidget *widget = factory->createWidget(this);
-      m_tabWidgets.insert(factory, widget);
+      m_usedFactories.push_back(factory);
+      m_tabWidgets.push_back(widget);
       addTab(widget, factory->label());
     }
   }
 }
 
-void PropertyWidget::updateShownTabs(const QStringList &availableExtensions)
+void PropertyWidget::updateShownTabs()
 {
   setUpdatesEnabled(false);
+  createWidgets();
 
-  for (QHash<PropertyWidgetTabFactoryBase*, QWidget*>::const_iterator it = m_tabWidgets.constBegin(); it != m_tabWidgets.constEnd(); ++it) {
-    QWidget *widget = it.value();
+  Q_ASSERT(m_tabWidgets.size() == m_usedFactories.size());
+  for (int i = 0; i < m_tabWidgets.size(); ++i) {
+    QWidget *widget = m_tabWidgets.at(i);
     const int index = indexOf(widget);
-    if (availableExtensions.contains(m_objectBaseName + '.' + it.key()->name())) {
+    auto factory = m_usedFactories.at(i);
+    if (extensionAvailable(factory)) {
       if (index == -1)
-        addTab(widget, it.key()->label());
+        addTab(widget, factory->label());
     } else if (index != -1) {
       removeTab(index);
     }
   }
 
   setUpdatesEnabled(true);
+}
+
+bool PropertyWidget::extensionAvailable(PropertyWidgetTabFactoryBase* factory) const
+{
+  return m_controller->availableExtensions().contains(m_objectBaseName + '.' + factory->name());
 }

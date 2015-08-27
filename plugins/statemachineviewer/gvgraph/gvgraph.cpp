@@ -5,6 +5,11 @@
   Copyright (C) 2010-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Kevin Funk <kevin.funk@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -170,6 +175,7 @@ NodeId GVGraph::addNode(const QString &name)
 QList< NodeId > GVGraph::addNodes(const QStringList &names)
 {
   QList<NodeId> ids;
+  ids.reserve(names.size());
   for (int i=0; i<names.size(); ++i) {
     ids << addNode(names.at(i));
   }
@@ -195,10 +201,10 @@ void GVGraph::removeNode(NodeId nodeId)
 
 void GVGraph::clearNodes()
 {
-  Q_FOREACH (Agnode_t *node, _nodeMap.keys()) { //krazy:exclude=foreach
+  Q_FOREACH (Agnode_t *node, _nodeMap.keys()) {
     removeNode(id(node));
   }
-  Q_FOREACH (Agraph_t *graph, _graphMap.keys()) { //krazy:exclude=foreach
+  Q_FOREACH (Agraph_t *graph, _graphMap.keys()) {
     removeGraph(id(graph));
   }
   Q_ASSERT(_graphMap.isEmpty());
@@ -341,9 +347,10 @@ QRectF GVGraph::boundingRect() const
 QList<GVNodePair> GVGraph::gvNodes() const
 {
   QList<GVNodePair> list;
+  list.reserve(_nodeMap.size());
   const qreal dpi  = dpiForGraph(_graph);
 
-  Q_FOREACH (Agnode_t *node, _nodeMap.keys()) { //krazy:exclude=foreach
+  Q_FOREACH (Agnode_t *node, _nodeMap.keys()) {
     GVNode object = _nodeMap[node];
     object.m_font = _font;
 
@@ -384,9 +391,10 @@ QList<GVNodePair> GVGraph::gvNodes() const
 QList<GVEdgePair> GVGraph::gvEdges() const
 {
   QList<GVEdgePair> list;
+  list.reserve(_edgeMap.size());
   const qreal dpi = dpiForGraph(_graph);
 
-  Q_FOREACH (Agedge_t *edge, _edgeMap.keys()) { //krazy:exclude=foreach
+  Q_FOREACH (Agedge_t *edge, _edgeMap.keys()) {
     GVEdge object = _edgeMap[edge];
     object.m_font = _font;
 
@@ -462,7 +470,7 @@ QList<GVSubGraphPair> GVGraph::gvSubGraphs() const
 {
   QList<GVSubGraphPair> list;
 
-  Q_FOREACH (Agraph_t *subGraph, _graphMap.keys()) { //krazy:exclude=foreach
+  Q_FOREACH (Agraph_t *subGraph, _graphMap.keys()) {
     if (subGraph == _graph) {
       continue;
     }

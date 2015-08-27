@@ -7,6 +7,11 @@
   Copyright (C) 2013-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -31,6 +36,8 @@
 
 using namespace GammaRay;
 
+void (*RemoteModel::s_registerClientCallback)() = 0;
+
 RemoteModel::Node::~Node()
 {
   qDeleteAll(children);
@@ -39,6 +46,7 @@ RemoteModel::Node::~Node()
 
 RemoteModel::RemoteModel(const QString &serverObject, QObject *parent) :
   QAbstractItemModel(parent),
+  m_pendingDataRequestsTimer(new QTimer(this)),
   m_serverObject(serverObject),
   m_myAddress(Protocol::InvalidObjectAddress),
   m_currentSyncBarrier(0),
@@ -46,10 +54,11 @@ RemoteModel::RemoteModel(const QString &serverObject, QObject *parent) :
 {
   m_root = new Node;
 
-  m_myAddress = Client::instance()->objectAddress(serverObject);
-  connect(Client::instance(), SIGNAL(objectRegistered(QString,Protocol::ObjectAddress)), SLOT(serverRegistered(QString,Protocol::ObjectAddress)));
-  connect(Client::instance(), SIGNAL(objectUnregistered(QString,Protocol::ObjectAddress)), SLOT(serverUnregistered(QString,Protocol::ObjectAddress)));
+  m_pendingDataRequestsTimer->setInterval(0);
+  m_pendingDataRequestsTimer->setSingleShot(true);
+  connect(m_pendingDataRequestsTimer, SIGNAL(timeout()), SLOT(doRequestDataAndFlags()));
 
+  registerClient(serverObject);
   connectToServer();
 }
 
@@ -99,9 +108,8 @@ int RemoteModel::rowCount(const QModelIndex &index) const
   if (node->rowCount < 0) {
     if (node->columnCount < 0) // not yet requested vs. in the middle of insertion
       requestRowColumnCount(index);
-    return 0;
   }
-  return node->rowCount;
+  return qMax(0, node->rowCount); // if requestRowColumnCount is synchronoous, ie. changes rowCount (as in simple unit test), returning 0 above would cause ModelTest to see inconsistent data
 }
 
 int RemoteModel::columnCount(const QModelIndex &index) const
@@ -152,7 +160,7 @@ bool RemoteModel::setData(const QModelIndex& index, const QVariant& value, int r
 
   Message msg(m_myAddress, Protocol::ModelSetDataRequest);
   msg.payload() << Protocol::fromQModelIndex(index) << role << value;
-  Client::send(msg);
+  sendMessage(msg);
   return false;
 }
 
@@ -164,7 +172,7 @@ Qt::ItemFlags RemoteModel::flags(const QModelIndex& index) const
   const QHash<int, Qt::ItemFlags>::const_iterator it = node->flags.constFind(index.column());
   if (it == node->flags.constEnd()) {
     // default flags if we don't know better, otherwise we can't select into non-expanded branches
-    return Qt::ItemIsSelectable | Qt::ItemIsEnabled;
+    return index.isValid() ? Qt::ItemIsSelectable | Qt::ItemIsEnabled : Qt::NoItemFlags;
   }
   return it.value();
 }
@@ -243,21 +251,27 @@ void RemoteModel::newMessage(const GammaRay::Message& msg)
 
     case Protocol::ModelContentReply:
     {
-      Protocol::ModelIndex index;
-      msg.payload() >> index;
-      Node *node = nodeForIndex(index);
-      const NodeStates state = node ? stateForColumn(node, index.last().second) : NoState;
-      if ((state & Loading) == 0)
-        break; // we didn't ask for this, probably outdated response for a moved cell
-      typedef QHash<int, QVariant> ItemData;
-      ItemData itemData;
-      qint32 flags;
-      msg.payload() >> itemData >> flags;
-      node->data[index.last().second] = itemData;
-      node->flags[index.last().second] = static_cast<Qt::ItemFlags>(flags);
-      node->state.insert(index.last().second, state & ~(Loading | Empty | Outdated));
-      const QModelIndex qmi = modelIndexForNode(node, index.last().second);
-      emit dataChanged(qmi, qmi);
+      quint32 size;
+      msg.payload() >> size;
+      Q_ASSERT(size > 0);
+      for (quint32 i = 0; i < size; ++i) {
+        Protocol::ModelIndex index;
+        msg.payload() >> index;
+        Node *node = nodeForIndex(index);
+        const NodeStates state = node ? stateForColumn(node, index.last().second) : NoState;
+        typedef QHash<int, QVariant> ItemData;
+        ItemData itemData;
+        qint32 flags;
+        msg.payload() >> itemData >> flags;
+        if ((state & Loading) == 0)
+          continue; // we didn't ask for this, probably outdated response for a moved cell
+        node->data[index.last().second] = itemData;
+        node->flags[index.last().second] = static_cast<Qt::ItemFlags>(flags);
+        node->state.insert(index.last().second, state & ~(Loading | Empty | Outdated));
+        // TODO we could do some range compression here
+        const QModelIndex qmi = modelIndexForNode(node, index.last().second);
+        emit dataChanged(qmi, qmi);
+      }
       break;
     }
 
@@ -462,7 +476,7 @@ void RemoteModel::requestRowColumnCount(const QModelIndex &index) const
 
   Message msg(m_myAddress, Protocol::ModelRowColumnCountRequest);
   msg.payload() << Protocol::fromQModelIndex(index);
-  Client::send(msg);
+  sendMessage(msg);
 }
 
 void RemoteModel::requestDataAndFlags(const QModelIndex& index) const
@@ -477,9 +491,24 @@ void RemoteModel::requestDataAndFlags(const QModelIndex& index) const
 
   node->state.insert(index.column(), state | Loading); // mark pending request
 
+  m_pendingDataRequests.push_back(Protocol::fromQModelIndex(index));
+  if (m_pendingDataRequests.size() > 100) {
+    m_pendingDataRequestsTimer->stop();
+    doRequestDataAndFlags();
+  } else {
+    m_pendingDataRequestsTimer->start();
+  }
+}
+
+void RemoteModel::doRequestDataAndFlags() const
+{
+  Q_ASSERT(!m_pendingDataRequests.isEmpty());
   Message msg(m_myAddress, Protocol::ModelContentRequest);
-  msg.payload() << Protocol::fromQModelIndex(index);
-  Client::send(msg);
+  msg.payload() << quint32(m_pendingDataRequests.size());
+  foreach (const auto &index, m_pendingDataRequests)
+    msg.payload() << index;
+  m_pendingDataRequests.clear();
+  sendMessage(msg);
 }
 
 void RemoteModel::requestHeaderData(Qt::Orientation orientation, int section) const
@@ -490,16 +519,18 @@ void RemoteModel::requestHeaderData(Qt::Orientation orientation, int section) co
 
   Message msg(m_myAddress, Protocol::ModelHeaderRequest);
   msg.payload() << qint8(orientation) << qint32(section);
-  Client::send(msg);
+  sendMessage(msg);
 }
 
 void RemoteModel::clear()
 {
   beginResetModel();
 
-  Message msg(m_myAddress, Protocol::ModelSyncBarrier);
-  msg.payload() << ++m_targetSyncBarrier;
-  Client::send(msg);
+  if (isConnected()) {
+    Message msg(m_myAddress, Protocol::ModelSyncBarrier);
+    msg.payload() << ++m_targetSyncBarrier;
+    sendMessage(msg);
+  }
 
   delete m_root;
   m_root = new Node;
@@ -595,6 +626,8 @@ void RemoteModel::doMoveRows(RemoteModel::Node* sourceParentNode, int sourceStar
 {
   Q_ASSERT(sourceParentNode->rowCount == sourceParentNode->children.size());
   Q_ASSERT(destParentNode->rowCount == destParentNode->children.size());
+  Q_ASSERT(sourceEnd >= sourceStart);
+  Q_ASSERT(sourceParentNode->rowCount > sourceEnd);
 
   const int destEnd = destStart + sourceEnd - sourceStart;
   const int amount = sourceEnd - sourceStart + 1;
@@ -628,4 +661,20 @@ void RemoteModel::doMoveRows(RemoteModel::Node* sourceParentNode, int sourceStar
   endMoveRows();
   resetLoadingState(sourceParentNode, sourceStart);
   resetLoadingState(destParentNode, destEnd);
+}
+
+void RemoteModel::registerClient(const QString &serverObject)
+{
+  if (Q_UNLIKELY(s_registerClientCallback)) { // called from ctor, so we can't use virtuals here
+    s_registerClientCallback();
+    return;
+  }
+  m_myAddress = Endpoint::instance()->objectAddress(serverObject);
+  connect(Endpoint::instance(), SIGNAL(objectRegistered(QString,Protocol::ObjectAddress)), SLOT(serverRegistered(QString,Protocol::ObjectAddress)));
+  connect(Endpoint::instance(), SIGNAL(objectUnregistered(QString,Protocol::ObjectAddress)), SLOT(serverUnregistered(QString,Protocol::ObjectAddress)));
+}
+
+void RemoteModel::sendMessage(const Message& msg) const
+{
+  Endpoint::send(msg);
 }

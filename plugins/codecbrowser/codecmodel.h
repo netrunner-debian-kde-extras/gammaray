@@ -7,6 +7,11 @@
   Copyright (C) 2010-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Stephen Kelly <stephen.kelly@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -36,20 +41,19 @@ class AllCodecsModel : public QAbstractItemModel
   public:
     explicit AllCodecsModel(QObject *parent);
 
-    virtual QVariant headerData(int section,
-                                Qt::Orientation orientation,
-                                int role = Qt::DisplayRole) const;
+    QVariant headerData(int section, Qt::Orientation orientation,
+                        int role = Qt::DisplayRole) const Q_DECL_OVERRIDE;
 
-    virtual QVariant data(const QModelIndex &index,
-                          int role = Qt::DisplayRole) const;
+    QVariant data(const QModelIndex &index,
+                  int role = Qt::DisplayRole) const Q_DECL_OVERRIDE;
 
-    virtual QModelIndex index(int row, int column,
-                              const QModelIndex &parent = QModelIndex()) const;
+    QModelIndex index(int row, int column,
+                      const QModelIndex &parent = QModelIndex()) const Q_DECL_OVERRIDE;
 
-    virtual QModelIndex parent(const QModelIndex &child) const;
+    QModelIndex parent(const QModelIndex &child) const Q_DECL_OVERRIDE;
 
-    virtual int columnCount(const QModelIndex &parent = QModelIndex()) const;
-    virtual int rowCount(const QModelIndex &parent = QModelIndex()) const;
+    int columnCount(const QModelIndex &parent = QModelIndex()) const Q_DECL_OVERRIDE;
+    int rowCount(const QModelIndex &parent = QModelIndex()) const Q_DECL_OVERRIDE;
 };
 
 class SelectedCodecsModel : public QAbstractItemModel
@@ -61,20 +65,19 @@ class SelectedCodecsModel : public QAbstractItemModel
     void setCodecs(const QStringList &codecs);
     QStringList currentCodecs() const;
 
-    virtual QVariant headerData(int section,
-                                Qt::Orientation orientation,
-                                int role = Qt::DisplayRole) const;
+    QVariant headerData(int section, Qt::Orientation orientation,
+                        int role = Qt::DisplayRole) const Q_DECL_OVERRIDE;
 
-    virtual QVariant data(const QModelIndex &index,
-                          int role = Qt::DisplayRole) const;
+    QVariant data(const QModelIndex &index,
+                  int role = Qt::DisplayRole) const Q_DECL_OVERRIDE;
 
-    virtual QModelIndex index(int row, int column,
-                              const QModelIndex &parent = QModelIndex()) const;
+    QModelIndex index(int row, int column,
+                      const QModelIndex &parent = QModelIndex()) const Q_DECL_OVERRIDE;
 
-    virtual QModelIndex parent(const QModelIndex &child) const;
+    QModelIndex parent(const QModelIndex &child) const Q_DECL_OVERRIDE;
 
-    virtual int columnCount(const QModelIndex &parent = QModelIndex()) const;
-    virtual int rowCount(const QModelIndex &parent = QModelIndex()) const;
+    int columnCount(const QModelIndex &parent = QModelIndex()) const Q_DECL_OVERRIDE;
+    int rowCount(const QModelIndex &parent = QModelIndex()) const Q_DECL_OVERRIDE;
 
   public slots:
     void updateText(const QString &text);

@@ -7,6 +7,11 @@
   Copyright (C) 2013-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  acuordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -24,6 +29,7 @@
 #include "endpoint.h"
 #include "message.h"
 #include "methodargument.h"
+#include "propertysyncer.h"
 
 #include <iostream>
 
@@ -32,7 +38,11 @@ using namespace std;
 
 Endpoint* Endpoint::s_instance = 0;
 
-Endpoint::Endpoint(QObject* parent): QObject(parent), m_socket(0), m_myAddress(Protocol::InvalidObjectAddress +1)
+Endpoint::Endpoint(QObject* parent):
+  QObject(parent),
+  m_propertySyncer(new PropertySyncer(this)),
+  m_socket(0),
+  m_myAddress(Protocol::InvalidObjectAddress +1)
 {
   Q_ASSERT(!s_instance);
   s_instance = this;
@@ -42,6 +52,8 @@ Endpoint::Endpoint(QObject* parent): QObject(parent), m_socket(0), m_myAddress(P
   endpointObj->name = QLatin1String("com.kdab.GammaRay.Server");
   // TODO: we could set this as message handler here and use the same dispatch mechanism
   insertObjectInfo(endpointObj);
+
+  connect(m_propertySyncer, SIGNAL(message(GammaRay::Message)), this, SLOT(sendMessage(GammaRay::Message)));
 }
 
 Endpoint::~Endpoint()
@@ -62,6 +74,11 @@ void Endpoint::send(const Message& msg)
   Q_ASSERT(s_instance);
   Q_ASSERT(msg.address() != Protocol::InvalidObjectAddress);
   msg.write(s_instance->m_socket);
+}
+
+void Endpoint::sendMessage(const Message& msg)
+{
+  send(msg);
 }
 
 void Endpoint::waitForMessagesWritten()
@@ -128,6 +145,10 @@ Protocol::ObjectAddress Endpoint::registerObject(const QString &name, QObject *o
   Q_ASSERT(obj);
   Q_ASSERT(!obj->object);
   Q_ASSERT(obj->address != Protocol::InvalidObjectAddress);
+  if (!obj || obj->object || obj->address == Protocol::InvalidObjectAddress) {
+    return 0;
+  }
+
   obj->object = object;
 
   Q_ASSERT(!m_objectMap.contains(object));
@@ -147,6 +168,9 @@ void Endpoint::invokeObject(const QString &objectName, const char *method, const
   ObjectInfo* obj = m_nameMap.value(objectName, 0);
   Q_ASSERT(obj);
   Q_ASSERT(obj->address != Protocol::InvalidObjectAddress);
+  if (!obj || obj->address == Protocol::InvalidObjectAddress) {
+    return;
+  }
 
   Message msg(obj->address, Protocol::MethodCall);
   const QByteArray name(method);
@@ -218,6 +242,10 @@ void Endpoint::objectDestroyed(QObject *obj)
   ObjectInfo* info = m_objectMap.value(obj, 0);
   Q_ASSERT(info);
   Q_ASSERT(info->object == obj);
+  if (!info || info->object != obj) {
+    return;
+  }
+
   info->object = 0;
   m_objectMap.remove(obj);
   objectDestroyed(info->address, QString(info->name), obj); // copy the name, in case unregisterMessageHandlerInternal() is called inside
@@ -298,11 +326,15 @@ void Endpoint::removeObjectInfo(Endpoint::ObjectInfo* oi)
   Q_ASSERT(m_nameMap.contains(oi->name));
   m_nameMap.remove(oi->name);
 
-  if (oi->receiver)
+  if (oi->receiver) {
+    disconnect(oi->receiver, SIGNAL(destroyed(QObject*)), this, SLOT(handlerDestroyed(QObject*)));
     m_handlerMap.remove(oi->receiver, oi);
+  }
 
-  if (oi->object)
+  if (oi->object) {
+    disconnect(oi->object, SIGNAL(destroyed(QObject*)), this, SLOT(objectDestroyed(QObject*)));
     m_objectMap.remove(oi->object);
+  }
 
   delete oi;
 }

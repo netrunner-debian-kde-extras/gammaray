@@ -8,6 +8,11 @@
   Author: Volker Krause <volker.krause@kdab.com>
   Author: Milian Wolff <milian.wolff@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -26,7 +31,6 @@
 #define GAMMARAY_SCENEINSPECTOR_SCENEINSPECTOR_H
 
 #include <core/toolfactory.h>
-#include "sceneinspectorwidget.h"
 #include "sceneinspectorinterface.h"
 
 #include <QGraphicsScene>
@@ -48,14 +52,14 @@ class SceneInspector : public SceneInspectorInterface
     explicit SceneInspector(ProbeInterface *probe, QObject *parent = 0);
 
   private slots:
-    virtual void initializeGui();
-    virtual void renderScene(const QTransform &transform, const QSize &size);
+    void initializeGui() Q_DECL_OVERRIDE;
+    void renderScene(const QTransform &transform, const QSize &size) Q_DECL_OVERRIDE;
 
     void sceneSelected(const QItemSelection &selection);
     void sceneItemSelected(const QItemSelection &selection);
     void sceneItemSelected(QGraphicsItem *item);
     void objectSelected(QObject *object, const QPoint &pos);
-    void sceneClicked(const QPointF &pos);
+    void sceneClicked(const QPointF &pos) Q_DECL_OVERRIDE;
 
     void clientConnectedChanged(bool clientConnected);
 
@@ -73,11 +77,11 @@ class SceneInspector : public SceneInspectorInterface
 };
 
 class SceneInspectorFactory : public QObject,
-                              public StandardToolFactory2<QGraphicsScene, SceneInspector, SceneInspectorWidget>
+                              public StandardToolFactory<QGraphicsScene, SceneInspector>
 {
   Q_OBJECT
-  Q_INTERFACES(GammaRay::ToolFactory GammaRay::ToolUiFactory)
-  Q_PLUGIN_METADATA(IID "com.kdab.gammaray.SceneInspector")
+  Q_INTERFACES(GammaRay::ToolFactory)
+  Q_PLUGIN_METADATA(IID "com.kdab.GammaRay.ToolFactory" FILE "gammaray_sceneinspector.json")
   public:
     explicit SceneInspectorFactory(QObject *parent = 0) : QObject(parent)
     {

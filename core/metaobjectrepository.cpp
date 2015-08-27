@@ -7,6 +7,11 @@
   Copyright (C) 2011-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -27,7 +32,9 @@
 #include <common/metatypedeclarations.h>
 
 #include <QAbstractSocket>
+#include <QCoreApplication>
 #include <QFile>
+#include <QFont>
 #include <QNetworkProxy>
 #include <QObject>
 #include <QPalette>
@@ -37,6 +44,7 @@
 #include <QThread>
 
 #if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+#include <QGuiApplication>
 #include <QOpenGLContext>
 #include <QOpenGLShader>
 #include <QScreen>
@@ -114,6 +122,40 @@ void MetaObjectRepository::initQObjectTypes()
   MO_ADD_PROPERTY_RO(QPaintDevice, int, physicalDpiX);
   MO_ADD_PROPERTY_RO(QPaintDevice, int, physicalDpiY);
   MO_ADD_PROPERTY_RO(QPaintDevice, int, widthMM);
+
+  MO_ADD_METAOBJECT1(QCoreApplication, QObject);
+  MO_ADD_PROPERTY_ST(QCoreApplication, QString, applicationDirPath);
+  MO_ADD_PROPERTY_ST(QCoreApplication, QString, applicationFilePath);
+  MO_ADD_PROPERTY_ST(QCoreApplication, qint64, applicationPid);
+  MO_ADD_PROPERTY_ST(QCoreApplication, QStringList, arguments);
+  MO_ADD_PROPERTY_ST(QCoreApplication, bool, closingDown);
+  MO_ADD_PROPERTY_ST(QCoreApplication, bool, hasPendingEvents);
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+  MO_ADD_PROPERTY_ST(QCoreApplication, bool, isQuitLockEnabled);
+#endif
+#if QT_VERSION >= QT_VERSION_CHECK(5, 3, 0)
+  MO_ADD_PROPERTY_ST(QCoreApplication, bool, isSetuidAllowed);
+#endif
+  MO_ADD_PROPERTY_ST(QCoreApplication, QStringList, libraryPaths);
+  MO_ADD_PROPERTY_ST(QCoreApplication, bool, startingUp);
+
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+  MO_ADD_METAOBJECT1(QGuiApplication, QCoreApplication);
+  MO_ADD_PROPERTY_ST(QGuiApplication, Qt::ApplicationState, applicationState);
+  MO_ADD_PROPERTY_ST(QGuiApplication, bool, desktopSettingsAware);
+  MO_ADD_PROPERTY_RO(QGuiApplication, qreal, devicePixelRatio);
+  MO_ADD_PROPERTY_ST(QGuiApplication, QObject*, focusObject);
+  MO_ADD_PROPERTY_ST(QGuiApplication, QWindow*, focusWindow);
+  MO_ADD_PROPERTY_ST(QGuiApplication, QFont, font);
+  MO_ADD_PROPERTY_ST(QGuiApplication, bool, isLeftToRight);
+  MO_ADD_PROPERTY_ST(QGuiApplication, bool, isRightToLeft);
+  MO_ADD_PROPERTY_RO(QGuiApplication, bool, isSavingSession);
+  MO_ADD_PROPERTY_RO(QGuiApplication, bool, isSessionRestored);
+  MO_ADD_PROPERTY_ST(QGuiApplication, QPalette, palette);
+  MO_ADD_PROPERTY_ST(QGuiApplication, QScreen*, primaryScreen);
+  MO_ADD_PROPERTY_RO(QGuiApplication, QString, sessionId);
+  MO_ADD_PROPERTY_RO(QGuiApplication, QString, sessionKey);
+#endif
 }
 
 
@@ -287,7 +329,8 @@ void MetaObjectRepository::initOpenGLTypes()
 
   MO_ADD_METAOBJECT1(QOpenGLContext, QObject);
   MO_ADD_PROPERTY_RO(QOpenGLContext, uint, defaultFramebufferObject);
-  MO_ADD_PROPERTY_RO(QOpenGLContext, QSet<QByteArray>, extensions);
+  // crashes if context isn't current
+//   MO_ADD_PROPERTY_RO(QOpenGLContext, QSet<QByteArray>, extensions);
   MO_ADD_PROPERTY_RO(QOpenGLContext, QSurfaceFormat, format);
   MO_ADD_PROPERTY_RO(QOpenGLContext, bool, isValid);
   MO_ADD_PROPERTY_RO(QOpenGLContext, QScreen*, screen);

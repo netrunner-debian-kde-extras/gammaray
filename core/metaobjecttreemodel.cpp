@@ -7,6 +7,11 @@
   Copyright (C) 2012-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Kevin Funk <kevin.funk@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -24,7 +29,6 @@
 #include "metaobjecttreemodel.h"
 
 #include "probe.h"
-#include "readorwritelocker.h"
 
 #include <QDebug>
 #include <QThread>
@@ -74,6 +78,7 @@ static inline bool hasDynamicMetaObject(const QObject* object)
 MetaObjectTreeModel::MetaObjectTreeModel(QObject *parent)
   : QAbstractItemModel(parent)
 {
+  scanMetaTypes();
 }
 
 QVariant MetaObjectTreeModel::headerData(int section, Qt::Orientation orientation, int role) const
@@ -149,13 +154,10 @@ QModelIndex MetaObjectTreeModel::index(int row, int column, const QModelIndex &p
 
 void MetaObjectTreeModel::objectAdded(QObject *obj)
 {
-  // slot, hence should always land in main thread due to auto connection
+  // Probe::objectFullyConstructed calls us and ensures this already
   Q_ASSERT(thread() == QThread::currentThread());
+  Q_ASSERT(Probe::instance()->isValidObject(obj));
 
-  ReadOrWriteLocker objectLock(Probe::instance()->objectLock());
-  if (!Probe::instance()->isValidObject(obj)) {
-    return;
-  }
   Q_ASSERT(!obj->parent() || Probe::instance()->isValidObject(obj->parent()));
 
   if (hasDynamicMetaObject(obj)) {
@@ -167,19 +169,30 @@ void MetaObjectTreeModel::objectAdded(QObject *obj)
   addMetaObject(metaObject);
 }
 
+void MetaObjectTreeModel::scanMetaTypes()
+{
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+  for (int mtId = 0; mtId <= QMetaType::User || QMetaType::isRegistered(mtId); ++mtId) {
+    if (!QMetaType::isRegistered(mtId))
+      continue;
+    const auto *mt = QMetaType::metaObjectForType(mtId);
+    if (mt) {
+      addMetaObject(mt);
+    }
+  }
+#endif
+}
+
 void MetaObjectTreeModel::addMetaObject(const QMetaObject *metaObject)
 {
-  if (indexForMetaObject(metaObject).isValid()) {
+  if (isKnownMetaObject(metaObject)) {
     return;
   }
 
   const QMetaObject *parentMetaObject = metaObject->superClass();
-  if (parentMetaObject) {
-    const QModelIndex parentIndex = indexForMetaObject(parentMetaObject);
-    if (!parentIndex.isValid()) {
+  if (parentMetaObject && !isKnownMetaObject(parentMetaObject)) {
       // add parent first
       addMetaObject(metaObject->superClass());
-    }
   }
 
   const QModelIndex parentIndex = indexForMetaObject(parentMetaObject);
@@ -205,6 +218,11 @@ void MetaObjectTreeModel::objectRemoved(QObject *obj)
 {
   Q_UNUSED(obj);
   // TODO
+}
+
+bool MetaObjectTreeModel::isKnownMetaObject(const QMetaObject* metaObject) const
+{
+  return m_childParentMap.contains(metaObject);
 }
 
 QModelIndex MetaObjectTreeModel::indexForMetaObject(const QMetaObject *metaObject) const

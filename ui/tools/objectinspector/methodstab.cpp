@@ -7,6 +7,11 @@
   Copyright (C) 2014-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Anton Kreuzkamp <anton.kreuzkamp@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -25,7 +30,8 @@
 #include "ui_methodstab.h"
 #include "propertywidget.h"
 
-#include "ui/methodinvocationdialog.h"
+#include <ui/methodinvocationdialog.h>
+#include <ui/propertybinder.h>
 
 #include "common/objectbroker.h"
 #include "common/metatypedeclarations.h"
@@ -70,13 +76,13 @@ void MethodsTab::setObjectBaseName(const QString &baseName)
           SLOT(methodContextMenu(QPoint)));
   m_ui->methodLog->setModel(ObjectBroker::model(baseName + '.' + "methodLog"));
 
-  m_interface =
-    ObjectBroker::object<MethodsExtensionInterface*>(baseName + ".methodsExtension");
+  m_interface = ObjectBroker::object<MethodsExtensionInterface*>(baseName + ".methodsExtension");
+  new PropertyBinder(m_interface, "hasObject", m_ui->methodLog, "visible");
 }
 
 void MethodsTab::methodActivated(const QModelIndex &index)
 {
-  if (!index.isValid()) {
+  if (!index.isValid() || !m_interface->hasObject()) {
     return;
   }
   m_interface->activateMethod();
@@ -91,7 +97,7 @@ void MethodsTab::methodActivated(const QModelIndex &index)
 void MethodsTab::methodContextMenu(const QPoint &pos)
 {
   const QModelIndex index = m_ui->methodView->indexAt(pos);
-  if (!index.isValid()) {
+  if (!index.isValid() || !m_interface->hasObject()) {
     return;
   }
 

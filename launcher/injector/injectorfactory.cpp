@@ -7,6 +7,11 @@
   Copyright (C) 2010-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -62,6 +67,7 @@ AbstractInjector::Ptr createInjector(const QString &name)
   return AbstractInjector::Ptr(0);
 }
 
+#if !defined(Q_OS_WIN)
 static AbstractInjector::Ptr findFirstWorkingInjector(const QStringList &types)
 {
   foreach (const QString &type, types) {
@@ -71,13 +77,14 @@ static AbstractInjector::Ptr findFirstWorkingInjector(const QStringList &types)
   }
   return AbstractInjector::Ptr(0);
 }
+#endif
 
 AbstractInjector::Ptr defaultInjectorForLaunch(const ProbeABI &abi)
 {
 #if defined(Q_OS_MAC)
   if (abi.majorQtVersion() >= 5 && abi.minorQtVersion() >= 4)
     return createInjector(QLatin1String("preload"));
-  return findFirstWorkingInjector(QStringList() << QLatin1String("gdb") << QLatin1String("lldb"));
+  return findFirstWorkingInjector(QStringList() << QLatin1String("lldb") << QLatin1String("gdb"));
 #elif defined(Q_OS_UNIX)
   Q_UNUSED(abi);
   return createInjector(QLatin1String("preload"));
@@ -89,7 +96,9 @@ AbstractInjector::Ptr defaultInjectorForLaunch(const ProbeABI &abi)
 
 AbstractInjector::Ptr defaultInjectorForAttach()
 {
-#ifndef Q_OS_WIN
+#if defined(Q_OS_MAC)
+  return findFirstWorkingInjector(QStringList() << QLatin1String("lldb") << QLatin1String("gdb"));
+#elif !defined(Q_OS_WIN)
   return findFirstWorkingInjector(QStringList() << QLatin1String("gdb") << QLatin1String("lldb"));
 #else
   return createInjector(QLatin1String("windll"));

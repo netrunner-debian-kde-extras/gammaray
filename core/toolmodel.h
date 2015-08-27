@@ -7,6 +7,11 @@
   Copyright (C) 2010-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -48,12 +53,12 @@ class ToolModel : public QAbstractListModel
   public:
     explicit ToolModel(QObject *parent = 0);
     ~ToolModel();
-    virtual QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const;
-    virtual int rowCount(const QModelIndex &parent = QModelIndex()) const;
-    virtual Qt::ItemFlags flags(const QModelIndex &index) const;
-    virtual QVariant headerData(int section, Qt::Orientation orientation,
-                                int role = Qt::DisplayRole) const;
-    virtual QMap<int, QVariant> itemData(const QModelIndex& index) const;
+    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const Q_DECL_OVERRIDE;
+    int rowCount(const QModelIndex &parent = QModelIndex()) const Q_DECL_OVERRIDE;
+    Qt::ItemFlags flags(const QModelIndex &index) const Q_DECL_OVERRIDE;
+    QVariant headerData(int section, Qt::Orientation orientation,
+                        int role = Qt::DisplayRole) const Q_DECL_OVERRIDE;
+    QMap<int, QVariant> itemData(const QModelIndex& index) const Q_DECL_OVERRIDE;
 
     /** returns all tools provided by plugins for the ToolPluginModel. */
     QVector<ToolFactory*> plugins() const;
@@ -62,12 +67,11 @@ class ToolModel : public QAbstractListModel
     /** returns the tool that is best suited to show information about \p object. */
     QModelIndex toolForObject(QObject *object) const;
     /** returns the tool that is best suited to show information about \p object. */
-    QModelIndex toolForObject(const void *object, const QString typeName) const;
+    QModelIndex toolForObject(const void *object, const QString &typeName) const;
 
   public slots:
     /** Check if we have to activate tools for this type */
     void objectAdded(QObject *obj);
-    void objectAddedMainThread(QObject *obj);
 
   private:
     /**
@@ -82,6 +86,7 @@ class ToolModel : public QAbstractListModel
   private:
     QVector<ToolFactory*> m_tools;
     QSet<ToolFactory*> m_inactiveTools;
+    QSet<const QMetaObject*> m_knownMetaObjects;
     QPointer<QWidget> m_parentWidget;
     QScopedPointer<ToolPluginManager> m_pluginManager;
 };

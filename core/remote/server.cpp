@@ -7,6 +7,11 @@
   Copyright (C) 2013-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -22,19 +27,22 @@
 */
 
 #include "server.h"
+#include "serverdevice.h"
 #include "probe.h"
 #include "probesettings.h"
 #include "multisignalmapper.h"
 
 #include <common/protocol.h>
 #include <common/message.h>
+#include <common/propertysyncer.h>
 
-#include <QTcpServer>
-#include <QTcpSocket>
-#include <QUdpSocket>
+#ifdef Q_OS_ANDROID
+# include <QDir>
+#endif
+
+#include <QDebug>
 #include <QTimer>
 #include <QMetaMethod>
-#include <QNetworkInterface>
 
 #include <iostream>
 
@@ -43,38 +51,39 @@ using namespace std;
 
 Server::Server(QObject *parent) :
   Endpoint(parent),
-  m_tcpServer(new QTcpServer(this)),
+  m_serverDevice(0),
   m_nextAddress(endpointAddress()),
   m_broadcastTimer(new QTimer(this)),
-  m_broadcastSocket(new QUdpSocket(this)),
   m_signalMapper(new MultiSignalMapper(this))
 {
   if (!ProbeSettings::value("RemoteAccessEnabled", true).toBool())
     return;
 
-  const QHostAddress address(ProbeSettings::value("TCPServer", QLatin1String("0.0.0.0")).toString());
+  m_serverDevice = ServerDevice::create(serverAddress(), this);
+  if (!m_serverDevice)
+    return;
 
-  connect(m_tcpServer, SIGNAL(newConnection()), SLOT(newConnection()));
-
-  // try the default port first, and fall back to a random port otherwise
-  if (!m_tcpServer->listen(address, defaultPort()))
-    m_tcpServer->listen(address, 0);
-
-  // broadcast announcement only if we are actually listinging to remote connections
-#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
-  if (address.toString() != "127.0.0.1" && address.toString() != "::1") {
-#else
-  if (!address.isLoopback()) {
-#endif
-    m_broadcastTimer->setInterval(5 * 1000);
-    m_broadcastTimer->setSingleShot(false);
-    m_broadcastTimer->start();
-    connect(m_broadcastTimer, SIGNAL(timeout()), SLOT(broadcast()));
-    connect(this, SIGNAL(disconnected()), m_broadcastTimer, SLOT(start()));
+  connect(m_serverDevice, SIGNAL(newConnection()), this, SLOT(newConnection()));
+  if (!m_serverDevice->listen()) {
+    qWarning() << "Failed to start server:" << m_serverDevice->errorString();
+    return;
   }
+
+  m_broadcastTimer->setInterval(5 * 1000);
+  m_broadcastTimer->setSingleShot(false);
+#ifndef Q_OS_ANDROID
+  m_broadcastTimer->start();
+#endif
+  connect(m_broadcastTimer, SIGNAL(timeout()), SLOT(broadcast()));
+  connect(this, SIGNAL(disconnected()), m_broadcastTimer, SLOT(start()));
 
   connect(m_signalMapper, SIGNAL(signalEmitted(QObject*,int,QVector<QVariant>)),
           this, SLOT(forwardSignal(QObject*,int,QVector<QVariant>)));
+
+  Endpoint::registerObjectInternal("com.kdab.GammaRay.PropertySyncer", ++m_nextAddress);
+  m_propertySyncer->setAddress(m_nextAddress);
+  Endpoint::registerObject("com.kdab.GammaRay.PropertySyncer", m_propertySyncer);
+  registerMessageHandlerInternal(m_nextAddress, m_propertySyncer, "handleMessage");
 }
 
 Server::~Server()
@@ -92,22 +101,36 @@ bool Server::isRemoteClient() const
   return false;
 }
 
-QString Server::serverAddress() const
+QUrl Server::serverAddress() const
 {
-  return QHostAddress(QHostAddress::LocalHost).toString();
+#ifdef Q_OS_ANDROID
+    QUrl url(QString(QLatin1String("local://%1/+gammaray_socket")).arg(QDir::homePath()));
+#else
+    QUrl url(ProbeSettings::value("ServerAddress", QLatin1String("tcp://0.0.0.0/")).toString().toUtf8().constData());
+    if (url.scheme().isEmpty())
+        url.setScheme("tcp");
+    if (url.port() <= 0)
+        url.setPort(defaultPort());
+#endif
+    return url;
 }
 
 void Server::newConnection()
 {
   if (isConnected()) {
     cerr << Q_FUNC_INFO << " connected already, refusing incoming connection." << endl;
-    m_tcpServer->nextPendingConnection()->close();
+    m_serverDevice->nextPendingConnection()->close();
     return;
   }
 
   m_broadcastTimer->stop();
-  setDevice(m_tcpServer->nextPendingConnection());
+  setDevice(m_serverDevice->nextPendingConnection());
 
+  sendServerGreeting();
+}
+
+void Server::sendServerGreeting()
+{
   // send greeting message for protocol version check
   {
     Message msg(endpointAddress(), Protocol::ServerVersion);
@@ -138,6 +161,7 @@ void Server::messageReceived(const Message& msg)
         Protocol::ObjectAddress addr;
         msg.payload() >> addr;
         Q_ASSERT(addr > Protocol::InvalidObjectAddress);
+        m_propertySyncer->setObjectEnabled(addr, msg.type() == Protocol::ObjectMonitored);
         const QHash<Protocol::ObjectAddress, QPair<QObject*, QByteArray> >::const_iterator it = m_monitorNotifiers.constFind(addr);
         if (it == m_monitorNotifiers.constEnd())
           break;
@@ -180,6 +204,7 @@ Protocol::ObjectAddress Server::registerObject(const QString &name, QObject *obj
       m_signalMapper->connectToSignal(object, method);
     }
   }
+  m_propertySyncer->addObject(address, object);
 
   return address;
 }
@@ -203,6 +228,7 @@ void Server::forwardSignal(QObject* sender, int signalIndex, const QVector< QVar
   name = name.mid(0, name.indexOf('('));
 
   QVariantList v;
+  v.reserve(args.size());
   foreach(const QVariant &arg, args)
     v.push_back(arg);
   Endpoint::invokeObject(sender->objectName(), name, v);
@@ -258,25 +284,18 @@ void Server::objectDestroyed(Protocol::ObjectAddress /*objectAddress*/, const QS
 
 void Server::broadcast()
 {
-  QString myAddress;
-  foreach (const QHostAddress &addr, QNetworkInterface::allAddresses()) {
-    if (addr == QHostAddress::LocalHost || addr == QHostAddress::LocalHostIPv6 || !addr.scopeId().isEmpty())
-      continue;
-    myAddress = addr.toString();
-    break;
-  }
-
   QByteArray datagram;
   QDataStream stream(&datagram, QIODevice::WriteOnly);
   stream << Protocol::broadcastFormatVersion();
   stream << Protocol::version();
-  stream << myAddress;
-  stream << port();
+  stream << externalAddress();
   stream << label(); // TODO integrate hostname
-  m_broadcastSocket->writeDatagram(datagram.data(), datagram.size(), QHostAddress::Broadcast, broadcastPort());
+  m_serverDevice->broadcast(datagram);
 }
 
-quint16 Server::port() const
+QUrl Server::externalAddress() const
 {
-  return m_tcpServer->serverPort();
+  if (!m_serverDevice)
+    return QUrl();
+  return m_serverDevice->externalAddress();
 }

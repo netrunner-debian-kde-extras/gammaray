@@ -29,6 +29,7 @@ endif()
 # probe lib
 if(APPLE) # DYLD_INSERT_LIBRARIES only works with real shared libraries, not modules
   add_library(gammaray_probe SHARED ${gammaray_probe_srcs})
+  set_target_properties(gammaray_probe PROPERTIES INSTALL_RPATH "@loader_path/../../../Frameworks")
 else()
   add_library(gammaray_probe MODULE ${gammaray_probe_srcs})
 endif()
@@ -36,12 +37,26 @@ target_link_libraries(gammaray_probe
   gammaray_core
 )
 
-if(NOT WIN32 AND NOT QNXNTO)
+if(NOT WIN32 AND NOT QNXNTO AND NOT ANDROID)
   target_link_libraries(gammaray_probe dl)
 endif()
 
-set_target_properties(gammaray_probe PROPERTIES
-  PREFIX ""
-  LIBRARY_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/${PLUGIN_INSTALL_DIR}/${GAMMARAY_PLUGIN_VERSION}/${GAMMARAY_PROBE_ABI}"
-)
-install(TARGETS gammaray_probe DESTINATION ${PLUGIN_INSTALL_DIR}/${GAMMARAY_PLUGIN_VERSION}/${GAMMARAY_PROBE_ABI}/)
+if(NOT ANDROID)
+  set_target_properties(gammaray_probe PROPERTIES
+    LIBRARY_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/${PROBE_PLUGIN_INSTALL_DIR}"
+  )
+  set_target_properties(gammaray_probe PROPERTIES PREFIX "")
+endif()
+
+if(ANDROID)
+  install(TARGETS gammaray_probe EXPORT GammaRayTargets ${INSTALL_TARGETS_DEFAULT_ARGS})
+  ecm_generate_pri_file(BASE_NAME GammaRayProbe
+                      LIB_NAME gammaray_probe
+                      DEPS "core gui network GammaRayCommon GammaRayCore"
+                      FILENAME_VAR PRI_FILENAME
+                      INCLUDE_INSTALL_DIR ${INCLUDE_INSTALL_DIR}/..)
+  install(FILES ${PRI_FILENAME} DESTINATION ${ECM_MKSPECS_INSTALL_DIR})
+  install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/gammaray_probe-android-dependencies.xml DESTINATION ${LIB_INSTALL_DIR})
+else()
+  install(TARGETS gammaray_probe DESTINATION ${PROBE_PLUGIN_INSTALL_DIR})
+endif()

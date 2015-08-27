@@ -7,6 +7,11 @@
   Copyright (C) 2011-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  acuordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -39,6 +44,7 @@
 #include <QMatrix4x4>
 
 #if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+#include <QGuiApplication>
 #include <QOpenGLShader>
 #include <QSurface>
 #include <QSurfaceFormat>
@@ -62,6 +68,10 @@ Q_DECLARE_METATYPE(QOpenGLShader::ShaderType)
 Q_DECLARE_METATYPE(QSurfaceFormat)
 Q_DECLARE_METATYPE(QSurface::SurfaceClass)
 Q_DECLARE_METATYPE(QSurface::SurfaceType)
+#endif
+
+#if QT_VERSION >= QT_VERSION_CHECK(5, 2, 0) && QT_VERSION < QT_VERSION_CHECK(5, 5, 0)
+Q_DECLARE_METATYPE(Qt::ApplicationState)
 #endif
 
 #endif

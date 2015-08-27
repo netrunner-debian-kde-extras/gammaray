@@ -5,6 +5,11 @@
   Copyright (C) 2012-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Kevin Funk <kevin.funk@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -37,10 +42,10 @@ public:
     explicit ToolPluginModel(const QVector<ToolFactory*> &plugins, QObject *parent = 0);
     ~ToolPluginModel();
 
-    QVariant data(const QModelIndex& index, int role) const;
-    int columnCount(const QModelIndex& parent) const;
-    int rowCount(const QModelIndex& parent) const;
-    QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
+    QVariant data(const QModelIndex& index, int role) const Q_DECL_OVERRIDE;
+    int columnCount(const QModelIndex& parent) const Q_DECL_OVERRIDE;
+    int rowCount(const QModelIndex& parent) const Q_DECL_OVERRIDE;
+    QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const Q_DECL_OVERRIDE;
 
 private:
     QVector<ToolFactory*> m_tools;

@@ -7,6 +7,11 @@
   Copyright (C) 2013-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -46,7 +51,7 @@ template <> struct matrix_trait<QMatrix4x4> {
 template <> struct matrix_trait<QVector2D> {
     static const int rows = 2;
     static const int columns = 1;
-    static qreal value(const QVector3D &vec, int r, int) { return vec[r]; }
+    static qreal value(const QVector2D &vec, int r, int) { return vec[r]; }
 };
 
 template <> struct matrix_trait<QVector3D> {
@@ -58,7 +63,7 @@ template <> struct matrix_trait<QVector3D> {
 template <> struct matrix_trait<QVector4D> {
   static const int rows = 4;
   static const int columns = 1;
-  static qreal value(const QVector3D &vec, int r, int) { return vec[r]; }
+  static qreal value(const QVector4D &vec, int r, int) { return vec[r]; }
 };
 #endif
 
@@ -86,11 +91,11 @@ void PropertyEditorDelegate::paint(QPainter* painter, const QStyleOptionViewItem
         paint(painter, option, index, value.value<QMatrix4x4>());
 #if QT_VERSION >= QT_VERSION_CHECK(5, 2, 0)
     } else if (value.canConvert<QVector2D>()) {
-        paint(painter, option, index, value.value<QVector3D>());
+        paint(painter, option, index, value.value<QVector2D>());
     } else if (value.canConvert<QVector3D>()) {
       paint(painter, option, index, value.value<QVector3D>());
     } else if (value.canConvert<QVector4D>()) {
-      paint(painter, option, index, value.value<QVector3D>());
+      paint(painter, option, index, value.value<QVector4D>());
 #endif
     } else {
         QStyledItemDelegate::paint(painter, option, index);
@@ -104,11 +109,11 @@ QSize PropertyEditorDelegate::sizeHint(const QStyleOptionViewItem& option, const
         return sizeHint(option, index, value.value<QMatrix4x4>());
 #if QT_VERSION >= QT_VERSION_CHECK(5, 2, 0)
     } else if (value.canConvert<QVector2D>()) {
-        return sizeHint(option, index, value.value<QVector3D>());
+        return sizeHint(option, index, value.value<QVector2D>());
     } else if (value.canConvert<QVector3D>()) {
       return sizeHint(option, index, value.value<QVector3D>());
     } else if (value.canConvert<QVector4D>()) {
-      return sizeHint(option, index, value.value<QVector3D>());
+      return sizeHint(option, index, value.value<QVector4D>());
 #endif
     }
     return QStyledItemDelegate::sizeHint(option, index);

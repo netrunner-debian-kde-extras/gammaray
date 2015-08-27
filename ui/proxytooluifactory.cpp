@@ -5,6 +5,11 @@
   Copyright (C) 2011-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -25,23 +30,19 @@
 
 using namespace GammaRay;
 
-ProxyToolUiFactory::ProxyToolUiFactory(const QString &path, QObject *parent)
-  : ProxyFactory<ToolUiFactory>(path, parent)
-  , m_remotingSupported(false)
+ProxyToolUiFactory::ProxyToolUiFactory(const PluginInfo &pluginInfo, QObject *parent)
+  : ProxyFactory<ToolUiFactory>(pluginInfo, parent)
 {
-  m_remotingSupported = value(QLatin1String("X-GammaRay-Remote"), true).toBool();
 }
 
 bool ProxyToolUiFactory::isValid() const
 {
-  return
-    !id().isEmpty() &&
-    !m_pluginPath.isEmpty();
+  return pluginInfo().isValid();
 }
 
 bool ProxyToolUiFactory::remotingSupported() const
 {
-  return m_remotingSupported;
+  return pluginInfo().remoteSupport();
 }
 
 QWidget *ProxyToolUiFactory::createWidget(QWidget *parentWidget)
@@ -49,7 +50,7 @@ QWidget *ProxyToolUiFactory::createWidget(QWidget *parentWidget)
   loadPlugin();
   ToolUiFactory *fac = factory();
   if (!fac) {
-    return new QLabel(tr("Plugin '%1' could not be loaded.").arg(m_pluginPath), parentWidget);
+    return new QLabel(tr("Plugin '%1' could not be loaded.").arg(pluginInfo().path()), parentWidget);
   }
   Q_ASSERT(fac);
   return fac->createWidget(parentWidget);

@@ -7,6 +7,11 @@
   Copyright (C) 2014-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Anton Kreuzkamp <anton.kreuzkamp@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -58,6 +63,8 @@ MethodsExtension::~MethodsExtension()
 
 bool MethodsExtension::setQObject(QObject* object)
 {
+  if (m_object == object)
+    return true;
   m_object = object;
 
   m_model->setMetaObject(object ? object->metaObject() : 0);
@@ -66,7 +73,10 @@ bool MethodsExtension::setQObject(QObject* object)
   m_signalMapper = new MultiSignalMapper(this);
   connect(m_signalMapper, SIGNAL(signalEmitted(QObject*,int,QVector<QVariant>)), SLOT(signalEmitted(QObject*,int,QVector<QVariant>)));
 
-  m_methodLogModel->clear();
+  if (m_methodLogModel->rowCount() > 0)
+    m_methodLogModel->clear();
+
+  setHasObject(true);
   return true;
 }
 
@@ -74,6 +84,7 @@ bool MethodsExtension::setMetaObject(const QMetaObject* metaObject)
 {
   m_object = 0;
   m_model->setMetaObject(metaObject);
+  setHasObject(false);
   return true;
 }
 
@@ -82,6 +93,7 @@ void MethodsExtension::signalEmitted(QObject* sender, int signalIndex, const QVe
   Q_ASSERT(m_object == sender);
 
   QStringList prettyArgs;
+  prettyArgs.reserve(args.size());
   foreach (const QVariant &v, args)
     prettyArgs.push_back(VariantHandler::displayString(v));
 
@@ -102,7 +114,7 @@ void MethodsExtension::activateMethod()
   if (selectionModel->selectedRows().size() != 1) {
     return;
   }
-  const QModelIndex index = selectionModel->selectedRows().first();
+  const QModelIndex index = selectionModel->selectedRows().at(0);
 
   const QMetaMethod method = index.data(ObjectMethodModelRole::MetaMethod).value<QMetaMethod>();
   m_methodArgumentModel->setMethod(method);
@@ -114,7 +126,7 @@ void MethodsExtension::connectToSignal()
   if (selectionModel->selectedRows().size() != 1) {
     return;
   }
-  const QModelIndex index = selectionModel->selectedRows().first();
+  const QModelIndex index = selectionModel->selectedRows().at(0);
 
   const QMetaMethod method = index.data(ObjectMethodModelRole::MetaMethod).value<QMetaMethod>();
   if (method.methodType() == QMetaMethod::Signal) {
@@ -135,7 +147,7 @@ void MethodsExtension::invokeMethod(Qt::ConnectionType connectionType)
   QMetaMethod method;
   QItemSelectionModel *selectionModel = ObjectBroker::selectionModel(m_model);
   if (selectionModel->selectedRows().size() == 1) {
-    const QModelIndex index = selectionModel->selectedRows().first();
+    const QModelIndex index = selectionModel->selectedRows().at(0);
     method = index.data(ObjectMethodModelRole::MetaMethod).value<QMetaMethod>();
   }
 

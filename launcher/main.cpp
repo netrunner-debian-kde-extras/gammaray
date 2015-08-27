@@ -7,6 +7,11 @@
   Copyright (C) 2010-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -21,7 +26,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "config-gammaray.h"
+#include <config-gammaray.h>
 #include "config-gammaray-version.h"
 #include "injector/injectorfactory.h"
 #include "launchoptions.h"
@@ -29,9 +34,9 @@
 #include "launcher.h"
 #include "probefinder.h"
 
-#include <common/paths.h>
-#include <common/probeabi.h>
-#include <common/probeabidetector.h>
+#include "common/paths.h"
+#include "common/probeabi.h"
+#include "common/probeabidetector.h"
 
 #ifdef HAVE_QT_WIDGETS
 #include <QApplication>
@@ -41,6 +46,7 @@
 
 #include <QDebug>
 #include <QDir>
+#include <QUrl>
 #include <QStringList>
 #include <QVariant>
 
@@ -94,6 +100,26 @@ static bool startLauncher()
   return proc.exitCode() == 0;
 }
 
+static QUrl urlFromUserInput(const QString &s)
+{
+  QUrl url(s);
+  if (url.scheme().isEmpty()) { // backward compat: map input without a scheme to tcp + hostname
+    url.setScheme("tcp");
+    QString host = url.path();
+    int port = -1;
+    const int pos = host.lastIndexOf(":");
+    if (pos > 0) {
+      port = host.mid(pos + 1).toUShort();
+      host = host.left(pos);
+    }
+    url.setHost(host);
+    url.setPort(port);
+    url.setPath(QString());
+  }
+
+  return url;
+}
+
 int main(int argc, char **argv)
 {
   QCoreApplication::setOrganizationName("KDAB");
@@ -101,6 +127,7 @@ int main(int argc, char **argv)
   QCoreApplication::setApplicationName("GammaRay");
 
   QStringList args;
+  args.reserve(argc);
   for (int i = 1; i < argc; ++i) {
     args.push_back(QString::fromLocal8Bit(argv[i]));
   }
@@ -143,7 +170,7 @@ int main(int argc, char **argv)
       options.setUiMode(LaunchOptions::NoUi);
     }
     if (arg == QLatin1String("--listen") && !args.isEmpty()) {
-      options.setProbeSetting("TCPServer", args.takeFirst());
+      options.setProbeSetting("ServerAddress", urlFromUserInput(args.takeFirst()).toString());
     }
     if ( arg == QLatin1String("--no-listen")) {
       options.setProbeSetting("RemoteAccessEnabled", false);
@@ -160,22 +187,16 @@ int main(int argc, char **argv)
         out << "Invalid probe ABI specified, see --list-probes for valid ones." << endl;
         return 1;
       }
-      if (ProbeFinder::findProbe("gammaray_probe", abi).isEmpty()) {
+      if (ProbeFinder::findProbe(GAMMARAY_PROBE_NAME, abi).isEmpty()) {
         out << abi.id() << "is not a known probe, see --list-probes." << endl;
         return 1;
       }
       options.setProbeABI(abi);
     }
     if ( arg == QLatin1String("--connect") && !args.isEmpty()) {
-      QString host = args.takeFirst();
-      quint16 port = 0;
-      const int pos = host.lastIndexOf(":");
-      if (pos > 0) {
-        port = host.mid(pos + 1).toUShort();
-        host = host.left(pos);
-      }
+      const QUrl url = urlFromUserInput(args.takeFirst());
       ClientLauncher client;
-      client.launch(host, port);
+      client.launch(url);
       client.waitForFinished();
       return 0;
     }
@@ -243,5 +264,6 @@ int main(int argc, char **argv)
   }
 
   Launcher launcher(options);
+  QObject::connect(&launcher, SIGNAL(finished()), &app, SLOT(quit()));
   return app.exec();
 }

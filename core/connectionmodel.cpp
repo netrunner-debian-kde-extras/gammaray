@@ -7,6 +7,11 @@
   Copyright (C) 2010-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -23,7 +28,6 @@
 
 #include "connectionmodel.h"
 #include "probe.h"
-#include "readorwritelocker.h"
 
 #include <common/metatypedeclarations.h>
 #include "util.h"
@@ -32,6 +36,7 @@
 #include <QDebug>
 #include <QMetaMethod>
 #include <QMetaObject>
+#include <QMutex>
 #include <QThread>
 
 using namespace GammaRay;
@@ -105,8 +110,11 @@ void ConnectionModel::connectionAdded(QObject *sender, const char *signal,
   //and use verktygs heuristics to detect likely misconnects
 
   // when called from background, delay into foreground, otherwise call directly
-  QMetaObject::invokeMethod(this, "connectionAddedMainThread", Qt::AutoConnection,
-                            Q_ARG(GammaRay::Connection, c));
+  static const QMetaMethod m = metaObject()->method(metaObject()->indexOfMethod("connectionAddedMainThread(Connection)"));
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+  Q_ASSERT(m.isValid());
+#endif
+  m.invoke(this, Qt::AutoConnection, Q_ARG(GammaRay::Connection, c));
 }
 
 void ConnectionModel::connectionAddedMainThread(const Connection& connection)
@@ -114,7 +122,7 @@ void ConnectionModel::connectionAddedMainThread(const Connection& connection)
   Q_ASSERT(thread() == QThread::currentThread());
 
   {
-    ReadOrWriteLocker objectLock(Probe::instance()->objectLock());
+    QMutexLocker objectLock(Probe::objectLock());
     if (!Probe::instance()->isValidObject(connection.sender) ||
         !Probe::instance()->isValidObject(connection.receiver)) {
       return;
@@ -142,9 +150,13 @@ void ConnectionModel::connectionRemoved(QObject *sender, const char *signal,
   }
 
   // when called from background, delay into foreground, otherwise call directly
-  QMetaObject::invokeMethod(this, "connectionRemovedMainThread", Qt::AutoConnection,
-                            Q_ARG(QObject*, sender), Q_ARG(QByteArray, normalizedSignal),
-                            Q_ARG(QObject*, receiver), Q_ARG(QByteArray, normalizedMethod));
+  static const QMetaMethod m = metaObject()->method(metaObject()->indexOfMethod("connectionRemovedMainThread(QObject*,QByteArray,QObject*,QByteArray)"));
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+  Q_ASSERT(m.isValid());
+#endif
+  m.invoke(this, Qt::AutoConnection,
+           Q_ARG(QObject*, sender), Q_ARG(QByteArray, normalizedSignal),
+           Q_ARG(QObject*, receiver), Q_ARG(QByteArray, normalizedMethod));
 }
 
 void ConnectionModel::connectionRemovedMainThread(QObject *sender, const QByteArray &normalizedSignal,
@@ -192,7 +204,7 @@ QVariant ConnectionModel::data(const QModelIndex &index, int role) const
 
   Connection con = m_connections.at(index.row());
 
-  ReadOrWriteLocker probeLock(Probe::instance()->objectLock());
+  QMutexLocker probeLock(Probe::objectLock());
   if (!Probe::instance()->isValidObject(con.sender)) {
     con.sender = 0;
   }

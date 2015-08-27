@@ -7,6 +7,11 @@
   Copyright (C) 2010-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -26,12 +31,15 @@
 #include "modelmodel.h"
 #include "modelcellmodel.h"
 #include "modeltester.h"
+#include "safetyfilterproxymodel.h"
 
 #include "probeinterface.h"
 
 #include "common/objectbroker.h"
 #include "remote/remotemodelserver.h"
 #include "remote/selectionmodelserver.h"
+
+#include <QDebug>
 
 using namespace GammaRay;
 
@@ -40,6 +48,7 @@ ModelInspector::ModelInspector(ProbeInterface* probe, QObject *parent) :
   m_modelModel(0),
   m_modelContentServer(0),
   m_modelContentSelectionModel(0),
+  m_safetyFilterProxyModel(0),
   m_modelTester(0)
 {
   m_modelModel = new ModelModel(this);
@@ -84,9 +93,17 @@ void ModelInspector::modelSelected(const QItemSelection& selected)
   if (index.isValid()) {
     QObject *obj = index.data(ObjectModel::ObjectRole).value<QObject*>();
     QAbstractItemModel *model = qobject_cast<QAbstractItemModel*>(obj);
-    m_modelContentServer->setModel(model);
 
-    m_modelContentSelectionModel = new SelectionModelServer("com.kdab.GammaRay.ModelContent.selection", model, this);
+    if (model->inherits("QQmlListModel")) {
+      if (!m_safetyFilterProxyModel)
+        m_safetyFilterProxyModel = new SafetyFilterProxyModel(this);
+      m_safetyFilterProxyModel->setSourceModel(model);
+      m_modelContentServer->setModel(m_safetyFilterProxyModel);
+    } else {
+      m_modelContentServer->setModel(model);
+    }
+
+    m_modelContentSelectionModel = new SelectionModelServer("com.kdab.GammaRay.ModelContent.selection", m_modelContentServer->model(), this);
     ObjectBroker::registerSelectionModel(m_modelContentSelectionModel);
     connect(m_modelContentSelectionModel,
             SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
