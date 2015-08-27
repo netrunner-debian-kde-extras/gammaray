@@ -1,5 +1,6 @@
-gammaray (2.3.0-1) UNRELEASED; urgency=medium
+gammaray (2.3.0-1) unstable; urgency=medium
 
+  * Team upload.
   * New upstream release.
   * Refresh use-empty-rpath.patch.
   * Build-depend on the new libvtk6-qt-dev package. (Closes: #793604)
@@ -7,7 +8,7 @@ gammaray (2.3.0-1) UNRELEASED; urgency=medium
     actually used.
   * Add "Enhances: gammaray" to the plugins. (Closes: #791353)
 
- -- Felix Geyer <fgeyer@debian.org>  Thu, 27 Aug 2015 12:02:59 +0200
+ -- Felix Geyer <fgeyer@debian.org>  Thu, 27 Aug 2015 12:53:08 +0200
 
 gammaray (2.2.1-1) unstable; urgency=medium
 
