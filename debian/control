@@ -14,7 +14,7 @@ Build-Depends: debhelper (>= 9),
                qtdeclarative5-private-dev,
                libqt4-dev,
                libgraphviz-dev,
-               libvtk6-dev,
+               libvtk6-qt-dev,
                gdb,
                xauth,
                xvfb
