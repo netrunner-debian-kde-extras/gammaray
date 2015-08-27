@@ -7,6 +7,11 @@
   Copyright (C) 2013-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  acuordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -32,6 +37,7 @@
 #include <QItemSelectionModel>
 #include <QAbstractProxyModel>
 #include <QCoreApplication>
+#include <QVector>
 
 namespace GammaRay {
 
@@ -43,6 +49,7 @@ struct ObjectlBrokerData {
   QHash<QByteArray, ObjectBroker::ClientObjectFactoryCallback> clientObjectFactories;
   ObjectBroker::ModelFactoryCallback modelCallback;
   ObjectBroker::selectionModelFactoryCallback selectionCallback;
+  QVector<QObject*> ownedObjects;
 };
 
 Q_GLOBAL_STATIC(ObjectlBrokerData, s_objectBroker)
@@ -79,6 +86,7 @@ QObject* ObjectBroker::objectInternal(const QString& name, const QByteArray &typ
     obj = new QObject(qApp);
     registerObject(name, obj);
   }
+  s_objectBroker()->ownedObjects.push_back(obj);
 
   Q_ASSERT(obj);
   // ensure it was registered
@@ -111,6 +119,7 @@ QAbstractItemModel* ObjectBroker::model(const QString& name)
     if (model) {
       model->setObjectName(name);
       s_objectBroker()->models.insert(name, model);
+      s_objectBroker()->ownedObjects.push_back(model);
       return model;
     }
   }
@@ -163,6 +172,7 @@ QItemSelectionModel* ObjectBroker::selectionModel(QAbstractItemModel* model)
     QItemSelectionModel* selectionModel = 0;
     if (sourceModel == model) {
       selectionModel = s_objectBroker()->selectionCallback(sourceModel);
+      s_objectBroker()->ownedObjects.push_back(selectionModel);
     } else {
       QItemSelectionModel *sourceSelectionModel = ObjectBroker::selectionModel(sourceModel);
       selectionModel = new KLinkItemSelectionModel(model, sourceSelectionModel, model);
@@ -183,9 +193,12 @@ void ObjectBroker::setSelectionModelFactoryCallback(ObjectBroker::selectionModel
 
 void ObjectBroker::clear()
 {
-  s_objectBroker()->objects.clear();
-  s_objectBroker()->models.clear();
-  s_objectBroker()->selectionModels.clear();
+  auto *ob = s_objectBroker();
+  qDeleteAll(ob->ownedObjects);
+  ob->ownedObjects.clear();
+  ob->objects.clear();
+  ob->models.clear();
+  ob->selectionModels.clear();
 }
 
 }

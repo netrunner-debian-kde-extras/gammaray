@@ -7,6 +7,11 @@
   Copyright (C) 2013-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -45,6 +50,8 @@ class RemoteModelServer : public QObject
     explicit RemoteModelServer(const QString &objectName, QObject *parent = 0);
     ~RemoteModelServer();
 
+    /** Returns the source model. */
+    QAbstractItemModel* model() const;
     /** Set the source model for this model server instance. */
     void setModel(QAbstractItemModel *model);
 
@@ -59,14 +66,22 @@ class RemoteModelServer : public QObject
     void connectModel();
     void disconnectModel();
     void sendAddRemoveMessage(Protocol::MessageType type, const QModelIndex &parent, int start, int end);
-    void sendMoveMessage(Protocol::MessageType type, const QModelIndex &sourceParent, int sourceStart, int sourceEnd, const QModelIndex &destinationParent, int destinationIndex);
+    void sendMoveMessage(Protocol::MessageType type, const Protocol::ModelIndex &sourceParent, int sourceStart, int sourceEnd, const Protocol::ModelIndex &destinationParent, int destinationIndex);
     QMap< int, QVariant > filterItemData(const QMap< int, QVariant >& data) const;
     bool canSerialize(const QVariant &value) const;
+
+    // unit test hooks
+    static void (*s_registerServerCallback)();
+    void registerServer();
+    virtual bool isConnected() const;
+    virtual void sendMessage(const Message &msg) const;
+    friend class FakeRemoteModelServer;
 
   private slots:
     void dataChanged(const QModelIndex &begin, const QModelIndex &end);
     void headerDataChanged(Qt::Orientation orientation, int first, int last);
     void rowsInserted(const QModelIndex &parent, int start, int end);
+    void rowsAboutToBeMoved(const QModelIndex &sourceParent, int sourceStart, int sourceEnd, const QModelIndex &destinationParent, int destinationRow);
     void rowsMoved(const QModelIndex &sourceParent, int sourceStart, int sourceEnd, const QModelIndex &destinationParent, int destinationRow);
     void rowsRemoved(const QModelIndex &parent, int start, int end);
     void columnsInserted(const QModelIndex &parent, int start, int end);
@@ -83,6 +98,10 @@ class RemoteModelServer : public QObject
     // especially since being a QObject triggers all kind of GammaRay internals
     QByteArray m_dummyData;
     QBuffer *m_dummyBuffer;
+    // converted model indexes from aboutToBeX signals, needed in cases where the operation changes
+    // the serialized index (move to sub-tree of source parent for example)
+    // as operations can occur nested, we need to have a stack for this
+    QList<Protocol::ModelIndex> m_preOpIndexes;
     Protocol::ObjectAddress m_myAddress;
     bool m_monitored;
 };

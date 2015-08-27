@@ -7,6 +7,11 @@
   Copyright (C) 2014-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -162,4 +167,25 @@ bool AbstractConnectionsModel::isDirectCrossThreadConnection(const Connection& c
   if (!conn.endpoint || !m_object || conn.endpoint->thread() == m_object->thread())
     return false;
   return conn.type == 1; // direct
+}
+
+void AbstractConnectionsModel::clear()
+{
+  if (m_connections.isEmpty())
+    return;
+
+  beginRemoveRows(QModelIndex(), 0, m_connections.size() - 1);
+  m_connections.clear();
+  endRemoveRows();
+}
+
+void AbstractConnectionsModel::setConnections(const QVector<Connection>& connections)
+{
+  Q_ASSERT(m_connections.isEmpty());
+  if (connections.isEmpty())
+    return;
+
+  beginInsertRows(QModelIndex(), 0, connections.size() - 1);
+  m_connections = connections;
+  endInsertRows();
 }

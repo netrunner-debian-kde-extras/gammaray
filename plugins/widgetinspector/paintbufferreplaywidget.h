@@ -7,6 +7,11 @@
   Copyright (C) 2012-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -24,7 +29,7 @@
 #ifndef GAMMARAY_WIDGETINSPECTOR_PAINTBUFFERREPLAYWIDGET_H
 #define GAMMARAY_WIDGETINSPECTOR_PAINTBUFFERREPLAYWIDGET_H
 
-#include "config-gammaray.h"
+#include <config-gammaray.h>
 
 #include <QWidget>
 
@@ -39,14 +44,14 @@ class PaintBufferReplayWidget : public QWidget
   public:
     explicit PaintBufferReplayWidget(QWidget *parent = 0);
 
-    virtual QSize sizeHint() const;
+    QSize sizeHint() const Q_DECL_OVERRIDE;
 
   public slots:
     void setZoomFactor(int zoom);
     void setPixmap(const QPixmap &pixmap);
 
   protected:
-    virtual void paintEvent(QPaintEvent *event);
+    void paintEvent(QPaintEvent *event) Q_DECL_OVERRIDE;
 
   private:
     QPixmap m_pixmap;

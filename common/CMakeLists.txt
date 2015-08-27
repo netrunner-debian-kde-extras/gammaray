@@ -4,6 +4,7 @@
 set(gammaray_common_srcs
   ${CMAKE_SOURCE_DIR}/3rdparty/kde/klinkitemselectionmodel.cpp
   ${CMAKE_SOURCE_DIR}/3rdparty/kde/kmodelindexproxymapper.cpp
+  ${CMAKE_SOURCE_DIR}/3rdparty/lz4/lz4.c
 
   methodargument.cpp
   objectbroker.cpp
@@ -11,13 +12,13 @@ set(gammaray_common_srcs
   message.cpp
   endpoint.cpp
   paths.cpp
+  propertysyncer.cpp
 )
 
 add_library(gammaray_common SHARED ${gammaray_common_srcs})
 set_target_properties(gammaray_common PROPERTIES
+  ${GAMMARAY_DEFAULT_LIBRARY_PROPERTIES}
   DEFINE_SYMBOL MAKE_GAMMARAY_COMMON_LIB
-  SOVERSION ${GAMMARAY_SOVERSION}
-  VERSION ${GAMMARAY_SOVERSION}
   OUTPUT_NAME gammaray_common-${GAMMARAY_PROBE_ABI}
 )
 
@@ -33,6 +34,7 @@ endif()
 install(TARGETS gammaray_common EXPORT GammaRayTargets ${INSTALL_TARGETS_DEFAULT_ARGS})
 
 set(gammaray_common_internal_srcs
+  plugininfo.cpp
   pluginmanager.cpp
   proxyfactorybase.cpp
   propertycontrollerinterface.cpp
@@ -80,6 +82,10 @@ if(APPLE)
   target_link_libraries(gammaray_common_internal "-framework CoreFoundation")
 endif()
 
+if (ANDROID)
+    add_definitions(-DENABLE_MESSAGE_COMPRESSSION)
+endif()
+
 gammaray_install_headers(
   gammaray_common_export.h
   endpoint.h
@@ -88,6 +94,16 @@ gammaray_install_headers(
   modelroles.h
   objectbroker.h
   objectmodel.h
+  paths.h
   propertycontrollerinterface.h
   protocol.h
 )
+
+ecm_generate_pri_file(BASE_NAME GammaRayCommon
+                      LIB_NAME gammaray_common-${GAMMARAY_PROBE_ABI}
+                      DEPS "core gui network"
+                      FILENAME_VAR PRI_FILENAME
+                      INCLUDE_INSTALL_DIR ${INCLUDE_INSTALL_DIR}/..
+)
+
+install(FILES ${PRI_FILENAME} DESTINATION ${ECM_MKSPECS_INSTALL_DIR})

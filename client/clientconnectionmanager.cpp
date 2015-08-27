@@ -7,6 +7,11 @@
   Copyright (C) 2013-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -24,8 +29,13 @@
 #include "clientconnectionmanager.h"
 
 #include "client.h"
+#include "remotemodel.h"
+#include "selectionmodelclient.h"
+#include "propertycontrollerclient.h"
+#include "probecontrollerclient.h"
 
 #include <common/objectbroker.h>
+#include <common/streamoperators.h>
 
 #include <ui/mainwindow.h>
 #include <ui/splashscreen.h>
@@ -36,18 +46,53 @@
 
 using namespace GammaRay;
 
-ClientConnectionManager::ClientConnectionManager(QObject* parent) :
+static QAbstractItemModel* modelFactory(const QString &name)
+{
+  return new RemoteModel(name, qApp);
+}
+
+static QItemSelectionModel* selectionModelFactory(QAbstractItemModel* model)
+{
+  return new SelectionModelClient(model->objectName() + ".selection", model, qApp);
+}
+
+static QObject* createPropertyController(const QString &name, QObject *parent)
+{
+  return new PropertyControllerClient(name, parent);
+}
+
+static QObject* createProbeController(const QString &name, QObject *parent)
+{
+  QObject *o = new ProbeControllerClient(parent);
+  ObjectBroker::registerObject(name, o);
+  return o;
+}
+
+void ClientConnectionManager::init()
+{
+  StreamOperators::registerOperators();
+
+  ObjectBroker::registerClientObjectFactoryCallback<PropertyControllerInterface*>(createPropertyController);
+  ObjectBroker::registerClientObjectFactoryCallback<ProbeControllerInterface*>(createProbeController);
+  ObjectBroker::setModelFactoryCallback(modelFactory);
+  ObjectBroker::setSelectionModelFactoryCallback(selectionModelFactory);
+}
+
+ClientConnectionManager::ClientConnectionManager(QObject* parent, bool showSplashScreenOnStartUp) :
   QObject(parent),
-  m_port(0),
   m_client(new Client(this)),
   m_mainWindow(0),
-  m_toolModel(0)
+  m_toolModel(0),
+  m_ignorePersistentError(false),
+  m_tries(0)
 {
-  showSplashScreen();
-
-  connect(m_client, SIGNAL(disconnected()), QApplication::instance(), SLOT(quit()));
+  if (showSplashScreenOnStartUp)
+     showSplashScreen();
+  connect(m_client, SIGNAL(disconnected()), SIGNAL(disconnected()));
   connect(m_client, SIGNAL(connectionEstablished()), SLOT(connectionEstablished()));
-  connect(m_client, SIGNAL(connectionError(QAbstractSocket::SocketError,QString)), SLOT(connectionError(QAbstractSocket::SocketError,QString)));
+  connect(m_client, SIGNAL(transientConnectionError()), SLOT(transientConnectionError()));
+  connect(m_client, SIGNAL(persisitentConnectionError(QString)), SIGNAL(persistentConnectionError(QString)));
+  connect(this, SIGNAL(persistentConnectionError(QString)), SLOT(delayedHideSplashScreen()));
 }
 
 ClientConnectionManager::~ClientConnectionManager()
@@ -55,17 +100,27 @@ ClientConnectionManager::~ClientConnectionManager()
   delete m_mainWindow;
 }
 
-void ClientConnectionManager::connectToHost(const QString& hostname, quint16 port)
+QMainWindow *ClientConnectionManager::mainWindow() const
 {
-  m_hostname = hostname;
-  m_port = port;
+  return m_mainWindow;
+}
+
+void ClientConnectionManager::connectToHost(const QUrl &url, int tryAgain)
+{
+  m_serverUrl = url;
   m_connectionTimeout.start();
+  m_tries = tryAgain;
   connectToHost();
+}
+
+void ClientConnectionManager::disconnectFromHost()
+{
+    m_client->disconnectFromHost();
 }
 
 void ClientConnectionManager::connectToHost()
 {
-  m_client->connectToHost(m_hostname, m_port);
+  m_client->connectToHost(m_serverUrl, m_tries ? m_tries-- : 0);
 }
 
 void ClientConnectionManager::connectionEstablished()
@@ -87,21 +142,34 @@ void ClientConnectionManager::toolModelPopulated()
     return;
 
   disconnect(m_toolModel, 0, this, 0);
-
-  m_mainWindow = new MainWindow;
-  m_mainWindow->show();
-  hideSplashScreen();
+  QTimer::singleShot(0, this, SLOT(delayedHideSplashScreen()));
+  emit ready();
 }
 
-void ClientConnectionManager::connectionError(QAbstractSocket::SocketError error, const QString& msg)
+QMainWindow *ClientConnectionManager::createMainWindow()
 {
-  if (m_connectionTimeout.elapsed() < 60 * 1000 && error == QAbstractSocket::ConnectionRefusedError) {
+  delete m_mainWindow;
+  m_mainWindow = new MainWindow;
+  connect(m_mainWindow, SIGNAL(targetQuitRequested()), this, SLOT(targetQuitRequested()));
+  m_ignorePersistentError = false;
+  m_mainWindow->show();
+  return m_mainWindow;
+}
+
+void ClientConnectionManager::transientConnectionError()
+{
+  if (m_connectionTimeout.elapsed() < 60 * 1000) {
     // client wasn't up yet, keep trying
     QTimer::singleShot(1000, this, SLOT(connectToHost()));
-    return;
+  } else {
+    emit persistentConnectionError(tr("Connection refused."));
   }
+}
 
-  hideSplashScreen();
+void ClientConnectionManager::handlePersistentConnectionError(const QString& msg)
+{
+  if (m_ignorePersistentError)
+    return;
 
   QString errorMsg;
   if (m_mainWindow)
@@ -113,3 +181,12 @@ void ClientConnectionManager::connectionError(QAbstractSocket::SocketError error
   QApplication::exit(1);
 }
 
+void ClientConnectionManager::delayedHideSplashScreen()
+{
+  hideSplashScreen();
+}
+
+void ClientConnectionManager::targetQuitRequested()
+{
+  m_ignorePersistentError = true;
+}

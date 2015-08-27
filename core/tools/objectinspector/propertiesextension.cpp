@@ -7,6 +7,11 @@
   Copyright (C) 2014-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Anton Kreuzkamp <anton.kreuzkamp@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -55,17 +60,33 @@ PropertiesExtension::~PropertiesExtension()
 
 bool PropertiesExtension::setQObject(QObject *object)
 {
+  if (m_object == object)
+    return true;
   m_object = object;
   m_staticPropertyModel->setObject(object);
   m_dynamicPropertyModel->setObject(object);
   m_metaPropertyModel->setObject(object);
+  setCanAddProperty(true);
   return true;
 }
 
 bool PropertiesExtension::setObject(void *object, const QString &typeName)
 {
   m_object = 0;
+  m_staticPropertyModel->setObject(0);
+  m_dynamicPropertyModel->setObject(0);
   m_metaPropertyModel->setObject(object, typeName);
+  setCanAddProperty(false);
+  return true;
+}
+
+bool PropertiesExtension::setMetaObject(const QMetaObject* metaObject)
+{
+  m_object = 0;
+  m_staticPropertyModel->setMetaObject(metaObject);
+  m_dynamicPropertyModel->setObject(0);
+  m_metaPropertyModel->setObject(0);
+  setCanAddProperty(false);
   return true;
 }
 

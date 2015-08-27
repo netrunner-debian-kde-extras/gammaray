@@ -57,3 +57,9 @@ if(Qt5Widgets_FOUND AND NOT Qt5Widgets_VERSION VERSION_LESS 5.2.0)
   )
   target_link_libraries(variantinspectortest Qt5::Widgets)
 endif()
+
+add_executable(gadgettest gadgettest.cpp)
+target_link_libraries(gadgettest ${QT_QTCORE_LIBRARIES})
+
+add_executable(objectreparenttest objectreparenttest.cpp)
+target_link_libraries(objectreparenttest ${QT_QTCORE_LIBRARIES})

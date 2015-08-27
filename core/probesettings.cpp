@@ -7,6 +7,11 @@
   Copyright (C) 2013-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -21,17 +26,18 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "config-gammaray.h"
+#include <config-gammaray.h>
 #include "probesettings.h"
 
-#include <common/sharedmemorylocker.h>
-#include <common/message.h>
-#include <common/paths.h>
+#include "common/sharedmemorylocker.h"
+#include "common/message.h"
+#include "common/paths.h"
 
 #include <QBuffer>
 #include <QCoreApplication>
 #include <QDebug>
 #include <QDir>
+#include <QUrl>
 #include <QSharedMemory>
 #include <QSystemSemaphore>
 
@@ -122,7 +128,14 @@ qint64 ProbeSettings::launcherIdentifier()
   return QCoreApplication::applicationPid();
 }
 
-void ProbeSettings::sendPort(quint16 port)
+void ProbeSettings::resetLauncherIdentifier()
+{
+  // if we were launch by GammaRay, and we later try to re-attach, we need to make sure
+  // to not end up with an outdated launcher id
+  qputenv("GAMMARAY_LAUNCHER_ID", "");
+}
+
+void ProbeSettings::sendServerAddress(const QUrl& addr)
 {
 #ifdef HAVE_SHM
   QSharedMemory shm(QLatin1String("gammaray-") + QString::number(launcherIdentifier()));
@@ -140,8 +153,8 @@ void ProbeSettings::sendPort(quint16 port)
   QBuffer buffer(&ba);
   buffer.open(QIODevice::WriteOnly);
   {
-    Message msg(Protocol::LauncherAddress, Protocol::ServerPort);
-    msg.payload() << port;
+    Message msg(Protocol::LauncherAddress, Protocol::ServerAddress);
+    msg.payload() << addr;
     msg.write(&buffer);
   }
   buffer.close();
@@ -158,6 +171,6 @@ void ProbeSettings::sendPort(quint16 port)
   QSystemSemaphore sem("gammaray-semaphore-" + QString::number(launcherIdentifier()), QSystemSemaphore::Open);
   sem.release();
 #else
-  Q_UNUSED(port);
+  Q_UNUSED(addr);
 #endif
 }

@@ -7,6 +7,11 @@
   Copyright (C) 2012-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -24,8 +29,6 @@
 #ifndef GAMMARAY_PALETTEMODEL_H
 #define GAMMARAY_PALETTEMODEL_H
 
-#include "gammaray_ui_export.h"
-
 #include <QAbstractItemModel>
 #include <QPalette>
 
@@ -34,7 +37,7 @@ namespace GammaRay {
 /**
  * @brief Model showing the content of a QPalette.
  */
-class GAMMARAY_UI_EXPORT PaletteModel : public QAbstractTableModel
+class PaletteModel : public QAbstractTableModel
 {
   Q_OBJECT
   public:
@@ -45,18 +48,18 @@ class GAMMARAY_UI_EXPORT PaletteModel : public QAbstractTableModel
     void setEditable(bool editable);
 
     ///@cond override
-    virtual QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const;
+    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const Q_DECL_OVERRIDE;
 
-    virtual int columnCount(const QModelIndex &parent = QModelIndex()) const;
+    int columnCount(const QModelIndex &parent = QModelIndex()) const Q_DECL_OVERRIDE;
 
-    virtual int rowCount(const QModelIndex &parent = QModelIndex()) const;
+    int rowCount(const QModelIndex &parent = QModelIndex()) const Q_DECL_OVERRIDE;
 
-    virtual QVariant headerData(int section, Qt::Orientation orientation,
-                                int role = Qt::DisplayRole) const;
+    QVariant headerData(int section, Qt::Orientation orientation,
+                                int role = Qt::DisplayRole) const Q_DECL_OVERRIDE;
 
-    virtual Qt::ItemFlags flags(const QModelIndex &index) const;
+    Qt::ItemFlags flags(const QModelIndex &index) const Q_DECL_OVERRIDE;
 
-    virtual bool setData(const QModelIndex &index, const QVariant &value, int role = Qt::EditRole);
+    bool setData(const QModelIndex &index, const QVariant &value, int role = Qt::EditRole) Q_DECL_OVERRIDE;
     ///@endcond
 
   private:

@@ -7,6 +7,11 @@
   Copyright (C) 2010-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -34,7 +39,6 @@
 #define GAMMARAY_TOOLFACTORY_H
 
 #include "probeinterface.h"
-#include <ui/tooluifactory.h>
 
 #include <QMetaType>
 #include <QStringList>
@@ -120,45 +124,6 @@ public:
   {
     return false;
   }
-};
-
-/**
- * @brief A templated generic ToolFactory for some data type and Tool.
- */
-// TODO: split this completely, this is just a migration aid
-template <typename Type, typename Tool, typename ToolUi>
-class StandardToolFactory2 : public ToolFactory, public ToolUiFactory
-{
-  public:
-    virtual inline QStringList supportedTypes() const
-    {
-      return QStringList(Type::staticMetaObject.className());
-    }
-
-    virtual inline QString id() const
-    {
-      return Tool::staticMetaObject.className();
-    }
-
-    virtual inline void init(ProbeInterface *probe)
-    {
-      new Tool(probe, probe->probe());
-    }
-
-    inline bool isHidden() const
-    {
-      return false;
-    }
-
-    virtual inline QWidget *createWidget(QWidget *parentWidget)
-    {
-      return new ToolUi(parentWidget);
-    }
-
-    virtual bool remotingSupported() const
-    {
-      return true;
-    }
 };
 
 }

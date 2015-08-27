@@ -7,6 +7,11 @@
   Copyright (C) 2013-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  acuordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -23,10 +28,41 @@
 
 #include "message.h"
 
+#include "lz4/lz4.h" //3rdparty
+
 #include <QDebug>
 #include <qendian.h>
 
+inline QByteArray compress(const QByteArray &src)
+{
+    const qint32 srcSz = src.size();
+
+    QByteArray dst;
+    dst.resize(LZ4_compressBound(srcSz + sizeof(srcSz)));
+    *(qint32*)dst.data() = srcSz; // save the source size
+
+    const int sz = LZ4_compress_default(src.constData(), dst.data() + sizeof(int), srcSz, dst.size());
+    dst.resize(sz + sizeof(srcSz));
+    return dst;
+}
+
+inline QByteArray uncompress(const QByteArray &src)
+{
+    const qint32 dstSz = *(const qint32*)src.constData(); // get the dest size
+    QByteArray dst;
+    dst.resize(dstSz);
+    const int sz = LZ4_decompress_safe(src.constData() + sizeof(dstSz), dst.data(), src.size()- sizeof(dstSz), dstSz);
+    if (sz <= 0)
+        dst.resize(0);
+    else
+        dst.resize(sz);
+    return dst;
+}
+
 static const QDataStream::Version StreamVersion = QDataStream::Qt_4_7;
+#ifdef ENABLE_MESSAGE_COMPRESSSION
+static const int minimumUncompressedSize = 32;
+#endif
 
 #if QT_VERSION < 0x040800
 // This template-specialization is missing in qendian.h, required for qFromBigEndian
@@ -114,30 +150,35 @@ bool Message::canReadMessage(QIODevice* device)
   const int peekSize = device->peek((char*)&payloadSize, sizeof(Protocol::PayloadSize));
   if (peekSize < (int)sizeof(Protocol::PayloadSize))
     return false;
-  payloadSize = qFromBigEndian(payloadSize);
-  if (payloadSize < 0 && !device->isSequential()) // input end on shared memory
+
+  if (payloadSize == -1 && !device->isSequential()) // input end on shared memory
     return false;
-  Q_ASSERT(payloadSize >= 0);
+
+  payloadSize = abs(qFromBigEndian(payloadSize));
   return device->bytesAvailable() >= payloadSize + minimumSize;
 }
 
 Message Message::readMessage(QIODevice* device)
 {
   Message msg;
-  QDataStream stream(device);
 
-  const Protocol::PayloadSize payloadSize = readNumber<qint32>(device);
-  Q_ASSERT(payloadSize >= 0);
+  Protocol::PayloadSize payloadSize = readNumber<qint32>(device);
 
   msg.m_objectAddress = readNumber<Protocol::ObjectAddress>(device);
   msg.m_messageType = readNumber<Protocol::MessageType>(device);
   Q_ASSERT(msg.m_messageType != Protocol::InvalidMessageType);
   Q_ASSERT(msg.m_objectAddress != Protocol::InvalidObjectAddress);
-
-  if (payloadSize)
-    msg.m_buffer = device->read(payloadSize);
-  Q_ASSERT(payloadSize == msg.m_buffer.size());
-
+  if (payloadSize < 0) {
+    payloadSize = abs(payloadSize);
+    QByteArray buff = device->read(payloadSize);
+    msg.m_buffer = uncompress(buff);
+    Q_ASSERT(payloadSize == buff.size());
+  } else {
+      if (payloadSize > 0) {
+          msg.m_buffer = device->read(payloadSize);
+          Q_ASSERT(payloadSize == msg.m_buffer.size());
+      }
+  }
   return msg;
 }
 
@@ -145,14 +186,34 @@ void Message::write(QIODevice* device) const
 {
   Q_ASSERT(m_objectAddress != Protocol::InvalidObjectAddress);
   Q_ASSERT(m_messageType != Protocol::InvalidMessageType);
+  const int buffSize = m_buffer.size();
+#ifdef ENABLE_MESSAGE_COMPRESSSION
+  QByteArray buff;
+  if (buffSize > minimumUncompressedSize)
+    buff = compress(m_buffer);
 
-  writeNumber<Protocol::PayloadSize>(device, m_buffer.size());
+  if (buff.size() && buff.size() <  buffSize)
+      writeNumber<Protocol::PayloadSize>(device, -buff.size()); // send compressed Buffer
+  else
+#endif
+      writeNumber<Protocol::PayloadSize>(device, buffSize); // send uncompressed Buffer
+
   writeNumber(device, m_objectAddress);
   writeNumber(device, m_messageType);
 
-  if (!m_buffer.isEmpty()) {
-    const int s = device->write(m_buffer);
-    Q_ASSERT(s == m_buffer.size());
-    Q_UNUSED(s);
+#ifdef ENABLE_MESSAGE_COMPRESSSION
+  if (buffSize) {
+      if (buff.size() && buff.size() <  buffSize) {
+        const int s = device->write(buff);
+        Q_ASSERT(s == buff.size());
+        Q_UNUSED(s);
+      } else {
+#endif
+        const int s = device->write(m_buffer);
+        Q_ASSERT(s == m_buffer.size());
+        Q_UNUSED(s);
+#ifdef ENABLE_MESSAGE_COMPRESSSION
+      }
   }
+#endif
 }

@@ -7,6 +7,11 @@
   Copyright (C) 2014-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Kevin Funk <kevin.funk@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -32,7 +37,7 @@
 
 #include <kdstatemachineeditor/core/state.h>
 #include <kdstatemachineeditor/core/transition.h>
-#include <kdstatemachineeditor/view/configurationcontroller.h>
+#include <kdstatemachineeditor/core/runtimecontroller.h>
 #include <kdstatemachineeditor/view/statemachinescene.h>
 #include <kdstatemachineeditor/view/statemachinetoolbar.h>
 #include <kdstatemachineeditor/view/statemachineview.h>
@@ -45,7 +50,6 @@
 #define IF_DEBUG(x)
 
 using namespace GammaRay;
-using namespace KDSME;
 
 namespace {
 
@@ -54,9 +58,10 @@ QObject* createStateMachineViewerClient(const QString &/*name*/, QObject *parent
   return new StateMachineViewerClient(parent);
 }
 
-ConfigurationController::Configuration toSmeConfiguration(const StateMachineConfiguration& config, const QHash<StateId, State*>& map)
+KDSME::RuntimeController::Configuration toSmeConfiguration(const StateMachineConfiguration& config,
+                                                                 const QHash<StateId, KDSME::State*>& map)
 {
-  ConfigurationController::Configuration result;
+  KDSME::RuntimeController::Configuration result;
   foreach (const StateId& id, config) {
     if (auto state = map.value(id)) {
       result << state;
@@ -130,7 +135,7 @@ StateMachineViewerWidgetNG::StateMachineViewerWidgetNG(QWidget* parent, Qt::Wind
   connect(m_interface, SIGNAL(graphRepopulated()), this, SLOT(repopulateView()));
 
   // append actions for the state machine view
-  StateMachineToolBar* toolBar = new StateMachineToolBar(m_stateMachineView, this);
+  KDSME::StateMachineToolBar* toolBar = new KDSME::StateMachineToolBar(m_stateMachineView, this);
   toolBar->setHidden(true);
   addActions(toolBar->actions());
 
@@ -164,7 +169,9 @@ void StateMachineViewerWidgetNG::showMessage(const QString& message)
 
 void StateMachineViewerWidgetNG::stateConfigurationChanged(const StateMachineConfiguration& config)
 {
-  m_stateMachineView->configurationController()->setActiveConfiguration(toSmeConfiguration(config, m_idToStateMap));
+  if (m_machine) {
+    m_machine->runtimeController()->setActiveConfiguration(toSmeConfiguration(config, m_idToStateMap));
+  }
 }
 
 void StateMachineViewerWidgetNG::stateAdded(const StateId stateId, const StateId parentId, const bool hasChildren,
@@ -177,29 +184,32 @@ void StateMachineViewerWidgetNG::stateAdded(const StateId stateId, const StateId
     return;
   }
 
-  State* parentState = m_idToStateMap.value(parentId);
-  State* state = 0;
+  KDSME::State* parentState = m_idToStateMap.value(parentId);
+  KDSME::State* state = 0;
   if (type == StateMachineState) {
-    state = m_machine = new StateMachine;
+    state = m_machine = new KDSME::StateMachine;
   } else if (type == GammaRay::FinalState) {
     state = new KDSME::FinalState(parentState);
   } else if (type == GammaRay::ShallowHistoryState) {
-    state = new KDSME::HistoryState(HistoryState::ShallowHistory, parentState);
+    state = new KDSME::HistoryState(KDSME::HistoryState::ShallowHistory, parentState);
   } else if (type == GammaRay::DeepHistoryState) {
-    state = new KDSME::HistoryState(HistoryState::DeepHistory, parentState);
+    state = new KDSME::HistoryState(KDSME::HistoryState::DeepHistory, parentState);
   } else {
-    state = new State(parentState);
+    state = new KDSME::State(parentState);
   }
 
   if (connectToInitial && parentState) {
-    State* initialState = new PseudoState(PseudoState::InitialState, parentState);
-    Transition* transition = new Transition(initialState);
+    KDSME::State* initialState = new KDSME::PseudoState(KDSME::PseudoState::InitialState, parentState);
+    initialState->setFlags(KDSME::Element::ElementIsSelectable);
+    KDSME::Transition* transition = new KDSME::Transition(initialState);
     transition->setTargetState(state);
+    transition->setFlags(KDSME::Element::ElementIsSelectable);
   }
 
   Q_ASSERT(state);
   state->setLabel(label);
   state->setInternalId(stateId);
+  state->setFlags(KDSME::Element::ElementIsSelectable);
   m_idToStateMap[stateId] = state;
 }
 
@@ -210,22 +220,25 @@ void StateMachineViewerWidgetNG::transitionAdded(const TransitionId transitionId
 
   IF_DEBUG(qDebug() << "transitionAdded" << transitionId << label << sourceId << targetId);
 
-  State* source = m_idToStateMap.value(sourceId);
-  State* target = m_idToStateMap.value(targetId);
+  KDSME::State* source = m_idToStateMap.value(sourceId);
+  KDSME::State* target = m_idToStateMap.value(targetId);
   if (!source || !target) {
     qDebug() << "Null source or target for transition:" <<  transitionId;
     return;
   }
 
-  Transition* transition = new Transition(source);
+  KDSME::Transition* transition = new KDSME::Transition(source);
   transition->setTargetState(target);
   transition->setLabel(label);
+  transition->setFlags(KDSME::Element::ElementIsSelectable);
   m_idToTransitionMap[transitionId] = transition;
 }
 
 void StateMachineViewerWidgetNG::statusChanged(const bool haveStateMachine, const bool running)
 {
-  m_stateMachineView->configurationController()->setIsRunning(running);
+  if (m_machine) {
+    m_machine->runtimeController()->setIsRunning(running);
+  }
 
   if (!running) {
     m_ui->startStopButton->setChecked(false);
@@ -240,14 +253,16 @@ void StateMachineViewerWidgetNG::statusChanged(const bool haveStateMachine, cons
 void StateMachineViewerWidgetNG::transitionTriggered(TransitionId transitionId, const QString& label)
 {
   Q_UNUSED(label);
-  m_stateMachineView->configurationController()->setLastTransition(m_idToTransitionMap.value(transitionId));
+  if (m_machine) {
+    m_machine->runtimeController()->setLastTransition(m_idToTransitionMap.value(transitionId));
+  }
 }
 
 void StateMachineViewerWidgetNG::clearGraph()
 {
   IF_DEBUG(qDebug() << Q_FUNC_INFO);
 
-  m_stateMachineView->scene()->setStateMachine(0);
+  m_stateMachineView->scene()->setRootState(0);
 
   m_idToStateMap.clear();
   m_idToTransitionMap.clear();
@@ -257,7 +272,7 @@ void StateMachineViewerWidgetNG::repopulateView()
 {
   IF_DEBUG(qDebug() << Q_FUNC_INFO);
 
-  m_stateMachineView->scene()->setStateMachine(m_machine);
+  m_stateMachineView->scene()->setRootState(m_machine);
   if (!m_machine)
     return;
   m_stateMachineView->scene()->layout();
@@ -270,6 +285,8 @@ void StateMachineViewerWidgetNG::repopulateView()
 void StateMachineViewerWidgetNG::stateModelReset()
 {
   m_ui->singleStateMachineView->expandAll();
-  m_stateMachineView->configurationController()->clear();
+  if (m_machine) {
+    m_machine->runtimeController()->clear();
+  }
 }
 

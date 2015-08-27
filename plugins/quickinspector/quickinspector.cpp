@@ -7,6 +7,11 @@
   Copyright (C) 2014-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -64,6 +69,7 @@
 
 #include <private/qquickanchors_p.h>
 #include <private/qquickitem_p.h>
+#include <private/qsgbatchrenderer_p.h>
 
 Q_DECLARE_METATYPE(QQmlError)
 
@@ -255,6 +261,9 @@ void QuickInspector::selectWindow(QQuickWindow *window)
   m_sgModel->setWindow(window);
 
   if (m_window) {
+    // make sure we have selected something for the property editor to not be entirely empty
+    selectItem(m_window->contentItem());
+
     // Insert a ShaderEffectSource to the scene, with the contentItem as its source, in
     // order to use it to generate a preview of the window as QImage to show on the client.
     QQuickItem *contentItem = m_window->contentItem();
@@ -510,6 +519,22 @@ void QuickInspector::setCustomRenderMode(
                               customRenderMode == VisualizeChanges  ? "changes"  :
                               "";
   m_window->update();
+#if QT_VERSION >= QT_VERSION_CHECK(5, 5, 0)
+  if (customRenderMode == VisualizeBatches) {
+    // Work around a performance optimization done in Qt 5.5, that breaks batch
+    // visualization completely. Because it breaks batch visualization,
+    // QSGBatchRenderer will only apply it if no batch visualization is applied.
+    // This workaround forces the batch renderer to reevaluate that, so that it
+    // recognizes it now is applied.
+    QQuickItemPrivate *contentPriv = QQuickItemPrivate::get(m_window->contentItem());
+    QSGNode *rootNode = contentPriv->itemNode();
+    while(rootNode->type() != QSGNode::RootNodeType)
+        rootNode = rootNode->parent();
+    winPriv->renderer->nodeChanged(rootNode, QSGNode::DirtyNodeRemoved);
+    winPriv->renderer->nodeChanged(rootNode, QSGNode::DirtyNodeAdded);
+  }
+#endif
+
 #else
   Q_UNUSED(customRenderMode);
 #endif
@@ -600,7 +625,19 @@ QQuickItem *QuickInspector::recursiveChiltAt(QQuickItem *parent, const QPointF &
 {
   Q_ASSERT(parent);
 
-  QQuickItem *child = parent->childAt(pos.x(), pos.y());
+  // we can't use childAt() as that will find m_source, but that's not what we are looking for
+  QQuickItem *child = Q_NULLPTR;
+  auto children = parent->childItems();
+  std::stable_sort(children.begin(), children.end(), [](QQuickItem *lhs, QQuickItem *rhs) { return lhs->z() < rhs->z(); });
+  std::reverse(children.begin(), children.end());
+  foreach (QQuickItem *c, children) {
+    const QPointF p = parent->mapToItem(c, pos);
+    if (c != m_source && c->isVisible() && p.x() >= 0 && c->width() >= p.x() && p.y() >= 0 && c->height() >= p.y()) {
+      child = c;
+      break;
+    }
+  }
+
   if (child) {
     return recursiveChiltAt(child, parent->mapToItem(child, pos));
   }

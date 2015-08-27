@@ -7,6 +7,11 @@
   Copyright (C) 2010-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -21,6 +26,8 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <config-gammaray.h>
+
 #include "webinspector.h"
 #include "webviewmodel.h"
 
@@ -28,9 +35,14 @@
 #include <core/objecttypefilterproxymodel.h>
 #include <core/probeinterface.h>
 #include <core/singlecolumnobjectproxymodel.h>
-#include <core/probesettings.h>
 
+#include <QDebug>
+#include <QUrl>
 #include <QtPlugin>
+
+#ifdef HAVE_QT_WEBKIT1
+#include <QWebPage>
+#endif
 
 using namespace GammaRay;
 
@@ -43,7 +55,10 @@ WebInspector::WebInspector(ProbeInterface *probe, QObject *parent)
 
   connect(probe->probe(), SIGNAL(objectCreated(QObject*)), SLOT(objectAdded(QObject*)));
 
-  const QString serverAddress = ProbeSettings::value("TCPServer", QLatin1String("0.0.0.0")).toString();
+  const QUrl serverUrl = Endpoint::instance()->serverAddress();
+  QString serverAddress("0.0.0.0");
+  if (serverUrl.scheme() == "tcp")
+    serverAddress = serverUrl.host();
   qputenv("QTWEBKIT_INSPECTOR_SERVER", serverAddress.toLocal8Bit() + ':' + QByteArray::number(Endpoint::defaultPort() + 1));
 }
 
@@ -88,7 +103,7 @@ QStringList WebInspectorFactory::supportedTypes() const
 {
   QStringList types;
 #ifdef HAVE_QT_WEBKIT1
-  types.push_back(QWebPage::staticMetaObject.className();
+  types.push_back(QWebPage::staticMetaObject.className());
 #endif
   types.push_back("QQuickWebView");
   return types;

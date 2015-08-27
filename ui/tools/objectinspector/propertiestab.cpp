@@ -7,6 +7,11 @@
   Copyright (C) 2014-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Anton Kreuzkamp <anton.kreuzkamp@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -30,6 +35,7 @@
 #include "ui/propertyeditor/propertyeditordelegate.h"
 #include "ui/propertyeditor/propertyeditorfactory.h"
 #include "ui/deferredresizemodesetter.h"
+#include <propertybinder.h>
 
 #include "common/objectbroker.h"
 #include <common/propertymodel.h>
@@ -92,8 +98,8 @@ void PropertiesTab::setObjectBaseName(const QString &baseName)
   connect(m_ui->newPropertyButton, SIGNAL(clicked()),
           this, SLOT(addNewProperty()));
 
-  m_interface =
-    ObjectBroker::object<PropertiesExtensionInterface*>(baseName + ".propertiesExtension");
+  m_interface = ObjectBroker::object<PropertiesExtensionInterface*>(baseName + ".propertiesExtension");
+  new PropertyBinder(m_interface, "canAddProperty", m_ui->newPropertyBar, "visible");
 }
 
 static PropertyEditorFactory::TypeId selectedTypeId(QComboBox *box)
@@ -109,7 +115,7 @@ void PropertiesTab::updateNewPropertyValueEditor()
  const PropertyEditorFactory::TypeId type = selectedTypeId(m_ui->newPropertyType);
 
  m_newPropertyValue = PropertyEditorFactory::instance()->createEditor(type, this);
- m_ui->newPropertyLayout->insertWidget(5, m_newPropertyValue);
+ static_cast<QHBoxLayout*>(m_ui->newPropertyBar->layout())->insertWidget(5, m_newPropertyValue);
  m_ui->newPropertyValueLabel->setBuddy(m_newPropertyValue);
 }
 
@@ -131,7 +137,6 @@ void PropertiesTab::propertyContextMenu(const QPoint &pos)
     return;
   }
 
-  // TODO: check if this is a dynamic property
   QMenu contextMenu;
   if (actions & PropertyModel::Delete) {
     QAction *action = contextMenu.addAction(tr("Remove"));
@@ -196,6 +201,7 @@ void PropertiesTab::onDoubleClick(const QModelIndex &index)
 
 void PropertiesTab::addNewProperty()
 {
+  Q_ASSERT(m_interface->canAddProperty());
   const PropertyEditorFactory::TypeId type = selectedTypeId(m_ui->newPropertyType);
 
   const QByteArray editorPropertyName = PropertyEditorFactory::instance()->valuePropertyName(type);

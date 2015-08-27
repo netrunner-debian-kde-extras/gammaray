@@ -7,6 +7,11 @@
   Copyright (C) 2014-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Anton Kreuzkamp <anton.kreuzkamp@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -255,13 +260,13 @@ void AnnotatedScenePreview::updatePreviewData()
     setImplicitWidth(m_zoom * m_image.width() + m_margin.width());
   }
 
-  m_itemRect = m_previewData.value("itemRect").value<QRectF>();
+  m_itemRect = m_previewData.value("itemRect").toRectF();
   m_itemRect = QRectF(m_itemRect.topLeft() * m_zoom, m_itemRect.bottomRight() * m_zoom);
-  m_boundingRect = m_previewData.value("boundingRect").value<QRectF>();
+  m_boundingRect = m_previewData.value("boundingRect").toRectF();
   m_boundingRect = QRectF(m_boundingRect.topLeft() * m_zoom, m_boundingRect.bottomRight() * m_zoom);
-  m_childrenRect = m_previewData.value("childrenRect").value<QRectF>();
+  m_childrenRect = m_previewData.value("childrenRect").toRectF();
   m_childrenRect = QRectF(m_childrenRect.topLeft() * m_zoom, m_childrenRect.bottomRight() * m_zoom);
-  m_transformOriginPoint = m_previewData.value("transformOriginPoint").value<QPointF>() * m_zoom;
+  m_transformOriginPoint = m_previewData.value("transformOriginPoint").toPointF() * m_zoom;
   m_transform = m_previewData.value("transform").value<QTransform>();
   m_parentTransform = m_previewData.value("parentTransform").value<QTransform>();
   m_leftMargin = m_previewData.value("leftMargin").toReal() * m_zoom;

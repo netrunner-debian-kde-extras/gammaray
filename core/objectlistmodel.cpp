@@ -7,6 +7,11 @@
   Copyright (C) 2010-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -24,7 +29,6 @@
 #include "objectlistmodel.h"
 
 #include "probe.h"
-#include "readorwritelocker.h"
 
 #include <QThread>
 
@@ -45,7 +49,7 @@ ObjectListModel::ObjectListModel(Probe *probe)
 
 QVariant ObjectListModel::data(const QModelIndex &index, int role) const
 {
-  ReadOrWriteLocker lock(Probe::instance()->objectLock());
+  QMutexLocker lock(Probe::objectLock());
   if (index.row() >= 0 && index.row() < m_objects.size()) {
     QObject *obj = m_objects.at(index.row());
     if (Probe::instance()->isValidObject(obj)) {
@@ -74,12 +78,10 @@ int ObjectListModel::rowCount(const QModelIndex &parent) const
 
 void ObjectListModel::objectAdded(QObject *obj)
 {
+  // see Probe::objectCreated, that promises a valid object in the main thread
   Q_ASSERT(QThread::currentThread() == thread());
   Q_ASSERT(obj);
-
-  ReadOrWriteLocker lock(Probe::instance()->objectLock());
-  if (!Probe::instance()->isValidObject(obj))
-    return;
+  Q_ASSERT(Probe::instance()->isValidObject(obj));
 
   QVector<QObject*>::iterator it = std::lower_bound(m_objects.begin(), m_objects.end(), obj);
   Q_ASSERT(it == m_objects.end() || *it != obj);

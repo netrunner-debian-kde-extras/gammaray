@@ -7,6 +7,11 @@
   Copyright (C) 2013-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Mathias Hasselmann <mathias.hasselmann@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -28,13 +33,11 @@
 #include <core/probeinterface.h>
 #include <core/util.h>
 #include <core/probe.h>
-#include <core/readorwritelocker.h>
 
 #include <QLocale>
+#include <QMutex>
 #include <QSet>
 #include <QThread>
-
-#include <private/qobject_p.h>
 
 using namespace GammaRay;
 
@@ -65,7 +68,11 @@ static void signal_begin_callback(QObject *caller, int method_index, void **argv
   Q_UNUSED(argv);
   if (s_historyModel) {
     const int signalIndex = method_index + 1; // offset 1, so unknown signals end up at 0
-    QMetaObject::invokeMethod(s_historyModel, "onSignalEmitted", Qt::AutoConnection, Q_ARG(QObject*, caller), Q_ARG(int, signalIndex));
+    static const QMetaMethod m = s_historyModel->metaObject()->method(s_historyModel->metaObject()->indexOfMethod("onSignalEmitted(QObject*,int)"));
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+    Q_ASSERT(m.isValid());
+#endif
+    m.invoke(s_historyModel, Qt::AutoConnection, Q_ARG(QObject*, caller), Q_ARG(int, signalIndex));
   }
 }
 
@@ -76,7 +83,8 @@ SignalHistoryModel::SignalHistoryModel(ProbeInterface *probe, QObject *parent)
   connect(probe->probe(), SIGNAL(objectCreated(QObject*)), this, SLOT(onObjectAdded(QObject*)));
   connect(probe->probe(), SIGNAL(objectDestroyed(QObject*)), this, SLOT(onObjectRemoved(QObject*)));
 
-  QSignalSpyCallbackSet spy = { signal_begin_callback, 0, 0, 0 };
+  SignalSpyCallbackSet spy;
+  spy.signalBeginCallback = signal_begin_callback;
   probe->registerSignalSpyCallbackSet(spy);
 
   s_historyModel = this;
@@ -175,7 +183,8 @@ void SignalHistoryModel::onObjectAdded(QObject* object)
 
   // blacklist event dispatchers
   if (qstrncmp(object->metaObject()->className(), "QPAEventDispatcher", 18) == 0
-    || qstrncmp(object->metaObject()->className(), "QGuiEventDispatcher", 19) == 0)
+    || qstrncmp(object->metaObject()->className(), "QGuiEventDispatcher", 19) == 0
+    || qstrncmp(object->metaObject()->className(), "QEventDispatcher", 16) == 0)
     return;
 
   beginInsertRows(QModelIndex(), m_tracedObjects.size(), m_tracedObjects.size());
@@ -218,7 +227,7 @@ void SignalHistoryModel::onSignalEmitted(QObject *sender, int signalIndex)
   // ensure the item is known
   if (signalIndex > 0 && !data->signalNames.contains(signalIndex)) {
     // protect dereferencing of sender here
-    ReadOrWriteLocker lock(Probe::instance()->objectLock());
+    QMutexLocker lock(Probe::objectLock());
     if (!Probe::instance()->isValidObject(sender))
       return;
     const QByteArray signalName = sender->metaObject()->method(signalIndex - 1)

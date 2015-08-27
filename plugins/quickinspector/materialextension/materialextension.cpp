@@ -7,6 +7,11 @@
   Copyright (C) 2014-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Anton Kreuzkamp <anton.kreuzkamp@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -21,12 +26,14 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <config-gammaray.h>
+
 #include "materialextension.h"
 
-#include <core/metapropertymodel.h>
-#include <core/propertycontroller.h>
-#include <core/varianthandler.h>
-#include <common/metatypedeclarations.h>
+#include "core/metapropertymodel.h"
+#include "core/propertycontroller.h"
+#include "core/varianthandler.h"
+#include "common/metatypedeclarations.h"
 
 #include <QFile>
 #include <QStandardItemModel>
@@ -36,9 +43,7 @@
 #include <QSGTextureMaterial>
 #include <QSGVertexColorMaterial>
 
-#include "config-gammaray.h"
-
-#include <private/qsgmaterialshader_p.h> //krazy:exclude=camelcase
+#include <private/qsgmaterialshader_p.h>
 
 using namespace GammaRay;
 

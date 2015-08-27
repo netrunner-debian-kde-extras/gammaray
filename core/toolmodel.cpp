@@ -7,6 +7,11 @@
   Copyright (C) 2010-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -26,7 +31,6 @@
 #include "toolfactory.h"
 #include "proxytoolfactory.h"
 #include "probe.h"
-#include "readorwritelocker.h"
 #include "probesettings.h"
 
 #include "tools/connectioninspector/connectioninspector.h"
@@ -51,6 +55,7 @@
 #include <QDebug>
 #include <QDir>
 #include <QLibrary>
+#include <QMetaMethod>
 #include <QThread>
 
 using namespace GammaRay;
@@ -147,17 +152,13 @@ QMap<int, QVariant> ToolModel::itemData(const QModelIndex& index) const
 
 void ToolModel::objectAdded(QObject *obj)
 {
-  // delay to main thread if required
-  QMetaObject::invokeMethod(this, "objectAddedMainThread",
-                            Qt::AutoConnection, Q_ARG(QObject*, obj));
-}
+  Q_ASSERT(QThread::currentThread() == thread());
+  Q_ASSERT(Probe::instance()->isValidObject(obj));
 
-void ToolModel::objectAddedMainThread(QObject *obj)
-{
-  ReadOrWriteLocker lock(Probe::instance()->objectLock());
-
-  if (Probe::instance()->isValidObject(obj)) {
+  // m_knownMetaObjects allows us to skip the expensive recursive search for matching tools
+  if (!m_knownMetaObjects.contains(obj->metaObject())) {
     objectAdded(obj->metaObject());
+    m_knownMetaObjects.insert(obj->metaObject());
   }
 }
 
@@ -204,7 +205,7 @@ QModelIndex ToolModel::toolForObject(QObject* object) const
   return QModelIndex();
 }
 
-QModelIndex ToolModel::toolForObject(const void* object, const QString typeName) const
+QModelIndex ToolModel::toolForObject(const void* object, const QString& typeName) const
 {
   if (!object)
     return QModelIndex();

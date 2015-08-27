@@ -7,6 +7,11 @@
   Copyright (C) 2011-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -26,31 +31,27 @@
 using namespace GammaRay;
 using namespace std;
 
-ProxyToolFactory::ProxyToolFactory(const QString &path, QObject *parent)
-  : ProxyFactory<ToolFactory>(path, parent)
+ProxyToolFactory::ProxyToolFactory(const PluginInfo &pluginInfo, QObject *parent)
+  : ProxyFactory<ToolFactory>(pluginInfo, parent)
 {
-  m_name = value(QLatin1String("Name")).toString();
-  m_supportedTypes = value(QLatin1String("X-GammaRay-Types")).toString().split(QLatin1Char(';'), QString::SkipEmptyParts);
-  m_hidden = value(QLatin1String("Hidden"), false).toBool();
 }
 
 bool ProxyToolFactory::isValid() const
 {
   return
-    !id().isEmpty() &&
-    !m_name.isEmpty() &&
-    !m_pluginPath.isEmpty() &&
-    !m_supportedTypes.isEmpty();
+    pluginInfo().isValid() &&
+    !name().isEmpty() &&
+    !supportedTypes().isEmpty();
 }
 
 QString ProxyToolFactory::name() const
 {
-  return m_name;
+  return pluginInfo().name();
 }
 
 QStringList ProxyToolFactory::supportedTypes() const
 {
-  return m_supportedTypes;
+  return pluginInfo().supportedTypes();
 }
 
 void ProxyToolFactory::init(ProbeInterface *probe)
@@ -66,5 +67,5 @@ void ProxyToolFactory::init(ProbeInterface *probe)
 
 bool ProxyToolFactory::isHidden() const
 {
-  return m_hidden;
+  return pluginInfo().isHidden();
 }

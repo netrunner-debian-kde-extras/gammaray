@@ -7,6 +7,11 @@
   Copyright (C) 2013-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Anton Kreuzkamp <anton.kreuzkamp@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  acuordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -32,19 +37,27 @@ namespace GammaRay {
 class PropertiesExtensionInterface : public QObject
 {
   Q_OBJECT
+  Q_PROPERTY(bool canAddProperty READ canAddProperty WRITE setCanAddProperty NOTIFY canAddPropertyChanged)
   public:
     explicit PropertiesExtensionInterface(const QString &name, QObject *parent = 0);
     virtual ~PropertiesExtensionInterface();
 
     const QString &name() const;
 
+    bool canAddProperty() const;
+    void setCanAddProperty(bool canAdd);
+
   public slots:
     virtual void navigateToValue(int modelRow) = 0;
     virtual void setProperty(const QString &name, const QVariant &value) = 0;
     virtual void resetProperty(const QString &name) = 0;
 
+  signals:
+    void canAddPropertyChanged();
+
   private:
     QString m_name;
+    bool m_canAddProperty;
 };
 
 }

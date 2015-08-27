@@ -7,6 +7,11 @@
   Copyright (C) 2013-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -24,18 +29,21 @@
 #ifndef GAMMARAY_REMOTEMODEL_H
 #define GAMMARAY_REMOTEMODEL_H
 
+#include "gammaray_client_export.h"
 #include <common/objectmodel.h>
 #include <common/protocol.h>
 
 #include <QAbstractItemModel>
 #include <QSet>
+#include <QTimer>
 #include <QVector>
 
 namespace GammaRay {
 
 class Message;
 
-class RemoteModel : public QAbstractItemModel
+/** @internal Exported for unit test use only. */
+class GAMMARAY_CLIENT_EXPORT RemoteModel : public QAbstractItemModel
 {
   Q_OBJECT
   public:
@@ -44,14 +52,14 @@ class RemoteModel : public QAbstractItemModel
 
     bool isConnected() const;
 
-    QModelIndex index(int row, int column, const QModelIndex& parent = QModelIndex()) const;
-    QModelIndex parent(const QModelIndex& child) const;
-    int rowCount(const QModelIndex& parent = QModelIndex()) const;
-    int columnCount(const QModelIndex& parent = QModelIndex()) const;
-    QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const;
-    bool setData(const QModelIndex& index, const QVariant& value, int role = Qt::EditRole);
-    Qt::ItemFlags flags(const QModelIndex& index) const;
-    QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
+    QModelIndex index(int row, int column, const QModelIndex& parent = QModelIndex()) const Q_DECL_OVERRIDE;
+    QModelIndex parent(const QModelIndex& child) const Q_DECL_OVERRIDE;
+    int rowCount(const QModelIndex& parent = QModelIndex()) const Q_DECL_OVERRIDE;
+    int columnCount(const QModelIndex& parent = QModelIndex()) const Q_DECL_OVERRIDE;
+    QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const Q_DECL_OVERRIDE;
+    bool setData(const QModelIndex& index, const QVariant& value, int role = Qt::EditRole) Q_DECL_OVERRIDE;
+    Qt::ItemFlags flags(const QModelIndex& index) const Q_DECL_OVERRIDE;
+    QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const Q_DECL_OVERRIDE;
 
   public slots:
     void newMessage(const GammaRay::Message &msg);
@@ -109,14 +117,27 @@ class RemoteModel : public QAbstractItemModel
     /// execute a rowsMoved() operation
     void doMoveRows(Node *sourceParentNode, int sourceStart, int sourceEnd, Node* destParentNode, int destStart);
 
+private slots:
+    void doRequestDataAndFlags() const;
+
+private:
     Node* m_root;
 
     mutable QHash<Qt::Orientation, QHash<int, QHash<int, QVariant> > > m_headers; // orientation -> section -> role -> data
+
+    mutable QVector<Protocol::ModelIndex> m_pendingDataRequests;
+    QTimer* m_pendingDataRequestsTimer;
 
     QString m_serverObject;
     Protocol::ObjectAddress m_myAddress;
 
     qint32 m_currentSyncBarrier, m_targetSyncBarrier;
+
+    // hooks for unit tests
+    static void (*s_registerClientCallback)();
+    void registerClient(const QString &serverObject);
+    virtual void sendMessage(const Message &msg) const;
+    friend class FakeRemoteModel;
 };
 
 }

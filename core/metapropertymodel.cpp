@@ -7,6 +7,11 @@
   Copyright (C) 2011-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -118,8 +123,7 @@ QVariant MetaPropertyModel::data(const QModelIndex &index, int role) const
   }
 
   MetaProperty *property = m_metaObject->propertyAt(index.row());
-  // TODO: cache this, to make this more robust against m_object becoming invalid
-  const QVariant value = property->value(m_metaObject->castForPropertyAt(m_object, index.row()));
+  // TODO: cache values, to make this more robust against m_object becoming invalid
 
   if (role == Qt::DisplayRole) {
     switch (index.column()) {
@@ -137,25 +141,29 @@ QVariant MetaPropertyModel::data(const QModelIndex &index, int role) const
       return QVariant();
     }
 
+    const QVariant value = property->value(m_metaObject->castForPropertyAt(m_object, index.row()));
     switch (role) {
     case Qt::DisplayRole:
       return VariantHandler::displayString(value);
     case Qt::DecorationRole:
       return VariantHandler::decoration(value);
     case Qt::EditRole:
-      return property->isReadOnly() ? QVariant() : value;
+      return VariantHandler::serializableVariant(value);
     }
   }
 
   if (role == PropertyModel::ActionRole) {
+    const QVariant value = property->value(m_metaObject->castForPropertyAt(m_object, index.row()));
     return (MetaObjectRepository::instance()->metaObject(property->typeName()) && *reinterpret_cast<void* const*>(value.data())) || value.value<QObject*>()
             ? PropertyModel::NavigateTo
             : PropertyModel::NoAction;
   } else if (role == PropertyModel::ValueRole) {
+      const QVariant value = property->value(m_metaObject->castForPropertyAt(m_object, index.row()));
       return value;
   } else if (role == PropertyModel::AppropriateToolRole) {
     ToolModel *toolModel = Probe::instance()->toolModel();
     ToolFactory *factory;
+    const QVariant value = property->value(m_metaObject->castForPropertyAt(m_object, index.row()));
     if (value.canConvert<QObject*>())
       factory = toolModel->data(toolModel->toolForObject(value.value<QObject*>()), ToolModelRole::ToolFactory).value<ToolFactory*>();
     else

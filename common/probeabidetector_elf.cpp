@@ -7,6 +7,11 @@
   Copyright (C) 2014-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  acuordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -21,7 +26,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "config-gammaray.h"
+#include <config-gammaray.h>
 
 #include "probeabidetector.h"
 #include "probeabi.h"
@@ -74,12 +79,14 @@ ProbeABI ProbeABIDetector::abiForExecutable(const QString& path) const
 }
 
 
-static QString qtCoreFromProc(qint64 pid)
+static bool qtCoreFromProc(qint64 pid, QString &path)
 {
   const QString mapsPath = QString("/proc/%1/maps").arg(pid);
   QFile f(mapsPath);
-  if (!f.open(QFile::ReadOnly))
-    return QString();
+  if (!f.open(QFile::ReadOnly)) {
+    path.clear();
+    return false;
+  }
 
   forever {
     const QByteArray line = f.readLine();
@@ -89,17 +96,19 @@ static QString qtCoreFromProc(qint64 pid)
       const int pos = line.indexOf('/');
       if (pos <= 0)
         continue;
-      return QString::fromLocal8Bit(line.mid(pos).trimmed());
+      path = QString::fromLocal8Bit(line.mid(pos).trimmed());
+      return true;
     }
   }
 
-  return QString();
+  path.clear();
+  return true;
 }
 
 ProbeABI ProbeABIDetector::abiForProcess(qint64 pid) const
 {
-  QString qtCorePath = qtCoreFromProc(pid);
-  if (qtCorePath.isEmpty())
+  QString qtCorePath;
+  if (!qtCoreFromProc(pid, qtCorePath))
     qtCorePath = qtCoreFromLsof(pid);
 
   return abiForQtCore(qtCorePath);

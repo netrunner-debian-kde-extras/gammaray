@@ -7,6 +7,11 @@
   Copyright (C) 2014-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Anton Kreuzkamp <anton.kreuzkamp@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -23,7 +28,7 @@
 
 #include "quickscenegraphmodel.h"
 
-#include <private/qquickitem_p.h> //krazy:exclude=camelcase
+#include <private/qquickitem_p.h>
 #include "quickitemmodelroles.h"
 
 #include <QQuickWindow>
@@ -167,6 +172,7 @@ void QuickSceneGraphModel::populateFromNode(QSGNode *node)
   QVector<QSGNode*> &oldChildList  = m_oldParentChildMap[node];
   QVector<QSGNode*> newChildList;
 
+  newChildList.reserve(node->childCount());
   for (QSGNode *childNode = node->firstChild(); childNode; childNode = childNode->nextSibling()) {
     newChildList.append(childNode);
   }
@@ -185,7 +191,7 @@ void QuickSceneGraphModel::populateFromNode(QSGNode *node)
       beginRemoveRows(myIndex, childList.size(), childList.size());
       endRemoveRows();
       emit nodeDeleted(*i);
-      i++;
+      ++i;
     } else if (*i > *j) { // Add to new list and inform the client about the change
       GET_INDEX
       beginInsertRows(myIndex, childList.size(), childList.size());
@@ -193,13 +199,13 @@ void QuickSceneGraphModel::populateFromNode(QSGNode *node)
       childList.append(*j);
       endInsertRows();
       populateFromNode(*j);
-      j++;
+      ++j;
     } else { // Adopt to new list, without informing the client (as nothing really changed)
       m_childParentMap.insert(*j, node);
       childList.append(*j);
       populateFromNode(*j);
-      j++;
-      i++;
+      ++j;
+      ++i;
     }
   }
   if (i == oldChildList.end() && j != newChildList.constEnd()) {
@@ -207,7 +213,7 @@ void QuickSceneGraphModel::populateFromNode(QSGNode *node)
     GET_INDEX
     beginInsertRows(myIndex, childList.size(),
                     childList.size() + std::distance(j, newChildList.constEnd()) - 1);
-    for (;j != newChildList.constEnd(); j++) {
+    for (;j != newChildList.constEnd(); ++j) {
       m_childParentMap.insert(*j, node);
       childList.append(*j);
       populateFromNode(*j);
@@ -218,7 +224,7 @@ void QuickSceneGraphModel::populateFromNode(QSGNode *node)
     beginRemoveRows(myIndex, childList.size(),
                     childList.size() + std::distance(i, oldChildList.end()) - 1);
     endRemoveRows();
-    for (; i != oldChildList.end(); i++) {
+    for (; i != oldChildList.end(); ++i) {
       emit nodeDeleted(*i);
     }
   }

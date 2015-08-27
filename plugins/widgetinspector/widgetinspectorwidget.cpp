@@ -7,6 +7,11 @@
   Copyright (C) 2010-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -20,20 +25,19 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
+#include <config-gammaray.h>
 
 #include "widgetinspectorwidget.h"
-#include "config-gammaray.h"
 #include "paintbufferviewer.h"
-#include "ui_widgetinspectorwidget.h"
 #include "widgetinspectorinterface.h"
 #include "widgetinspectorclient.h"
+#include "ui_widgetinspectorwidget.h"
 
-#include <common/objectbroker.h>
-#include <common/objectmodel.h>
+#include "common/objectbroker.h"
+#include "common/objectmodel.h"
 
 #include "kde/krecursivefilterproxymodel.h"
-#include "other/modelutils.h"
-#include <ui/deferredresizemodesetter.h>
+#include "ui/deferredresizemodesetter.h"
 
 #include <QDebug>
 #include <QFileDialog>
@@ -213,3 +217,7 @@ void WidgetInspectorWidget::analyzePainting()
   viewer->setModal(true);
   viewer->show();
 }
+
+#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
+Q_EXPORT_PLUGIN(WidgetInspectorUiFactory)
+#endif

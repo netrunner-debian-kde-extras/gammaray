@@ -7,6 +7,11 @@
   Copyright (C) 2013-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  acuordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -21,7 +26,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "config-gammaray.h"
+#include <config-gammaray.h>
 #include "paths.h"
 
 #include <QCoreApplication>
@@ -57,10 +62,15 @@ void setRelativeRootPath(const char* relativeRootPath)
 
 QString probePath(const QString& probeABI)
 {
+#ifndef Q_OS_ANDROID
   return rootPath() + QDir::separator()
     + QLatin1String(GAMMARAY_PLUGIN_INSTALL_DIR) + QDir::separator()
     + QLatin1String(GAMMARAY_PLUGIN_VERSION) + QDir::separator()
     + probeABI;
+#else
+  Q_UNUSED(probeABI);
+  return rootPath() + QDir::separator() + QLatin1String(GAMMARAY_PLUGIN_INSTALL_DIR);
+#endif
 }
 
 QString binPath()
@@ -78,5 +88,26 @@ QString currentProbePath()
   return probePath(GAMMARAY_PROBE_ABI);
 }
 
+QString libraryExtension()
+{
+#ifdef Q_OS_WIN
+  return QLatin1String(".dll");
+#elif defined(Q_OS_MAC)
+  return QLatin1String(".dylib");
+#else
+  return QLatin1String(".so");
+#endif
 }
+
+QString pluginExtension()
+{
+#ifdef Q_OS_MAC
+  return QLatin1String(".so");
+#else
+  return libraryExtension();
+#endif
+}
+
+}
+
 }

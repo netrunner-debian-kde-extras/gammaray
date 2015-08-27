@@ -7,6 +7,11 @@
   Copyright (C) 2013-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -36,6 +41,7 @@ class QTimer;
 namespace GammaRay {
 
 class MultiSignalMapper;
+class ServerDevice;
 
 /** Server side connection endpoint. */
 class GAMMARAY_CORE_EXPORT Server : public Endpoint
@@ -48,7 +54,7 @@ class GAMMARAY_CORE_EXPORT Server : public Endpoint
     /**
      * Register a server-side QObject to send/receive messages to/from the client side.
      */
-    virtual Protocol::ObjectAddress registerObject(const QString &name, QObject *object);
+    Protocol::ObjectAddress registerObject(const QString &name, QObject *object) Q_DECL_OVERRIDE;
 
     /** Register a new object with name @p objectName as a destination for messages.
      *  New messages to that object are passed to the slot @p messageHandlerName on @p receiver.
@@ -70,15 +76,20 @@ class GAMMARAY_CORE_EXPORT Server : public Endpoint
     /**
      * Call @p method on the remote client and also directly on the local object identified by @p objectName.
      */
-    virtual void invokeObject(const QString &objectName, const char *method, const QVariantList &args = QVariantList()) const;
+    void invokeObject(const QString &objectName, const char *method, const QVariantList &args = QVariantList()) const Q_DECL_OVERRIDE;
 
-    bool isRemoteClient() const;
-    QString serverAddress() const;
-    quint16 port() const;
+    bool isRemoteClient() const Q_DECL_OVERRIDE;
+    QUrl serverAddress() const Q_DECL_OVERRIDE;
+    /**
+     * Returns an address suitable to connect to this server.
+     * In contrast to serverAddress(), which returns the listening address, which might not
+     * be identical for all protocols (such as TCP).
+     */
+    QUrl externalAddress() const;
   protected:
-    void messageReceived(const Message& msg);
-    void handlerDestroyed(Protocol::ObjectAddress objectAddress, const QString& objectName);
-    void objectDestroyed(Protocol::ObjectAddress objectAddress, const QString &objectName, QObject *object);
+    void messageReceived(const Message& msg) Q_DECL_OVERRIDE;
+    void handlerDestroyed(Protocol::ObjectAddress objectAddress, const QString& objectName) Q_DECL_OVERRIDE;
+    void objectDestroyed(Protocol::ObjectAddress objectAddress, const QString &objectName, QObject *object) Q_DECL_OVERRIDE;
 
   private slots:
     void newConnection();
@@ -90,13 +101,15 @@ class GAMMARAY_CORE_EXPORT Server : public Endpoint
     void forwardSignal(QObject* sender, int signalIndex, const QVector<QVariant> &args);
 
   private:
-    QTcpServer *m_tcpServer;
+    void sendServerGreeting();
+
+  private:
+    ServerDevice *m_serverDevice;
     QHash<Protocol::ObjectAddress, QPair<QObject*, QByteArray> > m_monitorNotifiers;
     Protocol::ObjectAddress m_nextAddress;
 
     QString m_label;
     QTimer* m_broadcastTimer;
-    QUdpSocket* m_broadcastSocket;
 
     MultiSignalMapper* m_signalMapper;
 };

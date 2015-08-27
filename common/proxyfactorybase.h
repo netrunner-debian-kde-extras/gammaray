@@ -5,6 +5,11 @@
   Copyright (C) 2011-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  acuordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -22,8 +27,9 @@
 #ifndef GAMMARAY_PROXYFACTORYBASE_H
 #define GAMMARAY_PROXYFACTORYBASE_H
 
+#include "plugininfo.h"
+
 #include <QObject>
-#include <QSettings>
 #include <QString>
 
 #include <iostream>
@@ -36,35 +42,33 @@ class ProxyFactoryBase : public QObject
 {
   Q_OBJECT
 public:
-  explicit ProxyFactoryBase(const QString &desktopFilePath, QObject *parent = 0);
+  explicit ProxyFactoryBase(const PluginInfo &pluginInfo, QObject *parent = 0);
   ~ProxyFactoryBase();
 
-  QVariant value(const QString &key, const QVariant &defaultValue = QVariant()) const;
+  PluginInfo pluginInfo() const;
   QString errorString() const;
 
 protected:
   void loadPlugin();
 
-  QString m_id;
   QObject *m_factory;
   QString m_errorString;
-  QString m_pluginPath;
 
 private:
-  QSettings *m_desktopFile;
+  PluginInfo m_pluginInfo;
 };
 
 template <typename IFace>
 class ProxyFactory : public ProxyFactoryBase, public IFace
 {
 public:
-  explicit inline ProxyFactory(const QString &desktopFilePath, QObject *parent = 0)
-    : ProxyFactoryBase(desktopFilePath, parent) {}
+  explicit inline ProxyFactory(const PluginInfo &pluginInfo, QObject *parent = 0)
+    : ProxyFactoryBase(pluginInfo, parent) {}
   inline ~ProxyFactory() {}
 
   inline /*override*/ QString id() const
   {
-    return m_id;
+    return pluginInfo().id();
   }
 
 protected:
@@ -76,8 +80,8 @@ protected:
       m_errorString =
         QObject::tr("Plugin does not provide an instance of %1.").
         arg(qobject_interface_iid<IFace*>());
-      std::cerr << "Failed to cast object from " << qPrintable(m_pluginPath)
-                << " to " << qobject_interface_iid<IFace*>();
+      std::cerr << "Failed to cast object from " << qPrintable(pluginInfo().path())
+                << " to " << qobject_interface_iid<IFace*>() << std::endl;
     }
     return iface;
   }

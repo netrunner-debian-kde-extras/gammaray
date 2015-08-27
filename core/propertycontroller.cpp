@@ -7,6 +7,11 @@
   Copyright (C) 2013-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -44,6 +49,9 @@ PropertyController::PropertyController(const QString &baseName, QObject *parent)
 
 PropertyController::~PropertyController()
 {
+  const auto i = s_instances.indexOf(this);
+  if (i >= 0)
+    s_instances.remove(i);
 }
 
 void PropertyController::loadExtension(PropertyControllerExtensionFactoryBase* factory)
@@ -64,7 +72,7 @@ void PropertyController::registerModel(QAbstractItemModel *model, const QString 
 void PropertyController::setObject(QObject *object)
 {
   if (m_object)
-    disconnect(m_object, 0, this, 0);
+    disconnect(m_object, SIGNAL(destroyed(QObject*)), this, SLOT(objectDestroyed()));
   if (object)
     connect(object, SIGNAL(destroyed(QObject*)), this, SLOT(objectDestroyed()));
 
@@ -77,7 +85,7 @@ void PropertyController::setObject(QObject *object)
       availableExtensions << extension->name();
   }
 
-  emit availableExtensionsChanged(availableExtensions);
+  setAvailableExtensions(availableExtensions);
 }
 
 void PropertyController::setObject(void *object, const QString &className)
@@ -91,7 +99,7 @@ void PropertyController::setObject(void *object, const QString &className)
       availableExtensions << extension->name();
   }
 
-  emit availableExtensionsChanged(availableExtensions);
+  setAvailableExtensions(availableExtensions);
 }
 
 void PropertyController::setMetaObject(const QMetaObject *metaObject)
@@ -105,7 +113,7 @@ void PropertyController::setMetaObject(const QMetaObject *metaObject)
       availableExtensions << extension->name();
   }
 
-  emit availableExtensionsChanged(availableExtensions);
+  setAvailableExtensions(availableExtensions);
 }
 
 void PropertyController::objectDestroyed()

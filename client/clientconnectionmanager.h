@@ -7,6 +7,11 @@
   Copyright (C) 2013-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -24,41 +29,91 @@
 #ifndef GAMMARAY_CLIENTCONNECTIONMANAGER_H
 #define GAMMARAY_CLIENTCONNECTIONMANAGER_H
 
+#include "gammaray_client_export.h"
+
 #include <QObject>
-#include <QAbstractSocket>
 #include <QTime>
+#include <QUrl>
+#include <QPointer>
 
 class QAbstractItemModel;
+class QMainWindow;
 
 namespace GammaRay {
 
 class Client;
 class MainWindow;
 
-/** Pre-MainWindow connection setup logic. */
-class ClientConnectionManager : public QObject
+/** @brief Pre-MainWindow connection setup logic.
+ *
+ * This is useful for embedding the GammaRay client into another application
+ *
+ * @since 2.3
+ */
+class GAMMARAY_CLIENT_EXPORT ClientConnectionManager : public QObject
 {
   Q_OBJECT
   public:
-    explicit ClientConnectionManager(QObject* parent = 0);
+    explicit ClientConnectionManager(QObject* parent = 0, bool showSplashScreenOnStartUp = true);
     ~ClientConnectionManager();
 
-    void connectToHost(const QString &hostname, quint16 port);
+    QMainWindow *mainWindow() const;
+
+    /** Connect to a GammaRay probe at @p url. */
+    void connectToHost(const QUrl &url, int tryAgain = 0);
+
+    /** One-time initialization of stream operators and factory callbacks. */
+    static void init();
+
+  signals:
+    /** Emitted when the connection is established and the tool model is populated.
+     *  If you want to bring up the standard main window, connect this to createMainWindow(),
+     *  otherwise use this to show your own UI at this point.
+     */
+    void ready();
+
+    /** Emitted when there has been a persistent connection error.
+     *  You can connect this to handlePersistentConnectionError() for a standard
+     *  message box and application exit handling.
+     */
+    void persistentConnectionError(const QString &msg);
+
+    /** Emitted when the connection to the target has been closed, for whatever reason.
+     *  For a stand-alone client you probably want to connect this to QApplication::quit().
+     */
+    void disconnected();
+
+  public slots:
+    /** Disconnect GammaRay. */
+    void disconnectFromHost();
+
+    /** Brings up a client main window for the current connection.
+     *  If you want to use this, connect this slot to ready().
+     */
+    QMainWindow *createMainWindow();
+
+    /** Standard persistent connection error handler.
+     *  @see persistentConnectionError()
+     */
+    void handlePersistentConnectionError(const QString &msg);
 
   private slots:
     void connectToHost();
     void connectionEstablished();
-    void connectionError(QAbstractSocket::SocketError error, const QString &msg);
+    void transientConnectionError();
 
     void toolModelPopulated();
+    void delayedHideSplashScreen();
+    void targetQuitRequested();
 
   private:
-    QString m_hostname;
-    quint16 m_port;
+    QUrl m_serverUrl;
     Client *m_client;
-    MainWindow *m_mainWindow;
+    QPointer<MainWindow> m_mainWindow;
     QAbstractItemModel *m_toolModel;
     QTime m_connectionTimeout;
+    bool m_ignorePersistentError;
+    int m_tries;
 };
 
 }

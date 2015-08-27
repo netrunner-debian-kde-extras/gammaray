@@ -7,6 +7,11 @@
   Copyright (C) 2013-2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
   Author: Volker Krause <volker.krause@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -22,19 +27,27 @@
 */
 
 #include "client.h"
+#include "clientdevice.h"
 
 #include <common/message.h>
+#include <common/objectbroker.h>
+#include <common/propertysyncer.h>
 
 #include <QTcpSocket>
 #include <QHostAddress>
 #include <QDebug>
+#include <QUrl>
 
 using namespace GammaRay;
 
 Client::Client(QObject* parent)
   : Endpoint(parent)
+  , m_clientDevice(0)
   , m_initState(0)
 {
+  connect(this, SIGNAL(disconnected()), SLOT(socketDisconnected()));
+
+  m_propertySyncer->setRequestInitialSync(true);
 }
 
 Client::~Client()
@@ -51,33 +64,55 @@ bool Client::isRemoteClient() const
   return true;
 }
 
-QString Client::serverAddress() const
+QUrl Client::serverAddress() const
 {
-  return m_hostName;
+  return m_serverAddress;
 }
 
-void Client::connectToHost(const QString &hostName, quint16 port)
+void Client::connectToHost(const QUrl &url, int tryAgain)
 {
-  QTcpSocket *sock = new QTcpSocket(this);
-  connect(sock, SIGNAL(connected()), SLOT(socketConnected()));
-  connect(sock, SIGNAL(error(QAbstractSocket::SocketError)), SLOT(socketError()));
-  sock->connectToHost(hostName, port);
+  m_serverAddress = url;
   m_initState = 0;
-  m_hostName = hostName;
+
+  m_clientDevice = ClientDevice::create(m_serverAddress, this);
+  if (!m_clientDevice) {
+    emit persisitentConnectionError(tr("Unsupported transport protocol."));
+    return;
+  }
+
+  connect(m_clientDevice, SIGNAL(connected()), this, SLOT(socketConnected()));
+  connect(m_clientDevice, SIGNAL(transientError()), this, SIGNAL(transientConnectionError()));
+  connect(m_clientDevice, SIGNAL(persistentError(QString)), this, SIGNAL(persisitentConnectionError(QString)));
+  connect(m_clientDevice, SIGNAL(transientError()), this, SLOT(socketError()));
+  connect(m_clientDevice, SIGNAL(persistentError(QString)), this, SLOT(socketError()));
+  m_clientDevice->setTryAgain(tryAgain);
+  m_clientDevice->connectToHost();
+}
+
+void Client::disconnectFromHost()
+{
+    if (m_clientDevice)
+        m_clientDevice->disconnectFromHost();
 }
 
 void Client::socketConnected()
 {
-  Q_ASSERT(qobject_cast<QIODevice*>(sender()));
-  setDevice(qobject_cast<QIODevice*>(sender()));
+  Q_ASSERT(m_clientDevice->device());
+  setDevice(m_clientDevice->device());
 }
 
 void Client::socketError()
 {
-  QTcpSocket *socket = qobject_cast<QTcpSocket*>(sender());
-  Q_ASSERT(socket);
-  emit connectionError(socket->error(), socket->errorString());
-  socket->deleteLater();
+  m_clientDevice->deleteLater();
+  m_clientDevice = 0;
+}
+
+void Client::socketDisconnected()
+{
+  foreach (const auto &objInfo, objectAddresses()) {
+    unregisterObjectInternal(objInfo.second);
+  }
+  ObjectBroker::clear();
 }
 
 void Client::messageReceived(const Message& msg)
@@ -121,6 +156,11 @@ void Client::messageReceived(const Message& msg)
           if (it->first != endpointAddress())
             registerObjectInternal(it->second, it->first);
         }
+
+        m_propertySyncer->setAddress(objectAddress("com.kdab.GammaRay.PropertySyncer"));
+        Q_ASSERT(m_propertySyncer->address() != Protocol::InvalidObjectAddress  );
+        registerMessageHandlerInternal(m_propertySyncer->address(), m_propertySyncer, "handleMessage");
+
         m_initState |= ObjectMapReceived;
         break;
       }
@@ -149,6 +189,8 @@ Protocol::ObjectAddress Client::registerObject(const QString &name, QObject *obj
 {
   Q_ASSERT(isConnected());
   Protocol::ObjectAddress address = Endpoint::registerObject(name, object);
+  m_propertySyncer->addObject(address, object);
+  m_propertySyncer->setObjectEnabled(address, true);
 
   Message msg(endpointAddress(), Protocol::ObjectMonitored);
   msg.payload() << address;
