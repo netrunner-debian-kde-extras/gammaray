@@ -71,6 +71,7 @@ Depends: gammaray (= ${binary:Version}),
          qml-module-qtquick-controls,
          ${shlibs:Depends},
          ${misc:Depends}
+Enhances: gammaray
 Description: GammaRay plugin for inspecting QtQuick2 applications
  This plugin provides the user with the following inspection and debugging
  facilities:
@@ -88,6 +89,7 @@ Architecture: any
 Depends: gammaray (= ${binary:Version}),
          ${shlibs:Depends},
          ${misc:Depends}
+Enhances: gammaray
 Description: KJob tracker plugin for GammaRay
  This plugin can be used to monitor KJob instances within a KDE-based
  application.

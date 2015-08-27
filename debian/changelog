@@ -5,6 +5,7 @@ gammaray (2.3.0-1) UNRELEASED; urgency=medium
   * Build-depend on the new libvtk6-qt-dev package. (Closes: #793604)
   * Explicitly disable VTK for the Qt4 build. It throws errors but isn't
     actually used.
+  * Add "Enhances: gammaray" to the plugins. (Closes: #791353)
 
  -- Felix Geyer <fgeyer@debian.org>  Thu, 27 Aug 2015 12:02:59 +0200
 
