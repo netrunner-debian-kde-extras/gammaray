@@ -11,7 +11,7 @@ DEB_HOST_ARCH ?= $(shell dpkg-architecture -qDEB_HOST_ARCH)
 
 override_dh_auto_configure:
 	dh_auto_configure -B obj-qt5
-	dh_auto_configure -B obj-qt4 -- -DGAMMARAY_ENFORCE_QT4_BUILD=ON -DGAMMARAY_PROBE_ONLY_BUILD=ON
+	dh_auto_configure -B obj-qt4 -- -DGAMMARAY_ENFORCE_QT4_BUILD=ON -DGAMMARAY_PROBE_ONLY_BUILD=ON -DCMAKE_DISABLE_FIND_PACKAGE_VTK=True
 
 override_dh_auto_build:
 	dh_auto_build -B obj-qt5 -O--parallel
