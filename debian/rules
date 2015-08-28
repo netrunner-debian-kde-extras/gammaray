@@ -21,6 +21,9 @@ override_dh_auto_test:
 # tests fail on kfreebsd because of bug #570805: Wrong path in /proc/pid/maps when bind mounted
 ifneq (,$(filter $(DEB_HOST_ARCH), kfreebsd-amd64 kfreebsd-i386))
 	xvfb-run -a -s "-screen 0 640x480x24" dh_auto_test --max-parallel=1 -B obj-qt5 || true
+# attachtest-gdb is unstable on s90x and hangs builds
+else ifeq ($(DEB_HOST_ARCH), s390x)
+	xvfb-run -a -s "-screen 0 640x480x24" dh_auto_test --max-parallel=1 -B obj-qt5 -- ARGS="-E attachtest-gdb"
 else
 	xvfb-run -a -s "-screen 0 640x480x24" dh_auto_test --max-parallel=1 -B obj-qt5
 endif

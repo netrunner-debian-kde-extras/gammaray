@@ -1,3 +1,9 @@
+gammaray (2.3.0-3) unstable; urgency=medium
+
+  * Disable attachtest-gdb on s390x. It's unstable and hangs builds.
+
+ -- Felix Geyer <fgeyer@debian.org>  Sat, 29 Aug 2015 00:45:11 +0200
+
 gammaray (2.3.0-2) unstable; urgency=medium
 
   * Build-depend on libvtk6-qt-dev only on architectures where it's actually
