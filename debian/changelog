@@ -1,3 +1,9 @@
+gammaray (2.4.0-1) UNRELEASED; urgency=medium
+
+  * New upstream release.
+
+ -- Jakub Adam <jakub.adam@ktknet.cz>  Fri, 08 Jan 2016 00:52:03 +0100
+
 gammaray (2.3.0-3) unstable; urgency=medium
 
   * Disable attachtest-gdb on s390x. It's unstable and hangs builds.
