@@ -32,6 +32,8 @@
 #include <QMetaType>
 #include <QStringList>
 
+using namespace GammaRay;
+
 MetaTypesModel::MetaTypesModel(QObject *parent)
   : QAbstractTableModel(parent)
 {
@@ -65,7 +67,7 @@ QVariant MetaTypesModel::data(const QModelIndex &index, int role) const
   {
     const QMetaType::TypeFlags flags = QMetaType::typeFlags(metaTypeId);
     QStringList l;
-    #define F(x) if (flags & QMetaType:: x) l.push_back(#x)
+    #define F(x) if (flags & QMetaType:: x) l.push_back(QStringLiteral(#x))
     F(NeedsConstruction);
     F(NeedsDestruction);
     F(MovableType);
@@ -80,7 +82,7 @@ QVariant MetaTypesModel::data(const QModelIndex &index, int role) const
 #endif
     #undef F
 
-    return l.join(", ");
+    return l.join(QStringLiteral(", "));
   }
 #endif
   }

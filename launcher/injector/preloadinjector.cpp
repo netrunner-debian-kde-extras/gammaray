@@ -27,14 +27,17 @@
 */
 
 #include "preloadinjector.h"
-
-#include "interactiveprocess.h"
 #include "preloadcheck.h"
+
+#include <probeabidetector.h>
 
 #ifndef Q_OS_WIN
 
 #include <QProcess>
 #include <QDebug>
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+#include <QStandardPaths>
+#endif
 
 #include <cstdlib>
 
@@ -44,25 +47,38 @@ PreloadInjector::PreloadInjector() : ProcessInjector()
 {
 }
 
+QString PreloadInjector::name() const
+{
+  return QStringLiteral("preload");
+}
+
 bool PreloadInjector::launch(const QStringList &programAndArgs,
                             const QString &probeDll,
-                            const QString &probeFunc)
+                            const QString &probeFunc,
+                            const QProcessEnvironment &e)
 {
   Q_UNUSED(probeFunc);
 
-  QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+  QProcessEnvironment env(e);
 #ifdef Q_OS_MAC
-  env.insert("DYLD_FORCE_FLAT_NAMESPACE", QLatin1String("1"));
-  env.insert("DYLD_INSERT_LIBRARIES", probeDll);
-  env.insert("GAMMARAY_UNSET_DYLD", "1");
+  env.insert(QStringLiteral("DYLD_FORCE_FLAT_NAMESPACE"), QStringLiteral("1"));
+  env.insert(QStringLiteral("DYLD_INSERT_LIBRARIES"), probeDll);
+  env.insert(QStringLiteral("GAMMARAY_UNSET_DYLD"), QStringLiteral("1"));
 #else
-  env.insert("LD_PRELOAD", probeDll);
-  env.insert("GAMMARAY_UNSET_PRELOAD", "1");
+  env.insert(QStringLiteral("LD_PRELOAD"), probeDll);
+  env.insert(QStringLiteral("GAMMARAY_UNSET_PRELOAD"), QStringLiteral("1"));
 
+  auto exePath = programAndArgs.first();
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+  exePath = QStandardPaths::findExecutable(exePath);
+#endif
+
+  ProbeABIDetector abiDetector;
+  const auto qtCorePath = abiDetector.qtCoreForExecutable(exePath);
   PreloadCheck check;
-  const bool success = check.test("qt_startup_hook");
+  const bool success = check.test(qtCorePath, QStringLiteral("qt_startup_hook"));
 #if QT_VERSION < QT_VERSION_CHECK(5, 4, 0) // before 5.4 this is fatal, after that we have the built-in hooks and DLL initialization as an even better way
-  if (!success) {
+  if (!success  && !qtCorePath.isEmpty()) {
     mExitCode = 1;
     mErrorString = check.errorString();
     return false;

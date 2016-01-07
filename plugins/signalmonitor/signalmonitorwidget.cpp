@@ -33,8 +33,9 @@
 #include "signalmonitorclient.h"
 #include "signalmonitorcommon.h"
 
+#include <ui/searchlinecontroller.h>
+
 #include <common/objectbroker.h>
-#include <kde/krecursivefilterproxymodel.h>
 
 #include <cmath>
 
@@ -54,17 +55,12 @@ SignalMonitorWidget::SignalMonitorWidget(QWidget *parent)
   ObjectBroker::registerClientObjectFactoryCallback<SignalMonitorInterface*>(signalMonitorClientFactory);
 
   ui->setupUi(this);
+  ui->pauseButton->setIcon(qApp->style()->standardIcon(QStyle::SP_MediaPause));
 
-  QAbstractItemModel *const signalHistory = ObjectBroker::model("com.kdab.GammaRay.SignalHistoryModel");
+  QAbstractItemModel *const signalHistory = ObjectBroker::model(QStringLiteral("com.kdab.GammaRay.SignalHistoryModel"));
+  new SearchLineController(ui->objectSearchLine, signalHistory);
 
-  QSortFilterProxyModel *const searchProxy = new KRecursiveFilterProxyModel(this);
-  searchProxy->setSourceModel(signalHistory);
-  searchProxy->setDynamicSortFilter(true);
-  ui->objectSearchLine->setProxy(searchProxy);
-
-  ui->objectTreeView->setModel(searchProxy);
-
-  //ui->objectTreeView->setSelectionModel(ObjectBroker::selectionModel(ui->objectTreeView->model()));
+  ui->objectTreeView->setModel(signalHistory);
   ui->objectTreeView->setEventScrollBar(ui->eventScrollBar);
 
   connect(ui->pauseButton, SIGNAL(toggled(bool)), this, SLOT(pauseAndResume(bool)));

@@ -34,11 +34,11 @@
 #include "graphicsview.h"
 #include "ui_sceneinspectorwidget.h"
 
+#include <ui/searchlinecontroller.h>
+
 #include <common/objectbroker.h>
 #include <common/endpoint.h>
 #include <common/objectmodel.h>
-
-#include <kde/krecursivefilterproxymodel.h>
 
 #include <QGraphicsItem>
 #include <QGraphicsView>
@@ -69,17 +69,16 @@ SceneInspectorWidget::SceneInspectorWidget(QWidget *parent)
   m_interface = ObjectBroker::object<SceneInspectorInterface*>();
 
   ui->setupUi(this);
-  ui->scenePropertyWidget->setObjectBaseName("com.kdab.GammaRay.SceneInspector");
+  ui->scenePropertyWidget->setObjectBaseName(QStringLiteral("com.kdab.GammaRay.SceneInspector"));
 
-  ui->sceneComboBox->setModel(ObjectBroker::model("com.kdab.GammaRay.SceneList"));
+  ui->sceneComboBox->setModel(ObjectBroker::model(QStringLiteral("com.kdab.GammaRay.SceneList")));
   connect(ui->sceneComboBox, SIGNAL(currentIndexChanged(int)), SLOT(sceneSelected(int)));
 
-  QSortFilterProxyModel *sceneFilter = new KRecursiveFilterProxyModel(this);
-  sceneFilter->setSourceModel(ObjectBroker::model("com.kdab.GammaRay.SceneGraphModel"));
-  ui->sceneTreeView->setModel(sceneFilter);
-  ui->screneTreeSearchLine->setProxy(sceneFilter);
+  auto sceneModel = ObjectBroker::model(QStringLiteral("com.kdab.GammaRay.SceneGraphModel"));
+  ui->sceneTreeView->setModel(sceneModel);
+  new SearchLineController(ui->sceneTreeSearchLine, sceneModel);
 
-  QItemSelectionModel *itemSelection = ObjectBroker::selectionModel(sceneFilter);
+  QItemSelectionModel *itemSelection = ObjectBroker::selectionModel(sceneModel);
   ui->sceneTreeView->setSelectionModel(itemSelection);
   connect(itemSelection, SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
           this, SLOT(sceneItemSelected(QItemSelection)));

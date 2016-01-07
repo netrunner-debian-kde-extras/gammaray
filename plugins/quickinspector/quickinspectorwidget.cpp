@@ -30,11 +30,12 @@
 #include "quickinspectorclient.h"
 #include "quickclientitemmodel.h"
 #include "quickitemtreewatcher.h"
+#include "quickitemmodelroles.h"
+#include "quickscenepreviewwidget.h"
 #include "geometryextension/sggeometryextensionclient.h"
 #include "geometryextension/sggeometrytab.h"
 #include "materialextension/materialextensionclient.h"
 #include "materialextension/materialtab.h"
-#include "annotatedscenepreview.h"
 #include "quickitemdelegate.h"
 #include "transferimage.h"
 #include "ui_quickinspectorwidget.h"
@@ -42,57 +43,19 @@
 #include <common/endpoint.h>
 #include <common/objectbroker.h>
 #include <ui/deferredresizemodesetter.h>
+#include <ui/searchlinecontroller.h>
+#include <ui/uiintegration.h>
 
-#include <kde/krecursivefilterproxymodel.h>
 #include <client/remotemodel.h>
 
 #include <QEvent>
 #include <QLabel>
+#include <QMenu>
 #include <QTimer>
 #include <qmath.h>
-#include <QQuickImageProvider>
 #include <QRectF>
-#include <QQuickView>
-#include <QQuickItem>
-#include <QPainter>
-#include <QQmlContext>
 #include <QtCore/qglobal.h>
 #include <QPropertyAnimation>
-
-namespace GammaRay {
-
-class QuickSceneImageProvider : public QQuickImageProvider
-{
-  public:
-    explicit QuickSceneImageProvider() : QQuickImageProvider(QQuickImageProvider::Pixmap) {}
-    ~QuickSceneImageProvider() {}
-
-    QPixmap requestPixmap(const QString & id, QSize * size, const QSize & requestedSize)
-    {
-      Q_UNUSED(requestedSize);
-      if (id == "background") {
-        QPixmap bgPattern(20, 20);
-        bgPattern.fill(Qt::lightGray);
-        QPainter bgPainter(&bgPattern);
-        bgPainter.fillRect(10, 0, 10, 10, Qt::gray);
-        bgPainter.fillRect(0, 10, 10, 10, Qt::gray);
-        *size = QSize(20, 20);
-        return bgPattern;
-      }
-      *size = m_pixmap.size();
-      return m_pixmap;
-    }
-
-    void setPixmap(QPixmap pixmap)
-    {
-      m_pixmap = pixmap;
-    }
-
-  private:
-    QPixmap m_pixmap;
-};
-
-}
 
 using namespace GammaRay;
 
@@ -116,9 +79,7 @@ QuickInspectorWidget::QuickInspectorWidget(QWidget *parent)
     ui(new Ui::QuickInspectorWidget),
     m_renderTimer(new QTimer(this)),
     m_sceneChangedSinceLastRequest(false),
-    m_waitingForImage(false),
-    m_imageProvider(new QuickSceneImageProvider),
-    m_preview(new QQuickView)
+    m_waitingForImage(false)
 {
   ui->setupUi(this);
 
@@ -127,57 +88,45 @@ QuickInspectorWidget::QuickInspectorWidget(QWidget *parent)
 
   m_interface = ObjectBroker::object<QuickInspectorInterface*>();
   connect(m_interface, SIGNAL(sceneChanged()), this, SLOT(sceneChanged()));
-  connect(m_interface, SIGNAL(sceneRendered(QVariantMap)),
-          this, SLOT(sceneRendered(QVariantMap)));
+  connect(m_interface, SIGNAL(sceneRendered(GammaRay::TransferImage,GammaRay::QuickItemGeometry)),
+          this, SLOT(sceneRendered(GammaRay::TransferImage,GammaRay::QuickItemGeometry)));
 
-  ui->windowComboBox->setModel(ObjectBroker::model("com.kdab.GammaRay.QuickWindowModel"));
+  ui->windowComboBox->setModel(ObjectBroker::model(QStringLiteral("com.kdab.GammaRay.QuickWindowModel")));
   connect(ui->windowComboBox, SIGNAL(currentIndexChanged(int)),
           m_interface, SLOT(selectWindow(int)));
   if (ui->windowComboBox->currentIndex() >= 0) {
     m_interface->selectWindow(ui->windowComboBox->currentIndex());
   }
 
-  QSortFilterProxyModel *proxy = new QuickClientItemModel(this);
-  proxy->setSourceModel(ObjectBroker::model("com.kdab.GammaRay.QuickItemModel"));
-  proxy->setDynamicSortFilter(true);
+  auto model = ObjectBroker::model(QStringLiteral("com.kdab.GammaRay.QuickItemModel"));
+  auto proxy = new QuickClientItemModel(this);
+  proxy->setSourceModel(model);
   ui->itemTreeView->setModel(proxy);
-  ui->itemTreeSearchLine->setProxy(proxy);
+  new SearchLineController(ui->itemTreeSearchLine, model);
   QItemSelectionModel *selectionModel = ObjectBroker::selectionModel(proxy);
   ui->itemTreeView->setSelectionModel(selectionModel);
   ui->itemTreeView->setItemDelegate(new QuickItemDelegate(ui->itemTreeView));
   connect(selectionModel, SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
           this, SLOT(itemSelectionChanged(QItemSelection)));
   connect(proxy, SIGNAL(dataChanged(QModelIndex,QModelIndex,QVector<int>)),
-          this, SLOT(itemModelDataChanged(QModelIndex,QModelIndex)));
+          this, SLOT(itemModelDataChanged(QModelIndex,QModelIndex,QVector<int>)));
 
-  QSortFilterProxyModel *sgProxy = new KRecursiveFilterProxyModel(this);
-  sgProxy->setSourceModel(ObjectBroker::model("com.kdab.GammaRay.QuickSceneGraphModel"));
-  sgProxy->setDynamicSortFilter(true);
-  ui->sgTreeView->setModel(sgProxy);
-  ui->sgTreeSearchLine->setProxy(sgProxy);
-  QItemSelectionModel *sgSelectionModel = ObjectBroker::selectionModel(sgProxy);
+  model = ObjectBroker::model(QStringLiteral("com.kdab.GammaRay.QuickSceneGraphModel"));
+  ui->sgTreeView->setModel(model);
+  new SearchLineController(ui->sgTreeSearchLine, model);
+  QItemSelectionModel *sgSelectionModel = ObjectBroker::selectionModel(model);
   ui->sgTreeView->setSelectionModel(sgSelectionModel);
   connect(sgSelectionModel, SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
           this, SLOT(itemSelectionChanged(QItemSelection)));
 
   new QuickItemTreeWatcher(ui->itemTreeView, ui->sgTreeView, this);
-  new DeferredResizeModeSetter(ui->itemTreeView->header(), 0, QHeaderView::ResizeToContents);
 
-  ui->itemPropertyWidget->setObjectBaseName("com.kdab.GammaRay.QuickItem");
-  ui->sgPropertyWidget->setObjectBaseName("com.kdab.GammaRay.QuickSceneGraph");
+  m_previewWidget = new QuickScenePreviewWidget(m_interface, this);
 
-  qmlRegisterType<AnnotatedScenePreview>("com.kdab.GammaRay", 1, 0, "AnnotatedScenePreview");
+  ui->itemPropertyWidget->setObjectBaseName(QStringLiteral("com.kdab.GammaRay.QuickItem"));
+  ui->sgPropertyWidget->setObjectBaseName(QStringLiteral("com.kdab.GammaRay.QuickSceneGraph"));
 
-  QWidget *previewContainter = QWidget::createWindowContainer(m_preview, ui->previewTreeSplitter);
-  previewContainter->setFocusPolicy(Qt::StrongFocus);
-  m_preview->setResizeMode(QQuickView::SizeRootObjectToView);
-  m_preview->engine()->addImageProvider("quicksceneprovider", m_imageProvider);
-  m_preview->setSource(QUrl("qrc:/gammaray/plugins/quickinspector/quickpreview.qml"));
-  m_rootItem = qobject_cast< QQuickItem *>(m_preview->rootObject());
-  qmlRegisterUncreatableType<QuickInspectorInterface>(
-    "com.kdab.GammaRay", 1, 0, "QuickInspectorInterface", "Can't create. Only for enums.");
-  m_preview->engine()->rootContext()->setContextProperty("inspectorInterface", m_interface);
-  QTimer::singleShot(0, this, SLOT(setSplitterSizes()));
+  ui->previewTreeSplitter->addWidget(m_previewWidget);
 
   m_renderTimer->setInterval(100);
   m_renderTimer->setSingleShot(true);
@@ -185,6 +134,9 @@ QuickInspectorWidget::QuickInspectorWidget(QWidget *parent)
 
   connect(m_interface, SIGNAL(features(GammaRay::QuickInspectorInterface::Features)),
           this, SLOT(setFeatures(GammaRay::QuickInspectorInterface::Features)));
+
+  connect(ui->itemTreeView, SIGNAL(customContextMenuRequested(QPoint)),
+          this, SLOT(itemContextMenu(QPoint)));
 
   m_interface->checkFeatures();
 }
@@ -208,17 +160,12 @@ void QuickInspectorWidget::sceneChanged()
   }
 }
 
-void QuickInspectorWidget::sceneRendered(const QVariantMap &previewData)
+void QuickInspectorWidget::sceneRendered(const GammaRay::TransferImage &transfer, const GammaRay::QuickItemGeometry &itemGeometry)
 {
   m_waitingForImage = false;
 
-  if (m_rootItem) {
-    QVariantMap data(previewData);
-    const TransferImage transfer = data.value("rawImage").value<TransferImage>();
-    data.remove("rawImage");
-    data.insert("image", QVariant::fromValue(transfer.image())); // unwrap for usage in QML
-    m_rootItem->setProperty("previewData", data);
-  }
+  m_previewWidget->setImage(transfer.image());
+  m_previewWidget->setItemGeometry(itemGeometry);
 
   if (m_sceneChangedSinceLastRequest) {
     m_sceneChangedSinceLastRequest = false;
@@ -238,8 +185,7 @@ void QuickInspectorWidget::requestRender()
 
 void QuickInspectorWidget::setFeatures(QuickInspectorInterface::Features features)
 {
-  m_rootItem->setProperty("supportsCustomRenderModes",
-                          (bool)(features & QuickInspectorInterface::CustomRenderModes));
+  m_previewWidget->setSupportsCustomRenderModes(features);
 }
 
 void QuickInspectorWidget::itemSelectionChanged(const QItemSelection &selection)
@@ -251,9 +197,11 @@ void QuickInspectorWidget::itemSelectionChanged(const QItemSelection &selection)
   ui->itemTreeView->scrollTo(index);
 }
 
-void QuickInspectorWidget::itemModelDataChanged(const QModelIndex &topLeft,
-                                                const QModelIndex &bottomRight)
+void QuickInspectorWidget::itemModelDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight, const QVector<int> &roles)
 {
+  if (!roles.contains(QuickItemModelRole::ItemEvent))
+    return;
+
   for (int i = topLeft.row(); i <= bottomRight.row(); i++) {
     const QModelIndex index = ui->itemTreeView->model()->index(i, 0, topLeft.parent());
     RemoteModel::NodeStates state =
@@ -263,10 +211,11 @@ void QuickInspectorWidget::itemModelDataChanged(const QModelIndex &topLeft,
     }
 
     QVariantAnimation *colorAnimation = new QVariantAnimation(this);
-    colorAnimation->setProperty("index", QVariant::fromValue(QPersistentModelIndex(index)));
-    connect(colorAnimation, SIGNAL(valueChanged(QVariant)),
-            ui->itemTreeView->itemDelegate(), SLOT(setTextColor(QVariant)));
-
+    QPersistentModelIndex persistentIndex(index);
+    connect(colorAnimation, &QVariantAnimation::valueChanged,
+            ui->itemTreeView->itemDelegate(), [persistentIndex, this](const QVariant& value) {
+                qobject_cast<QuickItemDelegate*>(ui->itemTreeView->itemDelegate())->setTextColor(value, persistentIndex);
+            });
     colorAnimation->setStartValue(QColor(129, 0, 129));
     colorAnimation->setEndValue(QColor(129, 0, 129, 0));
     colorAnimation->setDuration(2000);
@@ -279,12 +228,12 @@ void QuickInspectorUiFactory::initUi()
   ObjectBroker::registerClientObjectFactoryCallback<MaterialExtensionInterface*>(
     createMaterialExtension);
 
-  PropertyWidget::registerTab<MaterialTab>("material", QObject::tr("Material"));
+  PropertyWidget::registerTab<MaterialTab>(QStringLiteral("material"), tr("Material"));
 
   ObjectBroker::registerClientObjectFactoryCallback<SGGeometryExtensionInterface*>(
     createSGGeometryExtension);
 
-  PropertyWidget::registerTab<SGGeometryTab>("sgGeometry", QObject::tr("Geometry"));
+  PropertyWidget::registerTab<SGGeometryTab>(QStringLiteral("sgGeometry"), tr("Geometry"));
 }
 
 void QuickInspectorWidget::showEvent(QShowEvent* event)
@@ -300,4 +249,37 @@ void QuickInspectorWidget::hideEvent(QHideEvent* event)
   if (Endpoint::isConnected())
     m_interface->setSceneViewActive(false);
   QWidget::hideEvent(event);
+}
+
+void GammaRay::QuickInspectorWidget::itemContextMenu(const QPoint& pos)
+{
+  const QModelIndex index = ui->itemTreeView->indexAt(pos);
+  if (!index.isValid() || !UiIntegration::instance()) {
+    return;
+  }
+
+  const auto sourceFile = index.data(QuickItemModelRole::SourceFileRole).toString();
+  if (sourceFile.isEmpty())
+    return;
+
+  QMenu contextMenu;
+  QAction *action =
+    contextMenu.addAction(tr("Show Code: %1:%2:%3").
+      arg(sourceFile,
+          index.data(QuickItemModelRole::SourceLineRole).toString(),
+          index.data(QuickItemModelRole::SourceColumnRole).toString()));
+  action->setData(QuickInspectorWidget::NavigateToCode);
+
+
+  if (QAction *action = contextMenu.exec(ui->itemTreeView->viewport()->mapToGlobal(pos))) {
+    UiIntegration *integ = 0;
+    switch (action->data().toInt()) {
+      case QuickInspectorWidget::NavigateToCode:
+        integ = UiIntegration::instance();
+        emit integ->navigateToCode(sourceFile,
+                                   index.data(QuickItemModelRole::SourceLineRole).toInt(),
+                                   index.data(QuickItemModelRole::SourceColumnRole).toInt());
+        break;
+    }
+  }
 }

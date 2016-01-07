@@ -110,7 +110,7 @@ void Client::socketError()
 void Client::socketDisconnected()
 {
   foreach (const auto &objInfo, objectAddresses()) {
-    unregisterObjectInternal(objInfo.second);
+    removeObjectNameAddressMapping(objInfo.second);
   }
   ObjectBroker::clear();
 }
@@ -120,12 +120,14 @@ void Client::messageReceived(const Message& msg)
   // server version must be the very first message we get
   if (!(m_initState & VersionChecked)) {
     if (msg.address() != endpointAddress() || msg.type() != Protocol::ServerVersion) {
-      qFatal("Protocol violation - first message is not the server version.\n");
+      emit persisitentConnectionError(tr("Protocol violation, first message is not the server version."));
+      disconnectFromHost();
     }
     qint32 serverVersion;
     msg.payload() >> serverVersion;
     if (serverVersion != Protocol::version()) {
-      qFatal("Server version is %d, was expecting %d - aborting.\n", serverVersion, Protocol::version());
+      emit persisitentConnectionError(tr("Server version is %1, was expecting %2.").arg(serverVersion).arg(Protocol::version()));
+      disconnectFromHost();
     }
     m_initState |= VersionChecked;
     return;
@@ -138,14 +140,14 @@ void Client::messageReceived(const Message& msg)
         QString name;
         Protocol::ObjectAddress addr;
         msg.payload() >> name >> addr;
-        registerObjectInternal(name, addr);
+        addObjectNameAddressMapping(name, addr);
         break;
       }
       case Protocol::ObjectRemoved:
       {
         QString name;
         msg.payload() >> name;
-        unregisterObjectInternal(name);
+        removeObjectNameAddressMapping(name);
         break;
       }
       case Protocol::ObjectMapReply:
@@ -154,12 +156,12 @@ void Client::messageReceived(const Message& msg)
         msg.payload() >> objects;
         for (QVector<QPair<Protocol::ObjectAddress, QString> >::const_iterator it = objects.constBegin(); it != objects.constEnd(); ++it) {
           if (it->first != endpointAddress())
-            registerObjectInternal(it->second, it->first);
+            addObjectNameAddressMapping(it->second, it->first);
         }
 
-        m_propertySyncer->setAddress(objectAddress("com.kdab.GammaRay.PropertySyncer"));
+        m_propertySyncer->setAddress(objectAddress(QStringLiteral("com.kdab.GammaRay.PropertySyncer")));
         Q_ASSERT(m_propertySyncer->address() != Protocol::InvalidObjectAddress  );
-        registerMessageHandlerInternal(m_propertySyncer->address(), m_propertySyncer, "handleMessage");
+        Endpoint::registerMessageHandler(m_propertySyncer->address(), m_propertySyncer, "handleMessage");
 
         m_initState |= ObjectMapReceived;
         break;
@@ -192,26 +194,20 @@ Protocol::ObjectAddress Client::registerObject(const QString &name, QObject *obj
   m_propertySyncer->addObject(address, object);
   m_propertySyncer->setObjectEnabled(address, true);
 
-  Message msg(endpointAddress(), Protocol::ObjectMonitored);
-  msg.payload() << address;
-  send(msg);
-
+  monitorObject(address);
   return address;
 }
 
-/// TODO: get rid of this
-void Client::registerForObject(Protocol::ObjectAddress objectAddress, QObject* handler, const char* slot)
+void Client::registerMessageHandler(Protocol::ObjectAddress objectAddress, QObject* receiver, const char* messageHandlerName)
 {
   Q_ASSERT(isConnected());
-  registerMessageHandlerInternal(objectAddress, handler, slot);
-  Message msg(endpointAddress(), Protocol::ObjectMonitored);
-  msg.payload() << objectAddress;
-  send(msg);
+  Endpoint::registerMessageHandler(objectAddress, receiver, messageHandlerName);
+  monitorObject(objectAddress);
 }
 
-void Client::unregisterForObject(Protocol::ObjectAddress objectAddress)
+void Client::unregisterMessageHandler(Protocol::ObjectAddress objectAddress)
 {
-  unregisterMessageHandlerInternal(objectAddress);
+  Endpoint::unregisterMessageHandler(objectAddress);
   unmonitorObject(objectAddress);
 }
 
@@ -223,6 +219,15 @@ void Client::objectDestroyed(Protocol::ObjectAddress objectAddress, const QStrin
 void Client::handlerDestroyed(Protocol::ObjectAddress objectAddress, const QString& /*objectName*/)
 {
   unmonitorObject(objectAddress);
+}
+
+void Client::monitorObject(Protocol::ObjectAddress objectAddress)
+{
+  if (!isConnected())
+    return;
+  Message msg(endpointAddress(), Protocol::ObjectMonitored);
+  msg.payload() << objectAddress;
+  send(msg);
 }
 
 void Client::unmonitorObject(Protocol::ObjectAddress objectAddress)

@@ -1,4 +1,5 @@
 set(gammaray_launcher_ui_internal_srcs
+  ${CMAKE_SOURCE_DIR}/ui/searchlinecontroller.cpp
   promolabel.cpp
   launcherwindow.cpp
   launchpage.cpp
@@ -25,9 +26,10 @@ qt4_wrap_ui(gammaray_launcher_ui_internal_srcs
 )
 
 add_library(gammaray_launcher_ui_internal STATIC ${gammaray_launcher_ui_internal_srcs})
+target_compile_definitions(gammaray_launcher_ui_internal PRIVATE GAMMARAY_UI_STATICLIB)
 target_link_libraries(gammaray_launcher_ui_internal
   LINK_PUBLIC
-  gammaray_launcher_shared
+  gammaray_launcher
 
   LINK_PRIVATE
   ${QT_QTCORE_LIBRARIES}
@@ -45,7 +47,7 @@ add_executable(gammaray-launcher WIN32 ${gammaray_launcher_ui_srcs})
 
 target_link_libraries(gammaray-launcher
   ${QT_QTGUI_LIBRARIES}
-  gammaray_common_internal
+  gammaray_common
   gammaray_launcher_ui_internal
 )
 

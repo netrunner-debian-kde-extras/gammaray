@@ -29,18 +29,22 @@
 #ifndef GAMMARAY_LAUNCHER_H
 #define GAMMARAY_LAUNCHER_H
 
+#include "gammaray_launcher_export.h"
+
 #include <QObject>
 #include <QTimer>
 
-#include "launchoptions.h"
-#include "clientlauncher.h"
-
+class QProcessEnvironment;
 class QSharedMemory;
+class QUrl;
 
 namespace GammaRay {
 
-/** The actual launcher logic of gammaray.exe. */
-class Launcher : public QObject
+class LaunchOptions;
+struct LauncherPrivate;
+
+/** @brief Manages launching a target process, injecting the probe and if needed also starting the client application. */
+class GAMMARAY_LAUNCHER_EXPORT Launcher : public QObject
 {
   Q_OBJECT
 public:
@@ -49,15 +53,26 @@ public:
 
   /** This is used to identify the communication channels used by the launcher and the target process. */
   qint64 instanceIdentifier() const;
+  bool start();
+  void stop();
+
+  /** Target exit code, in case we launched it. */
+  int exitCode() const;
+  /** Error message from attaching/launching the target, if any. */
+  QString errorMessage() const;
 
 signals:
+  void started();
   void finished();
+  void attached();
+
+  void stdoutMessage(const QString &message);
+  void stderrMessage(const QString &message);
 
 protected:
   virtual void startClient(const QUrl &serverAddress);
 
 private slots:
-  void delayedInit();
   void semaphoreReleased();
   void injectorError(int exitCode, const QString &errorMessage);
   void injectorFinished();
@@ -66,26 +81,12 @@ private slots:
 private:
   void sendLauncherId();
   void sendProbeSettings();
-  // in case shared memory isn't available
-  void sendProbeSettingsFallback();
   void checkDone();
 
 private:
-  LaunchOptions m_options;
-#ifndef QT_NO_SHAREDMEMORY
-  QSharedMemory *m_shm;
-#endif
-  ClientLauncher m_client;
-  QTimer m_safetyTimer;
-  enum State {
-    Initial = 0,
-    InjectorFinished = 1,
-    InjectorFailed = 2,
-    ClientStarted = 4,
-    Complete = InjectorFinished | ClientStarted
-  };
-  int m_state;
+  LauncherPrivate* const d;
 };
+
 }
 
 #endif // GAMMARAY_LAUNCHER_H

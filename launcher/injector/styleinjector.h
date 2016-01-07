@@ -35,16 +35,14 @@ namespace GammaRay {
 
 class StyleInjector : public GammaRay::ProcessInjector
 {
+  Q_OBJECT
   public:
     StyleInjector();
 
-    QString name() const
-    {
-      return QString("style");
-    }
-
+    QString name() const Q_DECL_OVERRIDE;
     bool launch(const QStringList &programAndArgs,
-                const QString &probeDll, const QString &probeFunc) Q_DECL_OVERRIDE;
+                const QString &probeDll, const QString &probeFunc,
+                const QProcessEnvironment &env) Q_DECL_OVERRIDE;
 
     bool selfTest() Q_DECL_OVERRIDE;
 };

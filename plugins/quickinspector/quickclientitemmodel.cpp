@@ -37,7 +37,7 @@
 using namespace GammaRay;
 
 QuickClientItemModel::QuickClientItemModel(QObject *parent)
-  : KRecursiveFilterProxyModel(parent)
+  : QIdentityProxyModel(parent)
 {
 }
 
@@ -51,8 +51,8 @@ QVariant QuickClientItemModel::data(const QModelIndex &index, int role) const
     return QVariant();
   }
 
-  if (role & (Qt::ForegroundRole | Qt::ToolTipRole)) {
-    int flags = QSortFilterProxyModel::data(index, QuickItemModelRole::ItemFlags).value<int>();
+  if (role == Qt::ForegroundRole || role == Qt::ToolTipRole) {
+    int flags = QIdentityProxyModel::data(index, QuickItemModelRole::ItemFlags).value<int>();
 
     // Grey out invisible items
     if (role == Qt::ForegroundRole &&
@@ -61,13 +61,13 @@ QVariant QuickClientItemModel::data(const QModelIndex &index, int role) const
     }
     // Adjust tooltip to show information about items
     if (role == Qt::ToolTipRole && flags) {
-      QString tooltip = QSortFilterProxyModel::data(index, role).toString();
+      QString tooltip = QIdentityProxyModel::data(index, role).toString();
       tooltip.append("<p style='white-space:pre'>");
       if ((flags & QuickItemModelRole::OutOfView) &&
           (~flags & QuickItemModelRole::Invisible)) {
         QByteArray byteArray;
         QBuffer buffer(&byteArray);
-        QIcon::fromTheme("dialog-warning").pixmap(16, 16).save(&buffer, "PNG");
+        QIcon::fromTheme(QStringLiteral("dialog-warning")).pixmap(16, 16).save(&buffer, "PNG");
         tooltip.append("<img src=\"data:image/png;base64,").
                 append(byteArray.toBase64()).
                 append("\"> Item is visible, but out of view.");
@@ -104,14 +104,14 @@ QVariant QuickClientItemModel::data(const QModelIndex &index, int role) const
 
         QByteArray byteArray;
         QBuffer buffer(&byteArray);
-        QIcon::fromTheme("dialog-information").pixmap(16, 16).save(&buffer, "PNG");
-        tooltip.append(QString("<img src=\"data:image/png;base64,").
+        QIcon::fromTheme(QStringLiteral("dialog-information")).pixmap(16, 16).save(&buffer, "PNG");
+        tooltip.append(QStringLiteral("<img src=\"data:image/png;base64,").
                 append(byteArray.toBase64()).
-                append("\"> Item %1.").arg(flagStrings.join(", ")));
+                append("\"> Item %1.").arg(flagStrings.join(QStringLiteral(", "))));
       }
       tooltip.append("</p>");
       return tooltip;
     }
   }
-  return KRecursiveFilterProxyModel::data(index, role);
+  return QIdentityProxyModel::data(index, role);
 }

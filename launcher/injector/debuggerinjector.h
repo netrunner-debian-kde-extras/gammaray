@@ -29,7 +29,7 @@
 #ifndef GAMMARAY_DEBUGGERINJECTOR_H
 #define GAMMARAY_DEBUGGERINJECTOR_H
 
-#include "injector/abstractinjector.h"
+#include "abstractinjector.h"
 
 #include <QObject>
 #include <QProcess>
@@ -37,12 +37,13 @@
 namespace GammaRay {
 
 /** Base class for debugger-based injectors. */
-class DebuggerInjector : public QObject, public AbstractInjector
+class DebuggerInjector : public AbstractInjector
 {
   Q_OBJECT
   public:
     DebuggerInjector();
     ~DebuggerInjector();
+    void stop() Q_DECL_OVERRIDE;
 
     bool selfTest() Q_DECL_OVERRIDE;
 
@@ -63,15 +64,18 @@ class DebuggerInjector : public QObject, public AbstractInjector
     virtual void loadSymbols(const QByteArray &library);
 
     /** Start the debugger with the given command line arguments. */
-    bool startDebugger(const QStringList &args);
+    bool startDebugger(const QStringList &args, const QProcessEnvironment &env = QProcessEnvironment());
     /** Add a breakpoint in common entry points and wait until they are hit. */
     void waitForMain();
     /** Given an interrupted process, this injects the probe and continues the process. */
-    int injectAndDetach(const QString &probeDll, const QString &probeFunc);
+    bool injectAndDetach(const QString &probeDll, const QString &probeFunc);
 
   protected slots:
     virtual void readyReadStandardError();
     virtual void readyReadStandardOutput();
+
+  private slots:
+    void processFinished();
 
   protected:
     QScopedPointer<QProcess> m_process;

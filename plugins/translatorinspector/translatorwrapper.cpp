@@ -131,9 +131,9 @@ void TranslationsModel::resetTranslations(const QModelIndex &first,
   }
   endRemoveRows();
 }
-QString TranslationsModel::translation(const QByteArray &context,
-                                       const QByteArray &sourceText,
-                                       const QByteArray &disambiguation,
+QString TranslationsModel::translation(const char *context,
+                                       const char *sourceText,
+                                       const char *disambiguation,
                                        const int n, const QString &default_)
 {
   QModelIndex existingIndex =
@@ -158,21 +158,24 @@ void TranslationsModel::setTranslation(const QModelIndex &index,
   if (!index.isValid()) {
     return;
   }
-  if (m_nodes[index.row()].isOverriden) {
+
+  auto& row = m_nodes[index.row()];
+  if (row.isOverriden || row.translation == translation) {
     return;
   }
-  m_nodes[index.row()].translation = translation;
+  row.translation = translation;
   emit dataChanged(index, index);
 }
-QModelIndex TranslationsModel::findNode(const QByteArray &context,
-                                        const QByteArray &sourceText,
-                                        const QByteArray &disambiguation,
+
+QModelIndex TranslationsModel::findNode(const char *context,
+                                        const char *sourceText,
+                                        const char *disambiguation,
                                         const int n, const bool create)
 {
   Q_UNUSED(n);
   // QUESTION make use of n?
   for (int i = 0; i < m_nodes.size(); ++i) {
-    const Row node = m_nodes.at(i);
+    const Row &node = m_nodes.at(i);
     if (node.context == context && node.sourceText == sourceText &&
         node.disambiguation == disambiguation) {
       return index(i, 0);
@@ -192,16 +195,16 @@ QModelIndex TranslationsModel::findNode(const QByteArray &context,
   return QModelIndex();
 }
 
-TranslatorWrapper::TranslatorWrapper(QObject *parent)
-    : QTranslator(parent), m_wrapped(0), m_model(new TranslationsModel(this))
-{
-}
 TranslatorWrapper::TranslatorWrapper(QTranslator *wrapped, QObject *parent)
     : QTranslator(parent), m_wrapped(wrapped),
       m_model(new TranslationsModel(this))
 {
-	connect(wrapped, SIGNAL(destroyed()), SLOT(deleteLater()));
+    Q_ASSERT(wrapped);
+
+    // not deleteLater(), otherwise we end up with a dangling pointer in here!
+    connect(wrapped, &QObject::destroyed, this, [this]() { delete this; });
 }
+
 bool TranslatorWrapper::isEmpty() const
 {
   return translator()->isEmpty();
@@ -213,7 +216,7 @@ QString TranslatorWrapper::translate(const char *context,
   const QString translation =
       translateInternal(context, sourceText, disambiguation, n);
 
-  if (QByteArray(context).startsWith("GammaRay::")) { //krazy:exclude=strings
+  if (strncmp(context, "GammaRay::", 10) == 0) {
     return translation;
   }
   // it's not for this translator
@@ -230,15 +233,18 @@ QString TranslatorWrapper::translateInternal(const char *context,
 {
   return translator()->translate(context, sourceText, disambiguation, n);
 }
+
 const QTranslator *TranslatorWrapper::translator() const
 {
-  return m_wrapped == 0 ? this : m_wrapped;
+    Q_ASSERT(m_wrapped);
+    return m_wrapped;
 }
+
 
 FallbackTranslator::FallbackTranslator(QObject *parent)
   : QTranslator(parent)
 {
-  setObjectName("Fallback Translator");
+  setObjectName(QStringLiteral("Fallback Translator"));
 }
 QString FallbackTranslator::translate(const char *context, const char *sourceText, const char *disambiguation, int n) const
 {

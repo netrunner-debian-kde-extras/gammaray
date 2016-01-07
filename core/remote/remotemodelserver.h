@@ -33,6 +33,7 @@
 
 #include <QObject>
 #include <QPointer>
+#include <QRegExp>
 
 class QBuffer;
 class QAbstractItemModel;
@@ -41,10 +42,18 @@ namespace GammaRay {
 
 class Message;
 
-/** Provides the server-side interface for a QAbstractItemModel to be used from a separate process. */
+/** Provides the server-side interface for a QAbstractItemModel to be used from a separate process.
+ *  If the source model is a QSortFilterProxyModel, this also forwards properties for configuring
+ *  the proxy behavior, enabling server-side searching and sorting.
+ */
 class RemoteModelServer : public QObject
 {
   Q_OBJECT
+  Q_PROPERTY(bool dynamicSortFilter READ proxyDynamicSortFilter WRITE setProxyDynamicSortFilter)
+  Q_PROPERTY(Qt::CaseSensitivity filterCaseSensitivity READ proxyFilterCaseSensitivity WRITE setProxyFilterCaseSensitivity)
+  Q_PROPERTY(int filterKeyColumn READ proxyFilterKeyColumn WRITE setProxyFilterKeyColumn)
+  Q_PROPERTY(QRegExp filterRegExp READ proxyFilterRegExp WRITE setProxyFilterRegExp)
+
   public:
     /** Registers a new model server object with name @p objectName (must be unique). */
     explicit RemoteModelServer(const QString &objectName, QObject *parent = 0);
@@ -68,7 +77,18 @@ class RemoteModelServer : public QObject
     void sendAddRemoveMessage(Protocol::MessageType type, const QModelIndex &parent, int start, int end);
     void sendMoveMessage(Protocol::MessageType type, const Protocol::ModelIndex &sourceParent, int sourceStart, int sourceEnd, const Protocol::ModelIndex &destinationParent, int destinationIndex);
     QMap< int, QVariant > filterItemData(const QMap< int, QVariant >& data) const;
+    void sendLayoutChanged(const QVector<Protocol::ModelIndex> &parents = QVector<Protocol::ModelIndex>(), quint32 hint = 0);
     bool canSerialize(const QVariant &value) const;
+
+    // proxy model settings
+    bool proxyDynamicSortFilter() const;
+    void setProxyDynamicSortFilter(bool dynamicSortFilter);
+    Qt::CaseSensitivity proxyFilterCaseSensitivity() const;
+    void setProxyFilterCaseSensitivity(Qt::CaseSensitivity caseSensitivity);
+    int proxyFilterKeyColumn() const;
+    void setProxyFilterKeyColumn(int column);
+    QRegExp proxyFilterRegExp() const;
+    void setProxyFilterRegExp(const QRegExp &regExp);
 
     // unit test hooks
     static void (*s_registerServerCallback)();
@@ -78,7 +98,7 @@ class RemoteModelServer : public QObject
     friend class FakeRemoteModelServer;
 
   private slots:
-    void dataChanged(const QModelIndex &begin, const QModelIndex &end);
+    void dataChanged(const QModelIndex &begin, const QModelIndex &end, const QVector<int> &roles = QVector<int>());
     void headerDataChanged(Qt::Orientation orientation, int first, int last);
     void rowsInserted(const QModelIndex &parent, int start, int end);
     void rowsAboutToBeMoved(const QModelIndex &sourceParent, int sourceStart, int sourceEnd, const QModelIndex &destinationParent, int destinationRow);
@@ -87,7 +107,12 @@ class RemoteModelServer : public QObject
     void columnsInserted(const QModelIndex &parent, int start, int end);
     void columnsMoved(const QModelIndex &sourceParent, int sourceStart, int sourceEnd, const QModelIndex &destinationParent, int destinationColumn);
     void columnsRemoved(const QModelIndex &parent, int start, int end);
+#ifdef QT4_MOC_WORKAROUND // Qt4 moc doesn't understand QT_VERSION preprocessor conditionals
     void layoutChanged();
+#else
+    void layoutChanged(const QList<QPersistentModelIndex> &parents, QAbstractItemModel::LayoutChangeHint hint);
+#endif
+
     void modelReset();
 
     void modelDeleted();

@@ -69,7 +69,7 @@ class PluginManagerBase
      * @param parent This is the parent object for all objects created by the plugins
      */
     explicit PluginManagerBase(QObject *parent = 0);
-    ~PluginManagerBase();
+    virtual ~PluginManagerBase();
 
     QList<PluginLoadError> errors() const
     {
@@ -95,7 +95,7 @@ public:
     {
       const QString iid = QString::fromLatin1(qobject_interface_iid<IFace*>());
       Q_ASSERT(!iid.isEmpty());
-      const QString serviceType = iid.split('/').first();
+      const QString serviceType = iid.split(QLatin1Char('/')).first();
       scan(serviceType);
     }
 
@@ -107,7 +107,7 @@ public:
     }
 
 protected:
-    bool createProxyFactory(const PluginInfo& pluginInfo, QObject* parent)
+    bool createProxyFactory(const PluginInfo& pluginInfo, QObject* parent) Q_DECL_OVERRIDE
     {
       Proxy *proxy = new Proxy(pluginInfo, parent);
       if (!proxy->isValid()) {

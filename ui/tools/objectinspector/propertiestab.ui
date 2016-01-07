@@ -12,7 +12,7 @@
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
-    <widget class="KFilterProxySearchLine" name="propertySearchLine"/>
+    <widget class="QLineEdit" name="propertySearchLine"/>
    </item>
    <item>
     <widget class="QTreeView" name="propertyView">
@@ -20,7 +20,7 @@
       <enum>Qt::CustomContextMenu</enum>
      </property>
      <property name="rootIsDecorated">
-      <bool>false</bool>
+      <bool>true</bool>
      </property>
      <property name="sortingEnabled">
       <bool>true</bool>
@@ -85,13 +85,6 @@
    </item>
   </layout>
  </widget>
- <customwidgets>
-  <customwidget>
-   <class>KFilterProxySearchLine</class>
-   <extends>QWidget</extends>
-   <header>kde/kfilterproxysearchline.h</header>
-  </customwidget>
- </customwidgets>
  <resources/>
  <connections/>
 </ui>

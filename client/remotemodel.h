@@ -34,6 +34,7 @@
 #include <common/protocol.h>
 
 #include <QAbstractItemModel>
+#include <QRegExp>
 #include <QSet>
 #include <QTimer>
 #include <QVector>
@@ -46,6 +47,11 @@ class Message;
 class GAMMARAY_CLIENT_EXPORT RemoteModel : public QAbstractItemModel
 {
   Q_OBJECT
+  Q_PROPERTY(bool dynamicSortFilter READ proxyDynamicSortFilter WRITE setProxyDynamicSortFilter NOTIFY proxyDynamicSortFilterChanged)
+  Q_PROPERTY(Qt::CaseSensitivity filterCaseSensitivity READ proxyFilterCaseSensitivity WRITE setProxyFilterCaseSensitivity NOTIFY proxyFilterCaseSensitivityChanged)
+  Q_PROPERTY(int filterKeyColumn READ proxyFilterKeyColumn WRITE setProxyFilterKeyColumn NOTIFY proxyFilterKeyColumnChanged)
+  Q_PROPERTY(QRegExp filterRegExp READ proxyFilterRegExp WRITE setProxyFilterRegExp NOTIFY proxyFilterRegExpChanged)
+
   public:
     explicit RemoteModel(const QString &serverObject, QObject *parent = 0);
     ~RemoteModel();
@@ -60,6 +66,7 @@ class GAMMARAY_CLIENT_EXPORT RemoteModel : public QAbstractItemModel
     bool setData(const QModelIndex& index, const QVariant& value, int role = Qt::EditRole) Q_DECL_OVERRIDE;
     Qt::ItemFlags flags(const QModelIndex& index) const Q_DECL_OVERRIDE;
     QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const Q_DECL_OVERRIDE;
+    void sort(int column, Qt::SortOrder order = Qt::AscendingOrder) Q_DECL_OVERRIDE;
 
   public slots:
     void newMessage(const GammaRay::Message &msg);
@@ -78,10 +85,22 @@ class GAMMARAY_CLIENT_EXPORT RemoteModel : public QAbstractItemModel
     };
     Q_DECLARE_FLAGS(NodeStates, NodeState)
 
+  signals:
+    void proxyDynamicSortFilterChanged();
+    void proxyFilterCaseSensitivityChanged();
+    void proxyFilterKeyColumnChanged();
+    void proxyFilterRegExpChanged();
+
   private:
     struct Node { // represents one row
       Node() : parent(0), rowCount(-1), columnCount(-1) {}
       ~Node();
+      Q_DISABLE_COPY(Node)
+      // delete all cached children data, but assume row/column count on this level is still accurate
+      void clearChildrenData();
+      // forget everything we know about our children, including row/column counts
+      void clearChildrenStructure();
+
       Node* parent;
       QVector<Node*> children;
       qint32 rowCount;
@@ -100,6 +119,9 @@ class GAMMARAY_CLIENT_EXPORT RemoteModel : public QAbstractItemModel
     Node* nodeForIndex(const Protocol::ModelIndex &index) const;
     QModelIndex modelIndexForNode(GammaRay::RemoteModel::Node* node, int column) const;
 
+    /** Checks if @p ancestor is a (grand)parent of @p child. */
+    bool isAncestor(Node *ancestor, Node *child) const;
+
     NodeStates stateForColumn(Node* node, int columnIndex) const;
 
     void requestRowColumnCount(const QModelIndex &index) const;
@@ -117,6 +139,16 @@ class GAMMARAY_CLIENT_EXPORT RemoteModel : public QAbstractItemModel
     /// execute a rowsMoved() operation
     void doMoveRows(Node *sourceParentNode, int sourceStart, int sourceEnd, Node* destParentNode, int destStart);
 
+    // sort/filter proxy model settings
+    bool proxyDynamicSortFilter() const;
+    void setProxyDynamicSortFilter(bool dynamicSortFilter);
+    Qt::CaseSensitivity proxyFilterCaseSensitivity() const;
+    void setProxyFilterCaseSensitivity(Qt::CaseSensitivity caseSensitivity);
+    int proxyFilterKeyColumn() const;
+    void setProxyFilterKeyColumn(int column);
+    QRegExp proxyFilterRegExp() const;
+    void setProxyFilterRegExp(const QRegExp &regExp);
+
 private slots:
     void doRequestDataAndFlags() const;
 
@@ -132,6 +164,16 @@ private:
     Protocol::ObjectAddress m_myAddress;
 
     qint32 m_currentSyncBarrier, m_targetSyncBarrier;
+
+    // default data() values for empty cells
+    static QVariant s_emptyDisplayValue;
+    static QVariant s_emptySizeHintValue;
+
+    // proxy model properties
+    bool m_proxyDynamicSortFilter;
+    Qt::CaseSensitivity m_proxyCaseSensitivity;
+    int m_proxyKeyColumn;
+    QRegExp m_proxyFilterRegExp;
 
     // hooks for unit tests
     static void (*s_registerClientCallback)();

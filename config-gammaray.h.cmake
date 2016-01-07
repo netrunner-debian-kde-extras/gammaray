@@ -1,13 +1,12 @@
 #include <qglobal.h>
 
+#cmakedefine GAMMARAY_INSTALL_QT_LAYOUT
+
 // relative install dirs
-#ifdef Q_OS_ANDROID
-# define GAMMARAY_PLUGIN_INSTALL_DIR "lib"
-#else
-# define GAMMARAY_PLUGIN_INSTALL_DIR "${PLUGIN_INSTALL_DIR}"
-#endif
+#define GAMMARAY_PLUGIN_INSTALL_DIR "${PLUGIN_INSTALL_DIR}"
 #define GAMMARAY_LIBEXEC_INSTALL_DIR "${LIBEXEC_INSTALL_DIR}"
 #define GAMMARAY_BIN_INSTALL_DIR "${BIN_INSTALL_DIR}"
+#define GAMMARAY_PROBE_INSTALL_DIR "${PROBE_INSTALL_DIR}"
 
 #define GAMMARAY_PLUGIN_VERSION "${GAMMARAY_PLUGIN_VERSION}"
 #define GAMMARAY_PROBE_ABI "${GAMMARAY_PROBE_ABI}"
@@ -18,11 +17,7 @@
 #define GAMMARAY_INVERSE_LIBEXEC_DIR "${GAMMARAY_INVERSE_LIBEXEC_DIR}"
 
 // probe name
-#ifdef Q_OS_ANDROID
-#define GAMMARAY_PROBE_NAME "libgammaray_probe"
-#else
-#define GAMMARAY_PROBE_NAME "gammaray_probe"
-#endif
+#define GAMMARAY_PROBE_NAME "${PROBE_NAME}"
 
 // build options
 #cmakedefine BUILD_TIMER_PLUGIN
@@ -30,6 +25,8 @@
 #cmakedefine HAVE_PRIVATE_QT_HEADERS
 
 #cmakedefine HAVE_STDINT_H
+#cmakedefine HAVE_BACKTRACE
+#cmakedefine HAVE_CXA_DEMANGLE
 
 #cmakedefine HAVE_QT_WIDGETS
 #cmakedefine HAVE_QT_SVG
@@ -39,10 +36,13 @@
 
 #cmakedefine HAVE_VTK
 #cmakedefine HAVE_GRAPHVIZ
+
 #cmakedefine HAVE_ELF_H
+#cmakedefine HAVE_SYS_ELF_H
+#cmakedefine HAVE_ELF
 
 #if !defined(QT_NO_SHAREDMEMORY) && !defined(QT_NO_SYSTEMSEMAPHORE) && !defined(Q_OS_ANDROID)
 #define HAVE_SHM
 #endif
 
-#cmakedefine GAMMARAY_UNKNOWN_CXX_MANGLED_NAMES
+#cmakedefine GAMMARAY_ENABLE_GPL_ONLY_FEATURES

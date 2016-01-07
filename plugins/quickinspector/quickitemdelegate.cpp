@@ -28,6 +28,7 @@
 
 #include "quickitemdelegate.h"
 #include "quickitemmodelroles.h"
+
 #include <QPainter>
 #include <QIcon>
 #include <QVariant>
@@ -51,7 +52,7 @@ void QuickItemDelegate::paint(QPainter *painter, const QStyleOptionViewItem &opt
   initStyleOption(&opt, index);
 
   // Disable foreground painting so we can do ourself
-  opt.text = "";
+  opt.text.clear();
   opt.icon = QIcon();
 
   QApplication::style()->drawControl(QStyle::CE_ItemViewItem, &opt, painter);
@@ -74,19 +75,23 @@ void QuickItemDelegate::paint(QPainter *painter, const QStyleOptionViewItem &opt
   }
 
   if (index.column() == 0) {
+    auto deco = index.data(Qt::DecorationRole);
     QVector<QPixmap> icons;
-    icons << index.data(Qt::DecorationRole).value<QPixmap>();
+    if (deco.canConvert<QPixmap>())
+      icons.push_back(deco.value<QPixmap>());
+    else if (deco.canConvert<QIcon>())
+      icons.push_back(deco.value<QIcon>().pixmap(16, 16));
 
     if ((flags & QuickItemModelRole::OutOfView) && (~flags & QuickItemModelRole::Invisible)) {
-      icons << QIcon(":/gammaray/plugins/quickinspector/warning.png").pixmap(16, 16);
+      icons << QIcon(QStringLiteral(":/gammaray/plugins/quickinspector/warning.png")).pixmap(16, 16);
     }
 
     if (flags & QuickItemModelRole::HasActiveFocus) {
-      icons << QIcon(":/gammaray/plugins/quickinspector/active-focus.png").pixmap(16, 16);
+      icons << QIcon(QStringLiteral(":/gammaray/plugins/quickinspector/active-focus.png")).pixmap(16, 16);
     }
 
     if (flags & QuickItemModelRole::HasFocus && ~flags & QuickItemModelRole::HasActiveFocus) {
-      icons << QIcon(":/gammaray/plugins/quickinspector/focus.png").pixmap(16, 16);
+      icons << QIcon(QStringLiteral(":/gammaray/plugins/quickinspector/focus.png")).pixmap(16, 16);
     }
 
     for (int i = 0; i < icons.size(); i++) {
@@ -102,6 +107,11 @@ QSize QuickItemDelegate::sizeHint(const QStyleOptionViewItem &option,
                                   const QModelIndex &index) const
 {
   Q_UNUSED(option);
+
+  // this gets us the cached value for empty cells
+  const auto sh = index.data(Qt::SizeHintRole);
+  if (sh.isValid())
+    return sh.toSize();
 
   QSize textSize =
     m_view->fontMetrics().size(Qt::TextSingleLine, index.data(Qt::DisplayRole).toString());
@@ -126,9 +136,8 @@ QSize QuickItemDelegate::sizeHint(const QStyleOptionViewItem &option,
                qMax(textSize.height(), decorationSize.height()));
 }
 
-void QuickItemDelegate::setTextColor(const QVariant &textColor)
+void QuickItemDelegate::setTextColor(const QVariant &textColor, const QPersistentModelIndex &index)
 {
-  const QPersistentModelIndex index = sender()->property("index").value<QPersistentModelIndex>();
   if (!index.isValid()) {
     return;
   }

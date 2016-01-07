@@ -27,34 +27,33 @@
 */
 
 #include "translatorinspector.h"
+#include "translatorwrapper.h"
+#include "translatorsmodel.h"
+
+#include <core/probeinterface.h>
+#include <core/objecttypefilterproxymodel.h>
+#include <core/remote/serverproxymodel.h>
+#include <common/objectbroker.h>
+#include <common/objectmodel.h>
 
 #include <QCoreApplication>
 #include <QItemSelectionModel>
-#include <QIdentityProxyModel>
 #include <private/qcoreapplication_p.h>
-
-#include <core/probeinterface.h>
-#include <common/objectbroker.h>
-#include <common/objectmodel.h>
-#include <core/objecttypefilterproxymodel.h>
-
-#include "translatorwrapper.h"
-#include "translatorsmodel.h"
 
 using namespace GammaRay;
 
 TranslatorInspector::TranslatorInspector(ProbeInterface *probe,
                                        QObject *parent)
-    : TranslatorInspectorInterface("com.kdab.GammaRay.TranslatorInspector",
+    : TranslatorInspectorInterface(QStringLiteral("com.kdab.GammaRay.TranslatorInspector"),
                                   parent),
       m_probe(probe)
 {
   m_translatorsModel = new TranslatorsModel(this);
-  probe->registerModel("com.kdab.GammaRay.TranslatorsModel",
+  probe->registerModel(QStringLiteral("com.kdab.GammaRay.TranslatorsModel"),
                        m_translatorsModel);
 
-  m_translationsModel = new QIdentityProxyModel(this);
-  probe->registerModel("com.kdab.GammaRay.TranslationsModel",
+  m_translationsModel = new ServerProxyModel<QSortFilterProxyModel>(this);
+  probe->registerModel(QStringLiteral("com.kdab.GammaRay.TranslationsModel"),
                        m_translationsModel);
 
   m_selectionModel = ObjectBroker::selectionModel(m_translatorsModel);
@@ -104,16 +103,14 @@ bool TranslatorInspector::eventFilter(QObject *object, QEvent *event)
     QCoreApplicationPrivate *obj = static_cast<QCoreApplicationPrivate *>(
         QCoreApplicationPrivate::get(qApp));
     for (int i = 0; i < obj->translators.size(); ++i) {
-      if (obj->translators.at(i)->metaObject()->className() ==
-          TranslatorWrapper::staticMetaObject.className()) {
+      if (obj->translators.at(i)->metaObject() == &TranslatorWrapper::staticMetaObject) {
         continue; // it's already setup correctly
       } else {
         /* wrap the translator set with installTranslator in a TranslatorWrapper
          * and make sure we use the TranslatorWrapper instead of the original
          * translator
          */
-        TranslatorWrapper *wrapper =
-            new TranslatorWrapper(obj->translators[i], this);
+        auto wrapper = new TranslatorWrapper(obj->translators.at(i), this);
         obj->translators[i] = wrapper;
         m_translatorsModel->registerTranslator(wrapper);
         connect(wrapper,
@@ -124,7 +121,7 @@ bool TranslatorInspector::eventFilter(QObject *object, QEvent *event)
                 [wrapper, this](QObject *) { m_translatorsModel->unregisterTranslator(wrapper); });
       }
     }
-    for (auto it = obj->translators.begin(); it != obj->translators.end(); ++it)
+    for (auto it = obj->translators.constBegin(); it != obj->translators.constEnd(); ++it)
     {
       TranslatorWrapper *wrapper = qobject_cast<TranslatorWrapper *>(*it);
       Q_ASSERT(wrapper);
@@ -143,4 +140,9 @@ void TranslatorInspector::selectionChanged(const QItemSelection &selection)
       m_translationsModel->setSourceModel(translator->model());
     }
   }
+}
+
+QString TranslatorInspectorFactory::name() const
+{
+  return tr("Translators");
 }

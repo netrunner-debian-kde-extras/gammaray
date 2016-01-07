@@ -36,12 +36,18 @@
         </attribute>
         <layout class="QVBoxLayout" name="verticalLayout">
          <item>
-          <widget class="KFilterProxySearchLine" name="itemTreeSearchLine"/>
+          <widget class="QLineEdit" name="itemTreeSearchLine"/>
          </item>
          <item>
           <widget class="QTreeView" name="itemTreeView">
+           <property name="contextMenuPolicy">
+            <enum>Qt::CustomContextMenu</enum>
+           </property>
            <property name="indentation">
             <number>10</number>
+           </property>
+           <property name="uniformRowHeights">
+            <bool>true</bool>
            </property>
            <attribute name="headerShowSortIndicator" stdset="0">
             <bool>true</bool>
@@ -56,12 +62,15 @@
         </attribute>
         <layout class="QVBoxLayout" name="verticalLayout_2">
          <item>
-          <widget class="KFilterProxySearchLine" name="sgTreeSearchLine"/>
+          <widget class="QLineEdit" name="sgTreeSearchLine"/>
          </item>
          <item>
           <widget class="QTreeView" name="sgTreeView">
            <property name="indentation">
             <number>10</number>
+           </property>
+           <property name="uniformRowHeights">
+            <bool>true</bool>
            </property>
            <attribute name="headerShowSortIndicator" stdset="0">
             <bool>true</bool>
@@ -99,11 +108,6 @@
   </layout>
  </widget>
  <customwidgets>
-  <customwidget>
-   <class>KFilterProxySearchLine</class>
-   <extends>QWidget</extends>
-   <header>kde/kfilterproxysearchline.h</header>
-  </customwidget>
   <customwidget>
    <class>GammaRay::PropertyWidget</class>
    <extends>QWidget</extends>

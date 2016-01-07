@@ -52,6 +52,8 @@
 #include "common/objectmodel.h"
 #include "common/paths.h"
 
+#include <3rdparty/kde/krecursivefilterproxymodel.h>
+
 #include <QAbstractItemView>
 #include <QApplication>
 #include <QComboBox>
@@ -101,16 +103,20 @@ WidgetInspectorServer::WidgetInspectorServer(ProbeInterface *probe, QObject *par
 
   WidgetTreeModel *widgetFilterProxy = new WidgetTreeModel(this);
   widgetFilterProxy->setSourceModel(probe->objectTreeModel());
-  probe->registerModel("com.kdab.GammaRay.WidgetTree", widgetFilterProxy);
 
-  m_widgetSelectionModel = ObjectBroker::selectionModel(widgetFilterProxy);
+  auto widgetSearchProxy = new KRecursiveFilterProxyModel(this);
+  widgetSearchProxy->setSourceModel(widgetFilterProxy);
+
+  probe->registerModel(QStringLiteral("com.kdab.GammaRay.WidgetTree"), widgetSearchProxy);
+
+  m_widgetSelectionModel = ObjectBroker::selectionModel(widgetSearchProxy);
   connect(m_widgetSelectionModel,
           SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
           SLOT(widgetSelected(QItemSelection)));
 
 #ifdef HAVE_PRIVATE_QT_HEADERS
   m_paintBufferModel = new PaintBufferModel(this);
-  probe->registerModel("com.kdab.GammaRay.PaintBufferModel", m_paintBufferModel);
+  probe->registerModel(QStringLiteral("com.kdab.GammaRay.PaintBufferModel"), m_paintBufferModel);
   connect(ObjectBroker::selectionModel(m_paintBufferModel), SIGNAL(currentChanged(QModelIndex,QModelIndex)),
           this, SLOT(eventuallyUpdatePaintAnalyzer()));
 #endif
@@ -444,6 +450,14 @@ void WidgetInspectorServer::registerWidgetMetaTypes()
   MO_ADD_PROPERTY_ST(QApplication, QDesktopWidget*, desktop);
   MO_ADD_PROPERTY_ST(QApplication, QWidget*, focusWidget);
   MO_ADD_PROPERTY_ST(QApplication, QStyle*, style);
+
+  MO_ADD_METAOBJECT1(QFrame, QWidget);
+  MO_ADD_METAOBJECT1(QAbstractScrollArea, QFrame);
+  MO_ADD_METAOBJECT1(QAbstractItemView, QAbstractScrollArea);
+  MO_ADD_PROPERTY_RO(QAbstractItemView, QAbstractItemModel*, model);
+
+  MO_ADD_METAOBJECT1(QComboBox, QWidget);
+  MO_ADD_PROPERTY_RO(QComboBox, QAbstractItemModel*, model);
 #endif
 }
 
@@ -456,10 +470,8 @@ static QString sizePolicyPolicyToString(QSizePolicy::Policy policy)
 
 static QString sizePolicyToString(const QSizePolicy &policy)
 {
-  return QString::fromLatin1("%1 x %2").
-    arg(sizePolicyPolicyToString(policy.horizontalPolicy())).
-    arg(sizePolicyPolicyToString(policy.verticalPolicy()));
-
+  return sizePolicyPolicyToString(policy.horizontalPolicy()) + " x "
+       + sizePolicyPolicyToString(policy.verticalPolicy());
 }
 
 void WidgetInspectorServer::registerVariantHandlers()

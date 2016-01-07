@@ -32,6 +32,7 @@
 #include <core/probeinterface.h>
 #include <core/metaobject.h>
 #include <core/metaobjectrepository.h>
+#include <core/remote/serverproxymodel.h>
 
 #include <QtPlugin>
 #include <QMenu>
@@ -50,12 +51,15 @@ ActionInspector::ActionInspector(ProbeInterface *probe, QObject *parent)
   : QObject(parent)
 {
   registerMetaTypes();
-  ObjectBroker::registerObject("com.kdab.GammaRay.ActionInspector", this);
+  ObjectBroker::registerObject(QStringLiteral("com.kdab.GammaRay.ActionInspector"), this);
 
   ActionModel *actionModel = new ActionModel(this);
   connect(probe->probe(), SIGNAL(objectCreated(QObject*)), actionModel, SLOT(objectAdded(QObject*)));
   connect(probe->probe(), SIGNAL(objectDestroyed(QObject*)), actionModel, SLOT(objectRemoved(QObject*)));
-  probe->registerModel("com.kdab.GammaRay.ActionModel", actionModel);
+
+  auto proxy = new ServerProxyModel<QSortFilterProxyModel>(this);
+  proxy->setSourceModel(actionModel);
+  probe->registerModel(QStringLiteral("com.kdab.GammaRay.ActionModel"), proxy);
 }
 
 ActionInspector::~ActionInspector()
@@ -64,7 +68,7 @@ ActionInspector::~ActionInspector()
 
 void ActionInspector::triggerAction(int row)
 {
-  QAbstractItemModel *model = ObjectBroker::model("com.kdab.GammaRay.ActionModel");
+  QAbstractItemModel *model = ObjectBroker::model(QStringLiteral("com.kdab.GammaRay.ActionModel"));
   const QModelIndex index = model->index(row, 0);
   if (!index.isValid()) {
     return;
@@ -87,6 +91,11 @@ void ActionInspector::registerMetaTypes()
   MO_ADD_PROPERTY   (QAction, bool, isSeparator, setSeparator);
   MO_ADD_PROPERTY_RO(QAction, QMenu*, menu);
   MO_ADD_PROPERTY_RO(QAction, QWidget*, parentWidget);
+}
+
+QString ActionInspectorFactory::name() const
+{
+  return tr("Action Inspector");
 }
 
 #if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)

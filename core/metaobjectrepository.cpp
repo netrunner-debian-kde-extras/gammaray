@@ -31,6 +31,7 @@
 
 #include <common/metatypedeclarations.h>
 
+#include <QAbstractItemModel>
 #include <QAbstractSocket>
 #include <QCoreApplication>
 #include <QFile>
@@ -40,6 +41,7 @@
 #include <QPalette>
 #include <QPen>
 #include <QSocketNotifier>
+#include <QSortFilterProxyModel>
 #include <QTcpServer>
 #include <QThread>
 
@@ -149,13 +151,25 @@ void MetaObjectRepository::initQObjectTypes()
   MO_ADD_PROPERTY_ST(QGuiApplication, QFont, font);
   MO_ADD_PROPERTY_ST(QGuiApplication, bool, isLeftToRight);
   MO_ADD_PROPERTY_ST(QGuiApplication, bool, isRightToLeft);
-  MO_ADD_PROPERTY_RO(QGuiApplication, bool, isSavingSession);
-  MO_ADD_PROPERTY_RO(QGuiApplication, bool, isSessionRestored);
   MO_ADD_PROPERTY_ST(QGuiApplication, QPalette, palette);
   MO_ADD_PROPERTY_ST(QGuiApplication, QScreen*, primaryScreen);
+#ifndef QT_NO_SESSIONMANAGER
+  MO_ADD_PROPERTY_RO(QGuiApplication, bool, isSavingSession);
+  MO_ADD_PROPERTY_RO(QGuiApplication, bool, isSessionRestored);
   MO_ADD_PROPERTY_RO(QGuiApplication, QString, sessionId);
   MO_ADD_PROPERTY_RO(QGuiApplication, QString, sessionKey);
 #endif
+#endif
+
+  MO_ADD_METAOBJECT1(QAbstractItemModel, QObject);
+  MO_ADD_PROPERTY_RO(QAbstractItemModel, QStringList, mimeTypes);
+#if QT_VERSION >= QT_VERSION_CHECK(5, 5, 0)
+  MO_ADD_PROPERTY_RO(QAbstractItemModel, Qt::DropActions, supportedDragActions);
+  MO_ADD_PROPERTY_RO(QAbstractItemModel, Qt::DropActions, supportedDropActions);
+#endif
+  MO_ADD_METAOBJECT1(QAbstractProxyModel, QAbstractItemModel);
+  MO_ADD_METAOBJECT1(QSortFilterProxyModel, QAbstractProxyModel);
+  MO_ADD_PROPERTY_RO(QSortFilterProxyModel, Qt::SortOrder, sortOrder);
 }
 
 
@@ -174,6 +188,9 @@ Q_DECLARE_METATYPE(QAbstractSocket::SocketState)
 #ifndef QT_NO_NETWORKPROXY
 Q_DECLARE_METATYPE(QNetworkProxy)
 #endif
+#endif
+#if QT_VERSION < QT_VERSION_CHECK(5, 5, 0)
+Q_DECLARE_METATYPE(Qt::SortOrder)
 #endif
 
 void MetaObjectRepository::initIOTypes()
@@ -271,6 +288,8 @@ void MetaObjectRepository::initNetworkTypes()
 void MetaObjectRepository::initGuiTypes()
 {
 #if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+  qRegisterMetaType<QScreen*>();
+
   MetaObject *mo = 0;
   MO_ADD_METAOBJECT0(QSurface);
   MO_ADD_PROPERTY_RO(QSurface, QSurfaceFormat, format);
@@ -358,8 +377,8 @@ MetaObject *MetaObjectRepository::metaObject(const QString &typeName) const
   QString typeName_ = typeName;
   typeName_.remove('*');
   typeName_.remove('&');
-  typeName_.remove("const ");
-  typeName_.remove(" const");
+  typeName_.remove(QStringLiteral("const "));
+  typeName_.remove(QStringLiteral(" const"));
   typeName_.remove(' ');
   return m_metaObjects.value(typeName_);
 }

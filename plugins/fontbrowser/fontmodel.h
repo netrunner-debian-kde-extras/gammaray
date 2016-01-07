@@ -29,31 +29,27 @@
 #ifndef GAMMARAY_FONTBROWSER_FONTMODEL_H
 #define GAMMARAY_FONTBROWSER_FONTMODEL_H
 
-#include <QAbstractItemModel>
+#include <QAbstractTableModel>
 #include <QFont>
 #include <QColor>
+#include <QVector>
 
 namespace GammaRay {
 
-class FontModel : public QAbstractItemModel
+class FontModel : public QAbstractTableModel
 {
   Q_OBJECT
   public:
     explicit FontModel(QObject *parent);
 
-    void updateFonts(const QList<QFont> &fonts);
-    QList<QFont> currentFonts() const;
+    void updateFonts(const QVector<QFont> &fonts);
+    QVector<QFont> currentFonts() const;
 
     QVariant headerData(int section, Qt::Orientation orientation,
                         int role = Qt::DisplayRole) const Q_DECL_OVERRIDE;
 
     QVariant data(const QModelIndex &index,
                   int role = Qt::DisplayRole) const Q_DECL_OVERRIDE;
-
-    QModelIndex index(int row, int column,
-                      const QModelIndex &parent = QModelIndex()) const Q_DECL_OVERRIDE;
-
-    QModelIndex parent(const QModelIndex &child) const Q_DECL_OVERRIDE;
 
     int columnCount(const QModelIndex &parent = QModelIndex()) const Q_DECL_OVERRIDE;
     int rowCount(const QModelIndex &parent = QModelIndex()) const Q_DECL_OVERRIDE;
@@ -69,7 +65,7 @@ class FontModel : public QAbstractItemModel
   private:
     void fontDataChanged();
 
-    QList<QFont> m_fonts;
+    QVector<QFont> m_fonts;
     QString m_text;
     int m_size;
     bool m_bold;

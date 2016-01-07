@@ -29,6 +29,8 @@
 #ifndef GAMMARAY_LAUNCHERFINDER_H
 #define GAMMARAY_LAUNCHERFINDER_H
 
+#include "gammaray_launcher_export.h"
+
 #include <QString>
 
 namespace GammaRay {
@@ -42,7 +44,7 @@ namespace LauncherFinder
     Client
   };
 
-  QString findLauncher(Type type);
+  GAMMARAY_LAUNCHER_EXPORT QString findLauncher(Type type);
 }
 
 }

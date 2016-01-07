@@ -35,17 +35,17 @@
 #include <core/metaobjectrepository.h>
 #include <core/propertycontroller.h>
 #include <core/varianthandler.h>
-
 #include <core/objecttypefilterproxymodel.h>
 #include <core/probeinterface.h>
 #include <core/singlecolumnobjectproxymodel.h>
 #include <core/remote/server.h>
 
-#include <kde/krecursivefilterproxymodel.h>
 #include <common/objectbroker.h>
 #include <common/endpoint.h>
 #include <common/metatypedeclarations.h>
 #include <common/objectmodel.h>
+
+#include <kde/krecursivefilterproxymodel.h>
 
 #include <QGraphicsEffect>
 #include <QGraphicsItem>
@@ -71,7 +71,7 @@ Q_DECLARE_METATYPE(QGraphicsPixmapItem::ShapeMode)
 
 SceneInspector::SceneInspector(ProbeInterface *probe, QObject *parent)
   : SceneInspectorInterface(parent),
-    m_propertyController(new PropertyController("com.kdab.GammaRay.SceneInspector", this)),
+    m_propertyController(new PropertyController(QStringLiteral("com.kdab.GammaRay.SceneInspector"), this)),
     m_clientConnected(false)
 {
   Server::instance()->registerMonitorNotifier(Endpoint::instance()->objectAddress(objectName()), this, "clientConnectedChanged");
@@ -87,15 +87,17 @@ SceneInspector::SceneInspector(ProbeInterface *probe, QObject *parent)
   sceneFilterProxy->setSourceModel(probe->objectListModel());
   SingleColumnObjectProxyModel *singleColumnProxy = new SingleColumnObjectProxyModel(this);
   singleColumnProxy->setSourceModel(sceneFilterProxy);
-  probe->registerModel("com.kdab.GammaRay.SceneList", singleColumnProxy);
+  probe->registerModel(QStringLiteral("com.kdab.GammaRay.SceneList"), singleColumnProxy);
 
   QItemSelectionModel* sceneSelection = ObjectBroker::selectionModel(singleColumnProxy);
   connect(sceneSelection, SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
           this, SLOT(sceneSelected(QItemSelection)));
 
   m_sceneModel = new SceneModel(this);
-  probe->registerModel("com.kdab.GammaRay.SceneGraphModel", m_sceneModel);
-  m_itemSelectionModel = ObjectBroker::selectionModel(m_sceneModel);
+  auto sceneProxy = new KRecursiveFilterProxyModel(this);
+  sceneProxy->setSourceModel(m_sceneModel);
+  probe->registerModel(QStringLiteral("com.kdab.GammaRay.SceneGraphModel"), sceneProxy);
+  m_itemSelectionModel = ObjectBroker::selectionModel(sceneProxy);
   connect(m_itemSelectionModel, SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
           this, SLOT(sceneItemSelected(QItemSelection)));
 
@@ -230,11 +232,11 @@ void SceneInspector::objectSelected(QObject *object, const QPoint &pos)
 
 void SceneInspector::sceneItemSelected(QGraphicsItem *item)
 {
-  const QModelIndexList indexList =
-    m_sceneModel->match(m_sceneModel->index(0, 0),
-                 SceneModel::SceneItemRole,
-                 QVariant::fromValue<QGraphicsItem*>(item), 1,
-                 Qt::MatchExactly | Qt::MatchRecursive);
+  const auto indexList = m_itemSelectionModel->model()->match(
+        m_itemSelectionModel->model()->index(0, 0),
+        SceneModel::SceneItemRole,
+        QVariant::fromValue<QGraphicsItem*>(item), 1,
+        Qt::MatchExactly | Qt::MatchRecursive);
   if (indexList.isEmpty()) {
     return;
   }
@@ -251,8 +253,8 @@ void SceneInspector::sceneClicked(const QPointF &pos)
 }
 
 #define QGV_CHECK_TYPE(Class) \
-  if (dynamic_cast<Class*>(item) && MetaObjectRepository::instance()->hasMetaObject(#Class)) \
-    return QLatin1String(#Class)
+  if (dynamic_cast<Class*>(item) && MetaObjectRepository::instance()->hasMetaObject(QStringLiteral(#Class))) \
+    return QStringLiteral(#Class)
 
 QString SceneInspector::findBestType(QGraphicsItem *item)
 {
@@ -268,7 +270,7 @@ QString SceneInspector::findBestType(QGraphicsItem *item)
   QGV_CHECK_TYPE(QGraphicsItemGroup);
   QGV_CHECK_TYPE(QGraphicsPixmapItem);
 
-  return QLatin1String("QGraphicsItem");
+  return QStringLiteral("QGraphicsItem");
 }
 
 void SceneInspector::registerGraphicsViewMetaTypes()
@@ -391,6 +393,11 @@ void SceneInspector::registerVariantHandlers()
   VariantHandler::registerStringConverter<QGraphicsObject*>(Util::displayString);
   VariantHandler::registerStringConverter<QGraphicsWidget*>(Util::displayString);
 #endif
+}
+
+QString SceneInspectorFactory::name() const
+{
+  return tr("Graphics Scenes");
 }
 
 #if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)

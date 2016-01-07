@@ -32,6 +32,9 @@
 #include "propertycontroller.h"
 
 #include <common/objectbroker.h>
+#include <core/remote/serverproxymodel.h>
+
+#include <3rdparty/kde/krecursivefilterproxymodel.h>
 
 #include <QDebug>
 #include <QItemSelectionModel>
@@ -39,10 +42,13 @@
 using namespace GammaRay;
 
 MetaObjectBrowser::MetaObjectBrowser(ProbeInterface *probe, QObject *parent)
-  : QObject(parent), m_propertyController(new PropertyController("com.kdab.GammaRay.MetaObjectBrowser", this))
+  : QObject(parent), m_propertyController(new PropertyController(QStringLiteral("com.kdab.GammaRay.MetaObjectBrowser"), this))
 {
-  Q_UNUSED(probe);
-  QItemSelectionModel *selectionModel = ObjectBroker::selectionModel(Probe::instance()->metaObjectModel());
+  auto model = new ServerProxyModel<KRecursiveFilterProxyModel>(this);
+  model->setSourceModel(Probe::instance()->metaObjectModel());
+  probe->registerModel(QStringLiteral("com.kdab.GammaRay.MetaObjectBrowserTreeModel"), model);
+
+  QItemSelectionModel *selectionModel = ObjectBroker::selectionModel(model);
 
   connect(selectionModel,SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
           SLOT(objectSelected(QItemSelection)));
@@ -65,3 +71,7 @@ void MetaObjectBrowser::objectSelected(const QItemSelection &selection)
   }
 }
 
+QString MetaObjectBrowserFactory::name() const
+{
+  return tr("Meta Objects");
+}

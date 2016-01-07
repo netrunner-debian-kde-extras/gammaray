@@ -38,6 +38,9 @@
 
 #include <algorithm>
 
+#include <private/qqmldata_p.h>
+#include <private/qqmlcontext_p.h>
+
 using namespace GammaRay;
 
 QuickItemModel::QuickItemModel(QObject *parent) : ObjectModelBase<QAbstractItemModel>(parent)
@@ -68,9 +71,48 @@ QVariant QuickItemModel::data(const QModelIndex &index, int role) const
   if (role == QuickItemModelRole::ItemFlags) {
     return m_itemFlags[item];
   }
+  if (role == QuickItemModelRole::SourceFileRole) {
+    QQmlData *objectData = QQmlData::get(item);
+    if (!objectData) {
+      return QVariant();
+    }
+
+    QQmlContextData *context = objectData->outerContext;
+    if (!context) {
+      return QVariant();
+    }
+
+#if QT_VERSION >= QT_VERSION_CHECK(5, 5, 0)
+    return context->url().scheme() == QStringLiteral("file")
+            ? context->url().path()
+            : context->url().toString(); // Most editors don't understand paths with the file://
+                                         // scheme, still we need the scheme for anything else
+                                         // but file (e.g. qrc:/)
+#else
+    return context->url.scheme() == QStringLiteral("file")
+            ? context->url.path()
+            : context->url.toString(); // same as above
+#endif
+  }
+  if (role == QuickItemModelRole::SourceLineRole) {
+    QQmlData *objectData = QQmlData::get(item);
+    if (!objectData) {
+      return QVariant();
+    }
+
+    return objectData->lineNumber;
+  }
+  if (role == QuickItemModelRole::SourceColumnRole) {
+    QQmlData *objectData = QQmlData::get(item);
+    if (!objectData) {
+      return QVariant();
+    }
+
+    return objectData->columnNumber;
+  }
   if (role == Qt::DisplayRole && index.column() == 0) {
     QQmlContext *ctx = QQmlEngine::contextForObject(item);
-    QString id = ctx ? ctx->nameForObject(item) : "";
+    QString id = ctx ? ctx->nameForObject(item) : QString();
     if (!id.isEmpty()) {
       return id;
     }
@@ -110,6 +152,9 @@ QMap<int, QVariant> QuickItemModel::itemData(const QModelIndex &index) const
 {
   QMap<int, QVariant> d = QAbstractItemModel::itemData(index);
   d.insert(QuickItemModelRole::ItemFlags, data(index, QuickItemModelRole::ItemFlags));
+  d.insert(QuickItemModelRole::SourceFileRole, data(index, QuickItemModelRole::SourceFileRole));
+  d.insert(QuickItemModelRole::SourceLineRole, data(index, QuickItemModelRole::SourceLineRole));
+  d.insert(QuickItemModelRole::SourceColumnRole, data(index, QuickItemModelRole::SourceColumnRole));
   return d;
 }
 
@@ -210,6 +255,7 @@ void QuickItemModel::addItem(QQuickItem *item)
   }
 
   QQuickItem *parentItem = item->parentItem();
+  //cppcheck-suppress nullPointerRedundantCheck
   if (parentItem) {
     // add parent first, if we don't know that yet
     if (!m_childParentMap.contains(parentItem)) {
@@ -251,8 +297,9 @@ void QuickItemModel::removeItem(QQuickItem *item, bool danglingPointer)
     disconnectItem(item);
   }
 
-  QQuickItem *parentItem = m_childParentMap[item];
+  QQuickItem *parentItem = m_childParentMap.value(item);
   const QModelIndex parentIndex = indexForItem(parentItem);
+  //cppcheck-suppress nullPointerRedundantCheck
   if (parentItem && !parentIndex.isValid()) {
     return;
   }
@@ -335,11 +382,14 @@ void QuickItemModel::itemUpdated()
 
 void QuickItemModel::recursivelyUpdateItem(QQuickItem *item)
 {
-  int oldFlags = m_itemFlags[item];
+  if (item->parent() == QObject::parent()) // skip items injected by ourselves
+    return;
+
+  int oldFlags = m_itemFlags.value(item);
   updateItemFlags(item);
 
-  if (oldFlags != m_itemFlags[item]) {
-    updateItem(item);
+  if (oldFlags != m_itemFlags.value(item)) {
+    updateItem(item, QuickItemModelRole::ItemFlags);
   }
 
   foreach (QQuickItem *child, item->childItems()) {
@@ -347,15 +397,20 @@ void QuickItemModel::recursivelyUpdateItem(QQuickItem *item)
   }
 }
 
-void QuickItemModel::updateItem(QQuickItem *item)
+void QuickItemModel::updateItem(QQuickItem *item, int role)
 {
   if (!item || item->window() != m_window) {
     return;
   }
 
   const QModelIndex left = indexForItem(item);
+  if (!left.isValid())
+    return;
   const QModelIndex right = left.sibling(left.row(), columnCount() - 1);
-  emit dataChanged(left, right);
+
+  Q_ASSERT(left.isValid());
+  Q_ASSERT(right.isValid());
+  emit dataChanged(left, right, QVector<int>() << role);
 }
 
 void QuickItemModel::updateItemFlags(QQuickItem *item)
@@ -394,7 +449,7 @@ bool QuickEventMonitor::eventFilter(QObject *obj, QEvent *event)
 {
   if (event->type() != QEvent::DeferredDelete && event->type() != QEvent::Destroy) {
     // exclude some unsafe event types
-    m_model->updateItem(qobject_cast<QQuickItem*>(obj));
+    m_model->updateItem(qobject_cast<QQuickItem*>(obj), QuickItemModelRole::ItemEvent);
   }
 
   return false;

@@ -28,25 +28,11 @@
 
 #include "messagemodel.h"
 
+#include <common/tools/messagehandler/messagemodelroles.h>
+
 #include <QDebug>
 
 using namespace GammaRay;
-
-QString typeToString(QtMsgType type)
-{
-  switch(type) {
-    case QtDebugMsg:
-      return QObject::tr("Debug");
-    case QtWarningMsg:
-      return QObject::tr("Warning");
-    case QtCriticalMsg:
-      return QObject::tr("Critical");
-    case QtFatalMsg:
-      return QObject::tr("Fatal");
-    default:
-      return QObject::tr("Unknown"); // never reached in theory
-  }
-}
 
 MessageModel::MessageModel(QObject *parent)
   : QAbstractTableModel(parent)
@@ -72,7 +58,11 @@ void MessageModel::addMessage(const DebugMessage &message)
 int MessageModel::columnCount(const QModelIndex &parent) const
 {
   Q_UNUSED(parent);
-  return COLUMN_COUNT;
+#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
+  return 2;
+#else
+  return MessageModelColumn::COUNT;
+#endif
 }
 
 int MessageModel::rowCount(const QModelIndex &parent) const
@@ -93,35 +83,38 @@ QVariant MessageModel::data(const QModelIndex &index, int role) const
   const DebugMessage &msg = m_messages.at(index.row());
 
   if (role == Qt::DisplayRole) {
-    if (index.column() == TypeColumn) {
-      return typeToString(msg.type);
-    } else if (index.column() == MessageColumn) {
-      ///TODO: elide
-      return msg.message;
-    } else if (index.column() == TimeColumn) {
-      return msg.time.toString();
+    switch (index.column()) {
+      case MessageModelColumn::Message:
+        return msg.message;
+      case MessageModelColumn::Time:
+        return msg.time.toString();
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+      case MessageModelColumn::Category:
+        return msg.category;
+      case MessageModelColumn::Function:
+        return msg.function;
+      case MessageModelColumn::File:
+        return msg.file;
+#endif
     }
-  } else if (role == Qt::ToolTipRole) {
-    if (!msg.backtrace.isEmpty()) {
-      QString bt;
-      int i = 0;
-      foreach (const QString &frame, msg.backtrace) {
-        bt += QString("#%1: %2\n").arg(i, 2).arg(frame);
-        ++i;
-      }
-      return tr("<qt><dl>"
-                  "<dt><b>Type:</b></dt><dd>%1</dd>"
-                  "<dt><b>Time:</b></dt><dd>%2</dd>"
-                  "<dt><b>Message:</b></dt><dd>%3</dd>"
-                  "<dt><b>Backtrace:</b></dt><dd><pre>%4</pre></dd>"
-                "</dl></qt>").arg(typeToString(msg.type), msg.time.toString(), msg.message, bt);
-    } else {
-      return tr("<qt><dl>"
-                  "<dt><b>Type:</b></dt><dd>%1</dd>"
-                  "<dt><b>Time:</b></dt><dd>%2</dd>"
-                  "<dt><b>Message:</b></dt><dd>%3</dd>"
-                "</dl></qt>").arg(typeToString(msg.type), msg.time.toString(), msg.message);
+  } else if (role == MessageModelRole::Sort) {
+    switch (index.column()) {
+      case MessageModelColumn::Time: return msg.time;
+      case MessageModelColumn::Message: return msg.message;
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+      case MessageModelColumn::Category: return msg.category;
+      case MessageModelColumn::Function: return msg.function;
+      case MessageModelColumn::File: return static_cast<QString>(QString::fromUtf8(msg.file) + ':' + QString::number(msg.line));
+#endif
     }
+  } else if (role == MessageModelRole::Type && index.column() == 0) {
+      return static_cast<int>(msg.type);
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+  } else if (role == MessageModelRole::Line && index.column() == MessageModelColumn::File) {
+    return msg.line;
+#endif
+  } else if (role == MessageModelRole::Backtrace && index.column() == 0) {
+    return msg.backtrace;
   }
 
   return QVariant();
@@ -130,12 +123,12 @@ QVariant MessageModel::data(const QModelIndex &index, int role) const
 QVariant MessageModel::headerData(int section, Qt::Orientation orientation, int role) const
 {
   if (role == Qt::DisplayRole && orientation == Qt::Horizontal) {
-    if (section == TypeColumn) {
-      return tr("Type");
-    } else if (section == MessageColumn) {
-      return tr("Message");
-    } else if (section == TimeColumn) {
-      return tr("Time");
+    switch (section) {
+      case MessageModelColumn::Message: return tr("Message");
+      case MessageModelColumn::Time: return tr("Time");
+      case MessageModelColumn::Category: return tr("Category");
+      case MessageModelColumn::Function: return tr("Function");
+      case MessageModelColumn::File: return tr("Source");
     }
   }
 

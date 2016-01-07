@@ -40,7 +40,6 @@ class PropertyController;
 
 class ObjectDynamicPropertyModel;
 class ObjectStaticPropertyModel;
-class MetaPropertyModel;
 class AggregatedPropertyModel;
 
 class PropertiesExtension : public PropertiesExtensionInterface, public PropertyControllerExtension
@@ -54,17 +53,12 @@ class PropertiesExtension : public PropertiesExtensionInterface, public Property
 
     void navigateToValue(int modelRow) Q_DECL_OVERRIDE;
     void setProperty(const QString &name, const QVariant &value) Q_DECL_OVERRIDE;
-    void resetProperty(const QString &name) Q_DECL_OVERRIDE;
 
     bool setObject(void *object, const QString &typeName) Q_DECL_OVERRIDE;
     bool setQObject(QObject *object) Q_DECL_OVERRIDE;
     bool setMetaObject(const QMetaObject* metaObject) Q_DECL_OVERRIDE;
 
   private:
-    ObjectStaticPropertyModel *m_staticPropertyModel;
-    ObjectDynamicPropertyModel *m_dynamicPropertyModel;
-    MetaPropertyModel *m_metaPropertyModel;
-
     AggregatedPropertyModel *m_aggregatedPropertyModel;
     QPointer<QObject> m_object;
 };

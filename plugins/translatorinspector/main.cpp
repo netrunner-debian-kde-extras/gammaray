@@ -76,7 +76,7 @@ class Widget : public QWidget
     }
 
   protected:
-    bool eventFilter(QObject *object, QEvent *event)
+    bool eventFilter(QObject *object, QEvent *event) Q_DECL_OVERRIDE
     {
       if (event->type() == QEvent::LanguageChange) {
         retranslate();
@@ -106,10 +106,10 @@ int main(int argc, char *argv[])
   QApplication app(argc, argv);
 
   loadTranslation(app.applicationDirPath() + "/translation.qm",
-                  "App translator");
+                  QStringLiteral("App translator"));
   loadTranslation(QLibraryInfo::location(QLibraryInfo::TranslationsPath) +
-                  "/qt_sv.qm",
-                  "Qt translator");
+                  QStringLiteral("/qt_sv.qm"),
+                  QStringLiteral("Qt translator"));
 
   Widget widget;
   widget.show();

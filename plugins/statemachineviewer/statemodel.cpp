@@ -54,6 +54,15 @@ class StateModelPrivate
                          qq, SLOT(stateConfigurationChanged())));
   }
 
+  void emitDataChangedForState(QAbstractState *state)
+  {
+    const auto left = indexForState(state);
+    const auto right = left.sibling(left.row(), q_ptr->columnCount() - 1);
+    if (!left.isValid() || !right.isValid())
+      return;
+    emit q_ptr->dataChanged(left, right);
+  }
+
   Q_DECLARE_PUBLIC(StateModel)
   StateModel * const q_ptr;
   StateMachineWatcher * const m_stateMachineWatcher;
@@ -122,22 +131,14 @@ QModelIndex StateModelPrivate::indexForState(QAbstractState *state) const
 
 void StateModelPrivate::stateConfigurationChanged()
 {
-  Q_Q(StateModel);
-
   QSet<QAbstractState *> newConfig = m_stateMachine->configuration();
   // states which became active
   foreach (QAbstractState *state, (newConfig - m_lastConfiguration)) {
-    const QModelIndex source = indexForState(state);
-    if (source.isValid()) {
-      q->dataChanged(source, source);
-    }
+    emitDataChangedForState(state);
   }
   // states which became inactive
   foreach (QAbstractState *state, (m_lastConfiguration - newConfig)) {
-    const QModelIndex source = indexForState(state);
-    if (source.isValid()) {
-      q->dataChanged(source, source);
-    }
+    emitDataChangedForState(state);
   }
   m_lastConfiguration = newConfig;
 }
@@ -217,7 +218,7 @@ QVariant StateModel::data(const QModelIndex &index, int role) const
         Q_ASSERT(l.contains(child));
         nums << QString::number(l.indexOf(child) - l.indexOf(state));
       }
-      return nums.join(",");
+      return nums.join(QStringLiteral(","));
     }
   }
   if (role == IsInitialStateRole) {
@@ -293,6 +294,17 @@ QModelIndex StateModel::parent(const QModelIndex &index) const
   QObject *grandParent = parent->parent();
   int row = d->children(grandParent).indexOf(parent);
   return createIndex(row, 0, grandParent);
+}
+
+QVariant StateModel::headerData(int section, Qt::Orientation orientation, int role) const
+{
+  if (role == Qt::DisplayRole && orientation == Qt::Horizontal) {
+    switch (section) {
+      case 0: return tr("State");
+      case 1: return tr("Type");
+    }
+  }
+  return QAbstractItemModel::headerData(section, orientation, role);
 }
 
 #include "moc_statemodel.cpp"

@@ -68,7 +68,7 @@ class TimerFilterModel : public ObjectTypeFilterProxyModel<QTimer>
   public:
     explicit TimerFilterModel(QObject *parent) : ObjectTypeFilterProxyModel<QTimer>(parent) {}
 
-    bool filterAcceptsObject(QObject *object) const
+    bool filterAcceptsObject(QObject *object) const Q_DECL_OVERRIDE
     {
       if (object && object->inherits("QQmlTimer"))
         return true;
@@ -90,12 +90,17 @@ TimerTop::TimerTop(ProbeInterface *probe, QObject *parent)
   TimerModel::instance()->setProbe(probe);
   TimerModel::instance()->setSourceModel(filterModel);
 
-  probe->registerModel("com.kdab.GammaRay.TimerModel", TimerModel::instance());
+  probe->registerModel(QStringLiteral("com.kdab.GammaRay.TimerModel"), TimerModel::instance());
+}
+
+QString TimerTopFactory::name() const
+{
+  return tr("Timers");
 }
 
 QStringList TimerTopFactory::supportedTypes() const
 {
-  return QStringList() << "QObject" << "QTimer";
+  return QStringList() << QStringLiteral("QObject") << QStringLiteral("QTimer");
 }
 
 #if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)

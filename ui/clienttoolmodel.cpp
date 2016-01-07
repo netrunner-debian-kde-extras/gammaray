@@ -28,7 +28,6 @@
 
 #include "clienttoolmodel.h"
 
-#include <ui/tools/connectioninspector/connectioninspectorwidget.h>
 #include <ui/tools/localeinspector/localeinspectorwidget.h>
 #include <ui/tools/messagehandler/messagehandlerwidget.h>
 #include <ui/tools/metaobjectbrowser/metaobjectbrowserwidget.h>
@@ -59,7 +58,6 @@ public: \
   virtual inline bool remotingSupported() const { return remote; } \
 }
 
-MAKE_FACTORY(ConnectionInspector, true);
 MAKE_FACTORY(LocaleInspector, true);
 MAKE_FACTORY(MessageHandler, true);
 MAKE_FACTORY(MetaObjectBrowser, true);
@@ -71,8 +69,10 @@ MAKE_FACTORY(StandardPaths, true);
 MAKE_FACTORY(TextDocumentInspector, true);
 
 struct PluginRepository {
+    PluginRepository() {}
+    Q_DISABLE_COPY(PluginRepository)
     ~PluginRepository() {
-        qDeleteAll(factories.values());
+        qDeleteAll(factories);
     }
 
     // ToolId -> ToolUiFactory
@@ -94,7 +94,6 @@ static void initPluginRepository()
     if (!s_pluginRepository()->factories.isEmpty())
         return;
 
-    insertFactory(new ConnectionInspectorFactory);
     insertFactory(new LocaleInspectorFactory);
     insertFactory(new MessageHandlerFactory);
     insertFactory(new MetaObjectBrowserFactory);

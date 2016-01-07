@@ -2,9 +2,6 @@
 # Shared code between in-process and out-of-process UI
 #
 set(gammaray_ui_srcs
-  ${CMAKE_SOURCE_DIR}/3rdparty/kde/krecursivefilterproxymodel.cpp
-  ${CMAKE_SOURCE_DIR}/3rdparty/kde/kfilterproxysearchline.cpp
-
   aboutdata.cpp
   clienttoolmodel.cpp
   deferredresizemodesetter.cpp
@@ -16,6 +13,8 @@ set(gammaray_ui_srcs
   propertywidget.cpp
   proxytooluifactory.cpp
   splashscreen.cpp
+  searchlinecontroller.cpp
+  uiintegration.cpp
 
   propertyeditor/propertycoloreditor.cpp
   propertyeditor/propertydoublepaireditor.cpp
@@ -27,11 +26,10 @@ set(gammaray_ui_srcs
   propertyeditor/palettedialog.cpp
   propertyeditor/propertyeditordelegate.cpp
 
-  tools/connectioninspector/connectioninspectorwidget.cpp
   tools/localeinspector/localeinspectorwidget.cpp
+  tools/messagehandler/messagedisplaymodel.cpp
   tools/messagehandler/messagehandlerwidget.cpp
   tools/messagehandler/messagehandlerclient.cpp
-  ../core/tools/messagehandler/messagehandlerinterface.cpp
   tools/metaobjectbrowser/metaobjectbrowserwidget.cpp
   tools/metatypebrowser/metatypebrowserwidget.cpp
   tools/mimetypes/mimetypeswidget.cpp
@@ -64,7 +62,6 @@ qt4_wrap_ui(gammaray_ui_srcs
   propertyeditor/propertyintpaireditor.ui
   propertyeditor/palettedialog.ui
 
-  tools/connectioninspector/connectioninspectorwidget.ui
   tools/localeinspector/localeinspectorwidget.ui
   tools/messagehandler/messagehandlerwidget.ui
   tools/metatypebrowser/metatypebrowserwidget.ui
@@ -81,11 +78,6 @@ qt4_wrap_ui(gammaray_ui_srcs
   tools/standardpaths/standardpathswidget.ui
   tools/textdocumentinspector/textdocumentinspectorwidget.ui
 )
-if(NOT Qt5Core_VERSION VERSION_LESS 5.2.0)
-  list(APPEND gammaray_ui_srcs
-    variantcontainermodel.cpp
-  )
-endif()
 
 add_library(gammaray_ui SHARED ${gammaray_ui_srcs})
 set_target_properties(gammaray_ui PROPERTIES
@@ -96,7 +88,7 @@ set_target_properties(gammaray_ui PROPERTIES
 
 target_link_libraries(gammaray_ui
   LINK_PUBLIC ${QT_QTCORE_LIBRARIES} ${QT_QTGUI_LIBRARIES} gammaray_common
-  LINK_PRIVATE gammaray_common_internal
+  LINK_PRIVATE gammaray_common_internal gammaray_kitemmodels
 )
 
 install(TARGETS gammaray_ui EXPORT GammaRayTargets ${INSTALL_TARGETS_DEFAULT_ARGS})
@@ -131,6 +123,7 @@ gammaray_install_headers(
   propertywidget.h
   propertywidgettab.h
   tooluifactory.h
+  uiintegration.h
 )
 
 ecm_generate_pri_file(BASE_NAME GammaRayUi

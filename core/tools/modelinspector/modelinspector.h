@@ -33,16 +33,16 @@
 
 #include "common/modelinspectorinterface.h"
 
+class QAbstractItemModel;
 class QItemSelection;
 class QItemSelectionModel;
-class SafetyFilterProxyModel;
 
 namespace GammaRay {
 
-class ModelModel;
 class ModelCellModel;
 class ModelTester;
 class RemoteModelServer;
+class SafetyFilterProxyModel;
 
 class ModelInspector : public ModelInspectorInterface
 {
@@ -56,9 +56,11 @@ class ModelInspector : public ModelInspectorInterface
     void selectionChanged(const QItemSelection &selected);
 
     void objectSelected(QObject* object);
+    void objectCreated(QObject *object);
 
   private:
-    ModelModel *m_modelModel;
+    ProbeInterface *m_probe;
+    QAbstractItemModel *m_modelModel;
     QItemSelectionModel *m_modelSelectionModel;
 
     RemoteModelServer *m_modelContentServer;

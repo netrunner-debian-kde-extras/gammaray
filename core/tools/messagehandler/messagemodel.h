@@ -30,6 +30,8 @@
 
 #include "backtrace.h"
 
+#include <common/tools/messagehandler/messagemodelroles.h>
+
 #include <QAbstractTableModel>
 #include <QTime>
 #include <QVector>
@@ -41,6 +43,12 @@ struct DebugMessage {
   QString message;
   QTime time;
   Backtrace backtrace;
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+  const char *category;
+  const char *file;
+  const char *function;
+  int line;
+#endif
 };
 
 }
@@ -62,13 +70,6 @@ class MessageModel : public QAbstractTableModel
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const Q_DECL_OVERRIDE;
     QVariant headerData(int section, Qt::Orientation orientation,
                         int role = Qt::DisplayRole) const Q_DECL_OVERRIDE;
-
-    enum Columns {
-      TypeColumn,
-      TimeColumn,
-      MessageColumn,
-      COLUMN_COUNT
-    };
 
   public slots:
     void addMessage(const GammaRay::DebugMessage &message);

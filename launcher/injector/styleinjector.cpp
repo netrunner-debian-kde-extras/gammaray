@@ -29,7 +29,6 @@
 #include <config-gammaray.h>
 
 #include "styleinjector.h"
-#include "interactiveprocess.h"
 
 #include <common/paths.h>
 
@@ -50,22 +49,28 @@ StyleInjector::StyleInjector() : ProcessInjector()
 {
 }
 
-bool StyleInjector::launch(const QStringList &programAndArgs,
-                          const QString &probeDll, const QString &probeFunc)
+QString StyleInjector::name() const
 {
-  QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-  env.insert("GAMMARAY_STYLEINJECTOR_PROBEDLL", probeDll);
-  env.insert("GAMMARAY_STYLEINJECTOR_PROBEFUNC", probeFunc);
+  return QStringLiteral("style");
+}
 
-  QString qtPluginPath = env.value("QT_PLUGIN_PATH");
+bool StyleInjector::launch(const QStringList &programAndArgs,
+                           const QString &probeDll, const QString &probeFunc,
+                           const QProcessEnvironment &e)
+{
+  auto env = e.isEmpty()? QProcessEnvironment::systemEnvironment() : e;
+  env.insert(QStringLiteral("GAMMARAY_STYLEINJECTOR_PROBEDLL"), probeDll);
+  env.insert(QStringLiteral("GAMMARAY_STYLEINJECTOR_PROBEFUNC"), probeFunc);
+
+  QString qtPluginPath = env.value(QStringLiteral("QT_PLUGIN_PATH"));
   if (!qtPluginPath.isEmpty()) {
     qtPluginPath.append(":");
   }
   qtPluginPath.append(Paths::currentProbePath());
-  env.insert("QT_PLUGIN_PATH", qtPluginPath);
+  env.insert(QStringLiteral("QT_PLUGIN_PATH"), qtPluginPath);
 
   QStringList args = programAndArgs;
-  args << QLatin1String("-style") << QLatin1String("gammaray-injector");
+  args << QStringLiteral("-style") << QStringLiteral("gammaray-injector");
 
   return launchProcess(args, env);
 }
@@ -74,7 +79,7 @@ bool StyleInjector::selfTest()
 {
 #ifdef HAVE_QT_WIDGETS
   QCoreApplication::addLibraryPath(Paths::currentProbePath());
-  if (!QStyleFactory::keys().contains(QLatin1String("gammaray-injector"))) {
+  if (!QStyleFactory::keys().contains(QStringLiteral("gammaray-injector"))) {
     mErrorString = QObject::tr("Injector style plugin is not found in the Qt style "
                                "plug-in search path or cannot be loaded");
     return false;

@@ -44,12 +44,14 @@ Endpoint::Endpoint(QObject* parent):
   m_socket(0),
   m_myAddress(Protocol::InvalidObjectAddress +1)
 {
+  if (s_instance)
+    qCritical("Found existing GammaRay::Endpoint instance - trying to attach to a GammaRay client?");
   Q_ASSERT(!s_instance);
   s_instance = this;
 
   ObjectInfo *endpointObj = new ObjectInfo;
   endpointObj->address = m_myAddress;
-  endpointObj->name = QLatin1String("com.kdab.GammaRay.Server");
+  endpointObj->name = QStringLiteral("com.kdab.GammaRay.Server");
   // TODO: we could set this as message handler here and use the same dispatch mechanism
   insertObjectInfo(endpointObj);
 
@@ -143,8 +145,12 @@ Protocol::ObjectAddress Endpoint::registerObject(const QString &name, QObject *o
 {
   ObjectInfo* obj = m_nameMap.value(name, 0);
   Q_ASSERT(obj);
+
   Q_ASSERT(!obj->object);
+
   Q_ASSERT(obj->address != Protocol::InvalidObjectAddress);
+
+  //cppcheck-suppress nullPointerRedundantCheck
   if (!obj || obj->object || obj->address == Protocol::InvalidObjectAddress) {
     return 0;
   }
@@ -167,7 +173,10 @@ void Endpoint::invokeObject(const QString &objectName, const char *method, const
 
   ObjectInfo* obj = m_nameMap.value(objectName, 0);
   Q_ASSERT(obj);
+
   Q_ASSERT(obj->address != Protocol::InvalidObjectAddress);
+
+  //cppcheck-suppress nullPointerRedundantCheck
   if (!obj || obj->address == Protocol::InvalidObjectAddress) {
     return;
   }
@@ -190,7 +199,7 @@ void Endpoint::invokeObjectLocal(QObject *object, const char *method, const QVar
   QMetaObject::invokeMethod(object, method, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9]);
 }
 
-void Endpoint::registerObjectInternal(const QString& objectName, Protocol::ObjectAddress objectAddress)
+void Endpoint::addObjectNameAddressMapping(const QString& objectName, Protocol::ObjectAddress objectAddress)
 {
   Q_ASSERT(objectAddress != Protocol::InvalidObjectAddress);
 
@@ -202,7 +211,7 @@ void Endpoint::registerObjectInternal(const QString& objectName, Protocol::Objec
   emit objectRegistered(objectName, objectAddress);
 }
 
-void Endpoint::unregisterObjectInternal(const QString& objectName)
+void Endpoint::removeObjectNameAddressMapping(const QString& objectName)
 {
   Q_ASSERT(m_nameMap.contains(objectName));
   ObjectInfo *obj = m_nameMap.value(objectName);
@@ -211,21 +220,30 @@ void Endpoint::unregisterObjectInternal(const QString& objectName)
   removeObjectInfo(obj);
 }
 
-void Endpoint::registerMessageHandlerInternal(Protocol::ObjectAddress objectAddress, QObject* receiver, const char* messageHandlerName)
+void Endpoint::registerMessageHandler(Protocol::ObjectAddress objectAddress, QObject* receiver, const char* messageHandlerName)
 {
   Q_ASSERT(m_addressMap.contains(objectAddress));
   ObjectInfo *obj = m_addressMap.value(objectAddress);
   Q_ASSERT(obj);
   Q_ASSERT(!obj->receiver);
-  Q_ASSERT(obj->messageHandler.isEmpty());
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0 ,0)
+  Q_ASSERT(!obj->messageHandler.isValid());
+#endif
   obj->receiver = receiver;
-  obj->messageHandler = messageHandlerName;
+
+  QByteArray signature(messageHandlerName);
+  signature += "(GammaRay::Message)";
+  auto idx = receiver->metaObject()->indexOfMethod(signature);
+  Q_ASSERT(idx >= 0);
+  obj->messageHandler = receiver->metaObject()->method(idx);
+
   Q_ASSERT(!m_handlerMap.contains(receiver, obj));
   m_handlerMap.insert(receiver, obj);
-  connect(receiver, SIGNAL(destroyed(QObject*)), SLOT(handlerDestroyed(QObject*)));
+  if (obj->receiver != obj->object)
+    connect(receiver, SIGNAL(destroyed(QObject*)), SLOT(handlerDestroyed(QObject*)));
 }
 
-void Endpoint::unregisterMessageHandlerInternal(Protocol::ObjectAddress objectAddress)
+void Endpoint::unregisterMessageHandler(Protocol::ObjectAddress objectAddress)
 {
   Q_ASSERT(m_addressMap.contains(objectAddress));
   ObjectInfo *obj = m_addressMap.value(objectAddress);
@@ -234,14 +252,17 @@ void Endpoint::unregisterMessageHandlerInternal(Protocol::ObjectAddress objectAd
   disconnect(obj->receiver, SIGNAL(destroyed(QObject*)), this, SLOT(handlerDestroyed(QObject*)));
   m_handlerMap.remove(obj->receiver, obj);
   obj->receiver = 0;
-  obj->messageHandler.clear();
+  obj->messageHandler = QMetaMethod();
 }
 
 void Endpoint::objectDestroyed(QObject *obj)
 {
   ObjectInfo* info = m_objectMap.value(obj, 0);
   Q_ASSERT(info);
+
   Q_ASSERT(info->object == obj);
+
+  //cppcheck-suppress nullPointerRedundantCheck
   if (!info || info->object != obj) {
     return;
   }
@@ -257,7 +278,7 @@ void Endpoint::handlerDestroyed(QObject* obj)
   m_handlerMap.remove(obj);
   foreach (ObjectInfo *obj, objs) {
     obj->receiver = 0;
-    obj->messageHandler.clear();
+    obj->messageHandler = QMetaMethod();
     handlerDestroyed(obj->address, QString(obj->name)); // copy the name, in case unregisterMessageHandlerInternal() is called inside
   }
 }
@@ -287,7 +308,7 @@ void Endpoint::dispatchMessage(const Message& msg)
   }
 
   if (obj->receiver) {
-    QMetaObject::invokeMethod(obj->receiver, obj->messageHandler, Q_ARG(GammaRay::Message, msg));
+    obj->messageHandler.invoke(obj->receiver, Q_ARG(GammaRay::Message, msg));
   }
 
   if (!obj->receiver && (msg.type() != Protocol::MethodCall || !obj->object)) {
@@ -348,4 +369,3 @@ void Endpoint::setLabel(const QString &label)
 {
   m_label = label;
 }
-

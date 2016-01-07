@@ -30,16 +30,16 @@
 #include "ui_propertiestab.h"
 #include "propertywidget.h"
 #include "editabletypesmodel.h"
-#include "variantcontainermodel.h"
 
-#include "ui/propertyeditor/propertyeditordelegate.h"
-#include "ui/propertyeditor/propertyeditorfactory.h"
-#include "ui/deferredresizemodesetter.h"
+#include <ui/propertyeditor/propertyeditordelegate.h>
+#include <ui/propertyeditor/propertyeditorfactory.h>
+#include <ui/deferredresizemodesetter.h>
+#include <ui/searchlinecontroller.h>
 #include <propertybinder.h>
 
-#include "common/objectbroker.h"
+#include <common/objectbroker.h>
 #include <common/propertymodel.h>
-#include "common/tools/objectinspector/propertiesextensioninterface.h"
+#include <common/tools/objectinspector/propertiesextensioninterface.h>
 
 #include <QSortFilterProxyModel>
 #include <QMenu>
@@ -55,7 +55,7 @@ PropertiesTab::PropertiesTab(PropertyWidget *parent)
 {
   m_ui->setupUi(this);
 
-  m_ui->newPropertyButton->setIcon(QIcon::fromTheme("list-add"));
+  m_ui->newPropertyButton->setIcon(QIcon::fromTheme(QStringLiteral("list-add")));
 
   setObjectBaseName(parent->objectBaseName());
 }
@@ -68,20 +68,17 @@ void PropertiesTab::setObjectBaseName(const QString &baseName)
 {
   QSortFilterProxyModel *proxy = new QSortFilterProxyModel(this);
   proxy->setDynamicSortFilter(true);
+  proxy->setSortCaseSensitivity(Qt::CaseInsensitive);
   QAbstractItemModel *model = ObjectBroker::model(baseName + '.' + "properties");
   proxy->setSourceModel(model);
   m_ui->propertyView->setModel(proxy);
   m_ui->propertyView->sortByColumn(0, Qt::AscendingOrder);
   new DeferredResizeModeSetter(
     m_ui->propertyView->header(), 0, QHeaderView::ResizeToContents);
-  m_ui->propertySearchLine->setProxy(proxy);
+  new SearchLineController(m_ui->propertySearchLine, proxy);
   m_ui->propertyView->setItemDelegate(new PropertyEditorDelegate(this));
   connect(m_ui->propertyView, SIGNAL(customContextMenuRequested(QPoint)),
           this, SLOT(propertyContextMenu(QPoint)));
-#if QT_VERSION >= QT_VERSION_CHECK(5, 2, 0)
-  connect(m_ui->propertyView, SIGNAL(doubleClicked(QModelIndex)),
-          SLOT(onDoubleClick(QModelIndex)));
-#endif
 
   EditableTypesModel *typesModel = new EditableTypesModel(this);
   proxy = new QSortFilterProxyModel(this);
@@ -100,6 +97,9 @@ void PropertiesTab::setObjectBaseName(const QString &baseName)
 
   m_interface = ObjectBroker::object<PropertiesExtensionInterface*>(baseName + ".propertiesExtension");
   new PropertyBinder(m_interface, "canAddProperty", m_ui->newPropertyBar, "visible");
+  m_ui->propertyView->header()->setSectionHidden(1, !m_interface->hasPropertyValues());
+  m_ui->propertyView->setRootIsDecorated(m_interface->hasPropertyValues());
+  connect(m_interface, SIGNAL(hasPropertyValuesChanged()), this, SLOT(hasValuesChanged()));
 }
 
 static PropertyEditorFactory::TypeId selectedTypeId(QComboBox *box)
@@ -157,10 +157,10 @@ void PropertiesTab::propertyContextMenu(const QPoint &pos)
     const QString propertyName = index.sibling(index.row(), 0).data(Qt::DisplayRole).toString();
     switch (action->data().toInt()) {
       case PropertyModel::Delete:
-        m_interface->setProperty(propertyName, QVariant());
+        m_ui->propertyView->model()->setData(index, QVariant(), Qt::EditRole);
         break;
       case PropertyModel::Reset:
-        m_interface->resetProperty(propertyName);
+        m_ui->propertyView->model()->setData(index, QVariant(), PropertyModel::ResetActionRole);
         break;
       case PropertyModel::NavigateTo:
         QSortFilterProxyModel *proxy =
@@ -176,29 +176,6 @@ void PropertiesTab::propertyContextMenu(const QPoint &pos)
   }
 }
 
-void PropertiesTab::onDoubleClick(const QModelIndex &index)
-{
-  if (index.column() != 0) {
-    return;
-  }
-
-#if QT_VERSION >= QT_VERSION_CHECK(5, 2, 0)
-  QVariant var = index.sibling(index.row(), 1).data(Qt::EditRole);
-
-  if (!var.canConvert<QVariantList>() && !var.canConvert<QVariantHash>()) {
-    return;
-  }
-
-  QTreeView *v = new QTreeView;
-
-  VariantContainerModel *m = new VariantContainerModel(v);
-  m->setVariant(var);
-
-  v->setModel(m);
-  v->show();
-#endif
-}
-
 void PropertiesTab::addNewProperty()
 {
   Q_ASSERT(m_interface->canAddProperty());
@@ -210,4 +187,10 @@ void PropertiesTab::addNewProperty()
 
   m_ui->newPropertyName->clear();
   updateNewPropertyValueEditor();
+}
+
+void PropertiesTab::hasValuesChanged()
+{
+  m_ui->propertyView->header()->setSectionHidden(1, !m_interface->hasPropertyValues());
+  m_ui->propertyView->setRootIsDecorated(m_interface->hasPropertyValues());
 }

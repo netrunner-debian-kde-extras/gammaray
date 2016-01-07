@@ -70,7 +70,7 @@ QVariant AbstractConnectionsModel::data(const QModelIndex& index, int role) cons
       case 0:
         if (!conn.endpoint || !m_object)
           return tr("Auto");
-        return tr("Auto (%1)").arg(conn.endpoint->thread() == m_object->thread() ? "Direct" : "Queued");
+        return tr("Auto (%1)").arg(conn.endpoint->thread() == m_object->thread() ? tr("Direct") : tr("Queued"));
       case 1: return tr("Direct");
       case 2: return tr("Queued");
       case 3: // Qt5
@@ -91,7 +91,7 @@ QVariant AbstractConnectionsModel::data(const QModelIndex& index, int role) cons
     if (isDirectCrossThreadConnection(conn))
       tips << tr("Direct cross-thread connection.\nThe connected slot is called in the context of the emitting thread.");
     if (!tips.isEmpty())
-      return tips.join("\n\n");
+      return tips.join(QStringLiteral("\n\n"));
   }
 
   if (role == ConnectionsModelRoles::EndpointRole) {
@@ -117,9 +117,9 @@ QVariant AbstractConnectionsModel::headerData(int section, Qt::Orientation orien
 QString AbstractConnectionsModel::displayString(QObject *object, int methodIndex)
 {
   if (!object)
-    return QObject::tr("<destroyed>");
+    return tr("<destroyed>");
   if (methodIndex < 0)
-    return QObject::tr("<unknown>");
+    return tr("<unknown>");
 
   const QMetaMethod method = object->metaObject()->method(methodIndex);
   return Util::prettyMethodSignature(method);
@@ -128,7 +128,7 @@ QString AbstractConnectionsModel::displayString(QObject *object, int methodIndex
 QString AbstractConnectionsModel::displayString(QObject* object)
 {
   if (!object)
-    return QObject::tr("<destroyed>");
+    return tr("<destroyed>");
   return Util::displayString(object);
 }
 

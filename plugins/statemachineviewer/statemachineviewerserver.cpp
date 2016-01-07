@@ -6,6 +6,11 @@
   Author: Kevin Funk <kevin.funk@kdab.com>
   Author: Milian Wolff <milian.wolff@kdab.com>
 
+  Licensees holding valid commercial KDAB GammaRay licenses may use this file in
+  accordance with GammaRay Commercial License Agreement provided with the Software.
+
+  Contact info@kdab.com if any conditions of this licensing are not clear to you.
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 2 of the License, or
@@ -26,14 +31,15 @@
 #include "statemachinewatcher.h"
 #include "transitionmodel.h"
 
-
 #include <core/objecttypefilterproxymodel.h>
 #include <core/probeinterface.h>
+#include <core/singlecolumnobjectproxymodel.h>
 #include <common/objectbroker.h>
 
 #include <QAbstractTransition>
 #include <QFinalState>
 #include <QHistoryState>
+#include <QMetaEnum>
 #include <QSignalTransition>
 #include <QStateMachine>
 #include <QItemSelectionModel>
@@ -42,29 +48,46 @@
 
 #include <iostream>
 
+#if QT_VERSION < QT_VERSION_CHECK(5, 5, 0)
+Q_DECLARE_METATYPE(Qt::KeyboardModifiers)
+#endif
+
 using namespace GammaRay;
 using namespace std;
 
-namespace {
-
-QString labelForTransition(QAbstractTransition *transition)
+QString StateMachineViewerServer::labelForTransition(QAbstractTransition* transition)
 {
   const QString objectName = transition->objectName();
   if (!objectName.isEmpty()) {
     return objectName;
   }
 
-  // Try to get a label for the transition if it is a QSignalTransition.
-  QSignalTransition *signalTransition = qobject_cast<QSignalTransition*>(transition);
-  if (signalTransition) {
-      return QString::fromLatin1("%1::%2").
-                  arg(Util::displayString(signalTransition->senderObject())).
-                  arg(QString::fromLatin1(signalTransition->signal().mid(1)));
+  // try to find descriptive labels for built-in transitions
+  if (auto signalTransition = qobject_cast<QSignalTransition*>(transition)) {
+    return Util::displayString(signalTransition->senderObject()) + "::" + signalTransition->signal().mid(1);
+  }
+  // QKeyEventTransition is in QtWidgets, so this is a bit dirty to avoid a hard dependency
+  else if (transition->inherits("QKeyEventTransition")) {
+    QString s;
+    const auto modifiers = transition->property("modifierMask").value<Qt::KeyboardModifiers>();
+    if (modifiers != Qt::NoModifier) {
+      const auto modIdx = staticQtMetaObject.indexOfEnumerator("KeyboardModifiers");
+      if (modIdx < 0)
+        return Util::displayString(transition);
+      const auto modEnum = staticQtMetaObject.enumerator(modIdx);
+      s += modEnum.valueToKey(modifiers) + QStringLiteral(" + ");
+    }
+
+    const auto key = transition->property("key").toInt();
+    const auto keyIdx = staticQtMetaObject.indexOfEnumerator("Key");
+    if (keyIdx < 0)
+      return Util::displayString(transition);
+    const auto keyEnum = staticQtMetaObject.enumerator(keyIdx);
+    s += keyEnum.valueToKey(key);
+    return s;
   }
 
   return Util::displayString(transition);
-}
-
 }
 
 StateMachineViewerServer::StateMachineViewerServer(ProbeInterface *probe, QObject *parent)
@@ -74,18 +97,18 @@ StateMachineViewerServer::StateMachineViewerServer(ProbeInterface *probe, QObjec
     m_maximumDepth(0),
     m_stateMachineWatcher(new StateMachineWatcher(this))
 {
-  probe->registerModel("com.kdab.GammaRay.StateModel", m_stateModel);
+  registerTypes();
+
+  probe->registerModel(QStringLiteral("com.kdab.GammaRay.StateModel"), m_stateModel);
   QItemSelectionModel *stateSelectionModel = ObjectBroker::selectionModel(m_stateModel);
   connect(stateSelectionModel, SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
           SLOT(stateSelectionChanged()));
 
-  ObjectTypeFilterProxyModel<QStateMachine> *stateMachineFilter =
-    new ObjectTypeFilterProxyModel<QStateMachine>(this);
+  auto stateMachineFilter = new ObjectTypeFilterProxyModel<QStateMachine>(this);
   stateMachineFilter->setSourceModel(probe->objectListModel());
-  probe->registerModel("com.kdab.GammaRay.StateMachineModel", stateMachineFilter);
-  QItemSelectionModel *stateMachineSelectionModel = ObjectBroker::selectionModel(stateMachineFilter);
-  connect(stateMachineSelectionModel, SIGNAL(currentChanged(QModelIndex,QModelIndex)),
-          SLOT(handleMachineClicked(QModelIndex)));
+  m_stateMachinesModel = new SingleColumnObjectProxyModel(this);
+  m_stateMachinesModel->setSourceModel(stateMachineFilter);
+  probe->registerModel(QStringLiteral("com.kdab.GammaRay.StateMachineModel"), m_stateMachinesModel);
 
   connect(m_stateMachineWatcher, SIGNAL(stateEntered(QAbstractState*)),
           SLOT(stateEntered(QAbstractState*)));
@@ -93,8 +116,6 @@ StateMachineViewerServer::StateMachineViewerServer(ProbeInterface *probe, QObjec
           SLOT(stateExited(QAbstractState*)));
   connect(m_stateMachineWatcher, SIGNAL(transitionTriggered(QAbstractTransition*)),
           SLOT(handleTransitionTriggered(QAbstractTransition*)));
-
-
 
   setMaximumDepth(3);
   updateStartStop();
@@ -197,7 +218,7 @@ void StateMachineViewerServer::setFilteredStates(const QVector<QAbstractState*>&
     foreach(QAbstractState* state, states) {
       stateNames << Util::displayString(state);
     }
-    emit message(tr("Setting filter on: %1").arg(stateNames.join(", ")));
+    emit message(tr("Setting filter on: %1").arg(stateNames.join(QStringLiteral(", "))));
   }
 
   m_filteredStates = states;
@@ -219,6 +240,9 @@ void StateMachineViewerServer::setMaximumDepth(int depth)
 void StateMachineViewerServer::setSelectedStateMachine(QStateMachine* machine)
 {
   QStateMachine* oldMachine = selectedStateMachine();
+  if (oldMachine == machine)
+    return;
+
   if (oldMachine) {
     disconnect(oldMachine, SIGNAL(started()), this, SLOT(updateStartStop()));
     disconnect(oldMachine, SIGNAL(stopped()), this, SLOT(updateStartStop()));
@@ -240,8 +264,10 @@ void StateMachineViewerServer::setSelectedStateMachine(QStateMachine* machine)
   updateStartStop();
 }
 
-void StateMachineViewerServer::handleMachineClicked(const QModelIndex &index)
+void StateMachineViewerServer::selectStateMachine(int row)
 {
+  Q_ASSERT(m_stateMachinesModel);
+  const auto index = m_stateMachinesModel->index(row, 0);
   if (!index.isValid()) {
     setSelectedStateMachine(0);
     return;
@@ -387,6 +413,22 @@ void StateMachineViewerServer::toggleRunning()
   } else {
     selectedStateMachine()->start();
   }
+}
+
+void StateMachineViewerServer::registerTypes()
+{
+#if QT_VERSION >= QT_VERSION_CHECK(5, 4, 0)
+  // moc auto-registration fails as this is only forward-declared and thus not seen by moc
+  qRegisterMetaType<QAbstractState*>();
+  qRegisterMetaType<QState*>();
+  qRegisterMetaType<QList<QAbstractState*> >();
+#endif
+}
+
+
+QString StateMachineViewerFactory::name() const
+{
+  return tr("State Machine Viewer");
 }
 
 #if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)

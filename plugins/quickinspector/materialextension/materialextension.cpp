@@ -30,10 +30,11 @@
 
 #include "materialextension.h"
 
-#include "core/metapropertymodel.h"
-#include "core/propertycontroller.h"
-#include "core/varianthandler.h"
-#include "common/metatypedeclarations.h"
+#include <core/aggregatedpropertymodel.h>
+#include <core/objectinstance.h>
+#include <core/propertycontroller.h>
+#include <core/varianthandler.h>
+#include <common/metatypedeclarations.h>
 
 #include <QFile>
 #include <QStandardItemModel>
@@ -60,11 +61,11 @@ MaterialExtension::MaterialExtension(PropertyController *controller)
   : MaterialExtensionInterface(controller->objectBaseName() + ".material", controller),
     PropertyControllerExtension(controller->objectBaseName() + ".material"),
     m_node(0),
-    m_materialPropertyModel(new MetaPropertyModel(this)),
+    m_materialPropertyModel(new AggregatedPropertyModel(this)),
     m_shaderModel(new QStandardItemModel(this))
 {
-  controller->registerModel(m_materialPropertyModel, "materialPropertyModel");
-  controller->registerModel(m_shaderModel, "shaderModel");
+  controller->registerModel(m_materialPropertyModel, QStringLiteral("materialPropertyModel"));
+  controller->registerModel(m_shaderModel, QStringLiteral("shaderModel"));
 }
 
 MaterialExtension::~MaterialExtension()
@@ -86,17 +87,17 @@ static const char* typeForMaterial(QSGMaterial *material)
 
 bool MaterialExtension::setObject(void *object, const QString &typeName)
 {
-  if (typeName == "QSGGeometryNode") {
+  if (typeName == QStringLiteral("QSGGeometryNode")) {
     m_node = static_cast<QSGGeometryNode*>(object);
 
-    m_materialPropertyModel->setObject(m_node->material(), typeForMaterial(m_node->material()));
+    m_materialPropertyModel->setObject(ObjectInstance(m_node->material(), typeForMaterial(m_node->material())));
 
     QSGMaterialShader *materialShader = m_node->material()->createShader();
     SGMaterialShaderThief *thief = reinterpret_cast<SGMaterialShaderThief*>(materialShader);
     const QHash<QOpenGLShader::ShaderType, QStringList> shaderSources = thief->getShaderSources();
 
     m_shaderModel->clear();
-    m_shaderModel->setHorizontalHeaderLabels(QStringList() << "Shader");
+    m_shaderModel->setHorizontalHeaderLabels(QStringList() << QStringLiteral("Shader"));
     for (auto it = shaderSources.constBegin(); it != shaderSources.constEnd(); ++it) {
       foreach (const QString &source, it.value()) {
         auto *item = new QStandardItem(source);

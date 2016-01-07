@@ -31,8 +31,11 @@
 
 #include <common/message.h>
 
+#include <QApplication>
 #include <QDataStream>
 #include <QDebug>
+#include <QStyle>
+#include <QStyleOptionViewItem>
 
 using namespace GammaRay;
 
@@ -43,6 +46,26 @@ RemoteModel::Node::~Node()
   qDeleteAll(children);
 }
 
+void RemoteModel::Node::clearChildrenData()
+{
+  foreach (auto child, children) {
+    child->clearChildrenStructure();
+    child->data.clear();
+    child->flags.clear();
+    child->state.clear();
+  }
+}
+
+void RemoteModel::Node::clearChildrenStructure()
+{
+  qDeleteAll(children);
+  children.clear();
+  rowCount = -1;
+  columnCount = -1;
+}
+
+QVariant RemoteModel::s_emptyDisplayValue;
+QVariant RemoteModel::s_emptySizeHintValue;
 
 RemoteModel::RemoteModel(const QString &serverObject, QObject *parent) :
   QAbstractItemModel(parent),
@@ -50,8 +73,24 @@ RemoteModel::RemoteModel(const QString &serverObject, QObject *parent) :
   m_serverObject(serverObject),
   m_myAddress(Protocol::InvalidObjectAddress),
   m_currentSyncBarrier(0),
-  m_targetSyncBarrier(0)
+  m_targetSyncBarrier(0),
+  m_proxyDynamicSortFilter(false),
+  m_proxyCaseSensitivity(Qt::CaseSensitive),
+  m_proxyKeyColumn(0)
 {
+  if (s_emptyDisplayValue.isNull()) {
+    s_emptyDisplayValue = tr("Loading...");
+#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
+    QStyleOptionViewItemV4 opt;
+    opt.features |= QStyleOptionViewItemV4::HasDisplay;
+#else
+    QStyleOptionViewItem opt;
+    opt.features |= QStyleOptionViewItem::HasDisplay;
+#endif
+    opt.text = s_emptyDisplayValue.toString();
+    s_emptySizeHintValue = QApplication::style()->sizeFromContents(QStyle::CT_ItemViewItem, &opt, QSize(), Q_NULLPTR);
+  }
+
   m_root = new Node;
 
   m_pendingDataRequestsTimer->setInterval(0);
@@ -135,17 +174,23 @@ QVariant RemoteModel::data(const QModelIndex &index, int role) const
   Q_ASSERT(node);
 
   const NodeStates state = stateForColumn(node, index.column());
-  if ((state & Outdated) && ((state & Loading) == 0)) {
-    requestDataAndFlags(index);
-  }
-
   if (role == LoadingState) {
     return QVariant::fromValue(state);
   }
 
+  // for size hint we don't want to trigger loading, as that's largely used for item view layouting
+  if (state & Empty) {
+    if (role == Qt::SizeHintRole)
+      return s_emptySizeHintValue;
+  }
+
+  if ((state & Outdated) && ((state & Loading) == 0)) {
+    requestDataAndFlags(index);
+  }
+
   if (state & Empty) { // still waiting for data
     if (role == Qt::DisplayRole)
-      return tr("Loading...");
+      return s_emptyDisplayValue;
     return QVariant();
   }
 
@@ -188,6 +233,13 @@ QVariant RemoteModel::headerData(int section, Qt::Orientation orientation, int r
   return m_headers.value(orientation).value(section).value(role);
 }
 
+void RemoteModel::sort(int column, Qt::SortOrder order)
+{
+  Message msg(m_myAddress, Protocol::ModelSortRequest);
+  msg.payload() << (quint32)column << (quint32)order;
+  sendMessage(msg);
+}
+
 void RemoteModel::newMessage(const GammaRay::Message& msg)
 {
   if (!checkSyncBarrier(msg))
@@ -208,13 +260,16 @@ void RemoteModel::newMessage(const GammaRay::Message& msg)
         // the object may already have been invalidated.
         break;
       }
-      int rowCount, columnCount;
+      qint32 rowCount, columnCount;
       msg.payload() >> rowCount >> columnCount;
-      Q_ASSERT(rowCount >= 0 && columnCount >= 0);
-      if (rowCount == node->rowCount && columnCount == node->columnCount) {
+      // we get -1/-1 if we requested for an invalid index, e.g. due to not having processed
+      // all structure changes yet. This will automatically trigger a retry.
+      Q_ASSERT((rowCount >= 0 && columnCount >= 0) || (rowCount == -1 && columnCount == -1));
+      if (node->rowCount >= 0 || node->columnCount >= 0) {
         // This can happen in similar racy conditions as below, when we request the row/col count
         // for two different Node* at the same index (one was deleted inbetween and then the other
-        // was created). Anyhow, since the data is equal we can/should ignore it anyways.
+        // was created). We ignore the new data as the node it is intended for will request it again
+        // after processing all structure changes.
         break;
       }
 
@@ -225,15 +280,15 @@ void RemoteModel::newMessage(const GammaRay::Message& msg)
 
       const QModelIndex qmi = modelIndexForNode(node, 0);
 
-      if (columnCount) {
+      if (columnCount > 0) {
         beginInsertColumns(qmi, 0, columnCount - 1);
         node->columnCount = columnCount;
         endInsertColumns();
       } else {
-        node->columnCount = 0;
+        node->columnCount = columnCount;
       }
 
-      if (rowCount) {
+      if (rowCount > 0) {
         beginInsertRows(qmi, 0, rowCount - 1);
         node->children.reserve(rowCount);
         for (int i = 0; i < rowCount; ++i) {
@@ -244,7 +299,7 @@ void RemoteModel::newMessage(const GammaRay::Message& msg)
         node->rowCount = rowCount;
         endInsertRows();
       } else {
-        node->rowCount = 0;
+        node->rowCount = rowCount;
       }
       break;
     }
@@ -292,7 +347,8 @@ void RemoteModel::newMessage(const GammaRay::Message& msg)
     case Protocol::ModelContentChanged:
     {
       Protocol::ModelIndex beginIndex, endIndex;
-      msg.payload() >> beginIndex >> endIndex;
+      QVector<int> roles;
+      msg.payload() >> beginIndex >> endIndex >> roles;
       Node *node = nodeForIndex(beginIndex);
       if (!node || node == m_root)
         break;
@@ -313,7 +369,11 @@ void RemoteModel::newMessage(const GammaRay::Message& msg)
       const QModelIndex qmiBegin = modelIndexForNode(node, beginIndex.last().second);
       const QModelIndex qmiEnd = qmiBegin.sibling(endIndex.last().first, endIndex.last().second);
 
+#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
       emit dataChanged(qmiBegin, qmiEnd);
+#else
+      emit dataChanged(qmiBegin, qmiEnd, roles);
+#endif
       break;
     }
 
@@ -398,10 +458,62 @@ void RemoteModel::newMessage(const GammaRay::Message& msg)
     case Protocol::ModelColumnsAdded:
     case Protocol::ModelColumnsMoved:
     case Protocol::ModelColumnsRemoved:
-    case Protocol::ModelLayoutChanged:
     {
       // TODO
       qWarning() << Q_FUNC_INFO << "not implemented yet" << msg.type() << m_serverObject;
+      clear();
+      break;
+    }
+
+    case Protocol::ModelLayoutChanged:
+    {
+      QVector<Protocol::ModelIndex> parents;
+      quint32 hint;
+      msg.payload() >> parents >> hint;
+
+      if (parents.isEmpty()) { // everything changed (or Qt4)
+        emit layoutAboutToBeChanged();
+        foreach (const auto &persistentIndex, persistentIndexList()) {
+          changePersistentIndex(persistentIndex, QModelIndex());
+        }
+        if (hint == 0)
+          m_root->clearChildrenStructure();
+        else
+          m_root->clearChildrenData();
+        emit layoutChanged();
+        break;
+      }
+
+      QVector<Node*> parentNodes;
+      parentNodes.reserve(parents.size());
+      foreach (const auto &p, parents) {
+        auto node = nodeForIndex(p);
+        if (!node)
+          continue;
+        parentNodes.push_back(node);
+      }
+      if (parentNodes.isEmpty())
+        break; // no currently loaded node changed, nothing to do
+
+      emit layoutAboutToBeChanged(); // TODO Qt5 support with exact sub-trees
+      foreach (const auto &persistentIndex, persistentIndexList()) {
+        auto persistentNode = nodeForIndex(persistentIndex);
+        Q_ASSERT(persistentNode);
+        foreach (auto node, parentNodes) {
+          if (!isAncestor(node, persistentNode))
+            continue;
+          changePersistentIndex(persistentIndex, QModelIndex());
+          break;
+        }
+      }
+      foreach (auto node, parentNodes) {
+        if (hint == 0)
+          node->clearChildrenStructure();
+        else
+          node->clearChildrenData();
+      }
+      emit layoutChanged(); // TODO Qt5 support with exact sub-trees
+      break;
     }
 
     case Protocol::ModelReset:
@@ -442,7 +554,7 @@ RemoteModel::Node* RemoteModel::nodeForIndex(const Protocol::ModelIndex &index) 
   for (int i = 0; i < index.size(); ++i) {
     if (node->children.size() <= index[i].first)
       return 0;
-    node = node->children[index[i].first];
+    node = node->children.at(index[i].first);
   }
   return node;
 }
@@ -453,6 +565,20 @@ QModelIndex RemoteModel::modelIndexForNode(Node* node, int column) const
   if (node == m_root)
     return QModelIndex();
   return createIndex(node->parent->children.indexOf(node), column, node);
+}
+
+bool RemoteModel::isAncestor(RemoteModel::Node* ancestor, RemoteModel::Node* child) const
+{
+  Q_ASSERT(ancestor);
+  Q_ASSERT(child);
+  Q_ASSERT(m_root);
+
+  if (child == m_root)
+    return false;
+  Q_ASSERT(child->parent);
+  if (child->parent == ancestor)
+    return true;
+  return isAncestor(ancestor, child->parent);
 }
 
 RemoteModel::NodeStates RemoteModel::stateForColumn(RemoteModel::Node* node, int columnIndex) const
@@ -515,7 +641,7 @@ void RemoteModel::requestHeaderData(Qt::Orientation orientation, int section) co
 {
   Q_ASSERT(section >= 0);
   Q_ASSERT(!m_headers.value(orientation).contains(section));
-  m_headers[orientation][section][Qt::DisplayRole] = tr("Loading...");
+  m_headers[orientation][section][Qt::DisplayRole] = s_emptyDisplayValue;
 
   Message msg(m_myAddress, Protocol::ModelHeaderRequest);
   msg.payload() << qint8(orientation) << qint32(section);
@@ -544,7 +670,8 @@ void RemoteModel::connectToServer()
     return;
 
   beginResetModel();
-  Client::instance()->registerForObject(m_myAddress, this, "newMessage");
+  Client::instance()->registerObject(m_serverObject, this);
+  Client::instance()->registerMessageHandler(m_myAddress, this, "newMessage");
   endResetModel();
 }
 
@@ -565,7 +692,7 @@ void RemoteModel::resetLoadingState(RemoteModel::Node* node, int startRow) const
 
   Q_ASSERT(node->children.size() == node->rowCount);
   for (int row = startRow; row < node->rowCount; ++row) {
-    Node *child = node->children[row];
+    Node *child = node->children.at(row);
     for (QHash<int, NodeStates>::iterator it = child->state.begin(); it != child->state.end(); ++it) {
       if (it.value() & Loading)
         it.value() = it.value() & ~Loading;
@@ -677,4 +804,56 @@ void RemoteModel::registerClient(const QString &serverObject)
 void RemoteModel::sendMessage(const Message& msg) const
 {
   Endpoint::send(msg);
+}
+
+bool RemoteModel::proxyDynamicSortFilter() const
+{
+  return m_proxyDynamicSortFilter;
+}
+
+void RemoteModel::setProxyDynamicSortFilter(bool dynamicSortFilter)
+{
+  if (m_proxyDynamicSortFilter == dynamicSortFilter)
+    return;
+  m_proxyDynamicSortFilter = dynamicSortFilter;
+  emit proxyDynamicSortFilterChanged();
+}
+
+Qt::CaseSensitivity RemoteModel::proxyFilterCaseSensitivity() const
+{
+  return m_proxyCaseSensitivity;
+}
+
+void RemoteModel::setProxyFilterCaseSensitivity(Qt::CaseSensitivity caseSensitivity)
+{
+  if (m_proxyCaseSensitivity == caseSensitivity)
+    return;
+  m_proxyCaseSensitivity = caseSensitivity;
+  emit proxyFilterCaseSensitivityChanged();
+}
+
+int RemoteModel::proxyFilterKeyColumn() const
+{
+  return m_proxyKeyColumn;
+}
+
+void RemoteModel::setProxyFilterKeyColumn(int column)
+{
+  if (m_proxyKeyColumn == column)
+    return;
+  m_proxyKeyColumn = column;
+  emit proxyFilterKeyColumnChanged();
+}
+
+QRegExp RemoteModel::proxyFilterRegExp() const
+{
+  return m_proxyFilterRegExp;
+}
+
+void RemoteModel::setProxyFilterRegExp(const QRegExp& regExp)
+{
+  if (m_proxyFilterRegExp == regExp)
+    return;
+  m_proxyFilterRegExp = regExp;
+  emit proxyFilterRegExpChanged();
 }

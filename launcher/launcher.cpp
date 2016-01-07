@@ -29,6 +29,9 @@
 #include <config-gammaray.h>
 #include "launcher.h"
 #include "probefinder.h"
+#include "probeabi.h"
+#include "clientlauncher.h"
+#include "launchoptions.h"
 #include "injector/abstractinjector.h"
 #include "injector/injectorfactory.h"
 
@@ -48,6 +51,53 @@
 
 #include <iostream>
 
+namespace GammaRay {
+
+enum State {
+  Initial = 0,
+  InjectorFinished = 1,
+  InjectorFailed = 2,
+  ClientStarted = 4,
+  Complete = InjectorFinished | ClientStarted
+};
+
+struct LauncherPrivate
+{
+  LauncherPrivate(const LaunchOptions& options) :
+    options(options),
+#ifdef HAVE_SHM
+    shm(0),
+#endif
+    state(Initial),
+    exitCode(0)
+  {}
+
+  AbstractInjector::Ptr createInjector() const
+  {
+    if (options.injectorType().isEmpty()) {
+      if (options.isAttach()) {
+        return InjectorFactory::defaultInjectorForAttach();
+      } else {
+        return InjectorFactory::defaultInjectorForLaunch(options.probeABI());
+      }
+    }
+    return InjectorFactory::createInjector(options.injectorType());
+  }
+
+  LaunchOptions options;
+#ifdef HAVE_SHM
+  QSharedMemory *shm;
+#endif
+  ClientLauncher client;
+  QTimer safetyTimer;
+  AbstractInjector::Ptr injector;
+  QString errorMessage;
+  int state;
+  int exitCode;
+};
+
+}
+
 using namespace GammaRay;
 
 class SemaphoreWaiter : public QThread
@@ -56,7 +106,7 @@ class SemaphoreWaiter : public QThread
 public:
   explicit SemaphoreWaiter(qint64 id, QObject *parent = 0) : QThread(parent), m_id(id) {}
   ~SemaphoreWaiter() {}
-  void run()
+  void run() Q_DECL_OVERRIDE
   {
 #ifdef HAVE_SHM
     QSystemSemaphore sem("gammaray-semaphore-" + QString::number(m_id), 0, QSystemSemaphore::Create);
@@ -72,138 +122,111 @@ private:
   qint64 m_id;
 };
 
-class InjectorThread : public QThread
-{
-  Q_OBJECT
-public:
-  explicit InjectorThread(const LaunchOptions &options, const QString &probeDll, QObject *parent = 0)
-    : QThread(parent), m_options(options), m_probeDll(probeDll)
-  {
-    Q_ASSERT(options.isValid());
-  }
-  ~InjectorThread() {}
-
-  AbstractInjector::Ptr createInjector() const
-  {
-    if (m_options.injectorType().isEmpty()) {
-      if (m_options.isAttach()) {
-        return InjectorFactory::defaultInjectorForAttach();
-      } else {
-        return InjectorFactory::defaultInjectorForLaunch(m_options.probeABI());
-      }
-    }
-    return InjectorFactory::createInjector(m_options.injectorType());
-  }
-
-  void run()
-  {
-    const AbstractInjector::Ptr injector = createInjector();
-
-    if (!injector) {
-      if (m_options.injectorType().isEmpty()) {
-        if (m_options.isAttach()) {
-          emit error(-1, tr("Uh-oh, there is no default attach injector on this platform."));
-        } else {
-          emit error(-1, tr("Uh-oh, there is no default launch injector on this platform."));
-        }
-      } else {
-        emit error(-1, tr("Injector %1 not found.").arg(m_options.injectorType()));
-      }
-      return;
-    }
-
-    bool success = false;
-    if (m_options.isLaunch()) {
-      success = injector->launch(m_options.launchArguments(), m_probeDll, QLatin1String("gammaray_probe_inject"));
-    }
-    if (m_options.isAttach()) {
-      success = injector->attach(m_options.pid(), m_probeDll, QLatin1String("gammaray_probe_inject"));
-    }
-
-    if (!success) {
-      QString errorMessage;
-      if (m_options.isLaunch())
-        errorMessage = tr("Failed to launch target '%1'.").arg(m_options.launchArguments().join(" "));
-      if (m_options.isAttach())
-        errorMessage = tr("Failed to attach to target with PID %1.").arg(m_options.pid());
-      if (!injector->errorString().isEmpty())
-        errorMessage += tr("\nError: %1").arg(injector->errorString());
-      emit error(injector->exitCode() ? injector->exitCode() : 1, errorMessage);
-    }
-  }
-
-signals:
-  void error(int exitCode, const QString &errorMessage);
-
-private:
-  LaunchOptions m_options;
-  QString m_probeDll;
-};
-
 Launcher::Launcher(const LaunchOptions& options, QObject* parent):
   QObject(parent),
-  m_options(options),
-#ifdef HAVE_SHM
-  m_shm(0),
-#endif
-  m_state(Initial)
+  d(new LauncherPrivate(options))
 {
   Q_ASSERT(options.isValid());
 
-  m_safetyTimer.setSingleShot(true);
-  m_safetyTimer.setInterval(60 * 1000);
-  connect(&m_safetyTimer, SIGNAL(timeout()), SLOT(timeout()));
-
-  // wait for the event loop to be available
-  QMetaObject::invokeMethod(this, "delayedInit", Qt::QueuedConnection);
+  const auto timeout = qgetenv("GAMMARAY_LAUNCHER_TIMEOUT").toInt();
+  d->safetyTimer.setInterval(std::max(60, timeout) * 1000);
+  d->safetyTimer.setSingleShot(true);
+  connect(&d->safetyTimer, SIGNAL(timeout()), SLOT(timeout()));
 }
 
 Launcher::~Launcher()
 {
-  m_client.waitForFinished();
+  stop();
+  d->client.waitForFinished();
+  delete d;
 }
 
 qint64 Launcher::instanceIdentifier() const
 {
-  if (m_options.isAttach())
-    return m_options.pid();
+  if (d->options.isAttach())
+    return d->options.pid();
   return QCoreApplication::applicationPid();
 }
 
-void Launcher::delayedInit()
+void Launcher::stop()
 {
-  const QString probeDll = ProbeFinder::findProbe(QLatin1String(GAMMARAY_PROBE_NAME), m_options.probeABI());
-  m_options.setProbeSetting("ProbePath", QFileInfo(probeDll).absolutePath());
+    d->injector->stop();
+}
+
+bool Launcher::start()
+{
+  auto probeDll = d->options.probePath();
+  if (probeDll.isEmpty()) {
+    probeDll = ProbeFinder::findProbe(QStringLiteral(GAMMARAY_PROBE_NAME), d->options.probeABI());
+    d->options.setProbePath(QFileInfo(probeDll).absolutePath());
+  }
 
   sendLauncherId();
   sendProbeSettings();
-  sendProbeSettingsFallback();
 
-  if (m_options.uiMode() != LaunchOptions::InProcessUi) {
+  if (d->options.uiMode() != LaunchOptions::InProcessUi) {
     SemaphoreWaiter *semWaiter = new SemaphoreWaiter(instanceIdentifier(), this);
     connect(semWaiter, SIGNAL(semaphoreReleased()), this, SLOT(semaphoreReleased()), Qt::QueuedConnection);
     semWaiter->start();
 
-    m_safetyTimer.start();
+    d->safetyTimer.start();
+  }
+  d->injector = d->createInjector();
+  if (!d->injector) {
+    if (d->options.injectorType().isEmpty()) {
+      if (d->options.isAttach()) {
+        injectorError(-1, tr("Uh-oh, there is no default attach injector on this platform."));
+      } else {
+        injectorError(-1, tr("Uh-oh, there is no default launch injector on this platform."));
+      }
+    } else {
+      injectorError(-1, tr("Injector %1 not found.").arg(d->options.injectorType()));
+    }
+    return false;
   }
 
-  InjectorThread *injector = new InjectorThread(m_options, probeDll, this);
-  connect(injector, SIGNAL(finished()), this, SLOT(injectorFinished()), Qt::QueuedConnection);
-  connect(injector, SIGNAL(error(int,QString)), this, SLOT(injectorError(int,QString)), Qt::QueuedConnection);
-  injector->start();
+  connect(d->injector.data(), SIGNAL(started()), this, SIGNAL(started()));
+  connect(d->injector.data(), SIGNAL(finished()), this, SLOT(injectorFinished()), Qt::QueuedConnection);
+  connect(d->injector.data(), SIGNAL(attached()), this, SIGNAL(attached()), Qt::QueuedConnection);
+  connect(d->injector.data(), SIGNAL(stderrMessage(QString)), this, SIGNAL(stderrMessage(QString)));
+  connect(d->injector.data(), SIGNAL(stdoutMessage(QString)), this, SIGNAL(stdoutMessage(QString)));
+
+  bool success = false;
+  if (d->options.isLaunch()) {
+    success = d->injector->launch(d->options.launchArguments(), probeDll, QStringLiteral("gammaray_probe_inject"), d->options.processEnvironment());
+  } else if (d->options.isAttach()) {
+    success = d->injector->attach(d->options.pid(), probeDll, QStringLiteral("gammaray_probe_inject"));
+  }
+
+  if (!success) {
+    QString errorMessage;
+    if (d->options.isLaunch())
+      errorMessage = tr("Failed to launch target '%1'.").arg(d->options.launchArguments().join(QStringLiteral(" ")));
+    if (d->options.isAttach())
+      errorMessage = tr("Failed to attach to target with PID %1.").arg(d->options.pid());
+    if (!d->injector->errorString().isEmpty())
+      errorMessage += tr("\nError: %1").arg(d->injector->errorString());
+    injectorError(d->injector->exitCode() ? d->injector->exitCode() : 1, errorMessage);
+    return false;
+  }
+  return true;
+}
+
+int Launcher::exitCode() const
+{
+  return d->exitCode;
+}
+
+QString Launcher::errorMessage() const
+{
+  return d->errorMessage;
 }
 
 void Launcher::sendLauncherId()
 {
   // if we are launching a new process, make sure it knows how to talk to us
-  if (m_options.isLaunch()) {
-    qputenv("GAMMARAY_LAUNCHER_ID", QByteArray::number(instanceIdentifier()));
-  } else {
-#if QT_VERSION < QT_VERSION_CHECK(5, 1, 0)
-    qputenv("GAMMARAY_LAUNCHER_ID", "");
-#else
-    qunsetenv("GAMMARAY_LAUNCHER_ID");
-#endif
+  if (d->options.isLaunch()) {
+      d->options.setProbeSetting(QStringLiteral("LAUNCHER_ID"), instanceIdentifier());
   }
 }
 
@@ -222,47 +245,37 @@ void Launcher::sendProbeSettings()
 
   {
     Message msg(Protocol::LauncherAddress, Protocol::ProbeSettings);
-    msg.payload() << m_options.probeSettings();
+    msg.payload() << d->options.probeSettings();
     msg.write(&buffer);
   }
 
   buffer.close();
 
-  m_shm = new QSharedMemory(QLatin1String("gammaray-") + QString::number(instanceIdentifier()), this);
-  if (!m_shm->create(qMax(ba.size(), 1024))) { // make sure we have enough space for the answer
-    qWarning() << Q_FUNC_INFO << "Failed to obtain shared memory for probe settings:" << m_shm->errorString()
-      << "- error code (QSharedMemory::SharedMemoryError):" << m_shm->error();
-    delete m_shm;
-    m_shm = 0;
+  d->shm = new QSharedMemory(QStringLiteral("gammaray-") + QString::number(instanceIdentifier()), this);
+  if (!d->shm->create(qMax(ba.size(), 1024))) { // make sure we have enough space for the answer
+    qWarning() << Q_FUNC_INFO << "Failed to obtain shared memory for probe settings:" << d->shm->errorString()
+      << "- error code (QSharedMemory::SharedMemoryError):" << d->shm->error();
+    delete d->shm;
+    d->shm = 0;
     return;
   }
 
-  SharedMemoryLocker locker(m_shm);
-  qMemCopy(m_shm->data(), ba.constData(), ba.size());
-  if (m_shm->size() > ba.size()) // Windows...
-    qMemSet(static_cast<char*>(m_shm->data()) + ba.size(), 0xff, m_shm->size() - ba.size());
+  SharedMemoryLocker locker(d->shm);
+  qMemCopy(d->shm->data(), ba.constData(), ba.size());
+  if (d->shm->size() > ba.size()) // Windows...
+    qMemSet(static_cast<char*>(d->shm->data()) + ba.size(), 0xff, d->shm->size() - ba.size());
 #endif
-}
-
-void Launcher::sendProbeSettingsFallback()
-{
-  if (!m_options.isAttach())
-    return;
-
-  const QHash<QByteArray, QByteArray> probeSettings = m_options.probeSettings();
-  for (QHash<QByteArray, QByteArray>::const_iterator it = probeSettings.constBegin(); it != probeSettings.constEnd(); ++it)
-    qputenv("GAMMARAY_" + it.key(), it.value());
 }
 
 void Launcher::semaphoreReleased()
 {
-  m_safetyTimer.stop();
+  d->safetyTimer.stop();
 
   QUrl serverAddress;
 #ifdef HAVE_SHM
   {
-    SharedMemoryLocker locker(m_shm);
-    QByteArray ba = QByteArray::fromRawData(static_cast<const char*>(m_shm->data()), m_shm->size());
+    SharedMemoryLocker locker(d->shm);
+    QByteArray ba = QByteArray::fromRawData(static_cast<const char*>(d->shm->data()), d->shm->size());
     QBuffer buffer(&ba);
     buffer.open(QIODevice::ReadOnly);
 
@@ -279,8 +292,8 @@ void Launcher::semaphoreReleased()
       }
     }
   }
-  delete m_shm;
-  m_shm = 0;
+  delete d->shm;
+  d->shm = 0;
 
   if (serverAddress.isEmpty()) {
     qWarning() << "Unable to receive server address.";
@@ -295,21 +308,21 @@ void Launcher::semaphoreReleased()
 
   std::cout << "GammaRay server listening on: " << qPrintable(serverAddress.toString()) << std::endl;
 
-  if (m_options.uiMode() != LaunchOptions::OutOfProcessUi) // inject only, so we are done here
+  if (d->options.uiMode() != LaunchOptions::OutOfProcessUi) // inject only, so we are done here
     return;
 
   // safer, since we will always be running locally, and the server might give us an external address
-  if (serverAddress.scheme() == "tcp")
-    serverAddress.setHost("127.0.0.1");
+  if (serverAddress.scheme() == QStringLiteral("tcp"))
+    serverAddress.setHost(QStringLiteral("127.0.0.1"));
 
   startClient(serverAddress);
-  m_state |= ClientStarted;
+  d->state |= ClientStarted;
   checkDone();
 }
 
 void Launcher::startClient(const QUrl& serverAddress)
 {
-  if (!m_client.launch(serverAddress)) {
+  if (!d->client.launch(serverAddress)) {
     qCritical("Unable to launch gammaray-client!");
     QCoreApplication::exit(1);
   }
@@ -317,30 +330,49 @@ void Launcher::startClient(const QUrl& serverAddress)
 
 void Launcher::injectorFinished()
 {
-  if ((m_state & InjectorFailed) == 0)
-    m_state |= InjectorFinished;
+  d->exitCode = d->injector->exitCode();
+  if (d->errorMessage.isEmpty()) {
+    d->errorMessage = d->injector->errorString();
+    if (!d->errorMessage.isEmpty()) {
+      d->state |= InjectorFailed;
+      std::cerr << "Injector error: " << qPrintable(d->errorMessage) << std::endl;
+    }
+  }
+
+  if ((d->state & InjectorFailed) == 0)
+    d->state |= InjectorFinished;
   checkDone();
 }
 
 void Launcher::injectorError(int exitCode, const QString& errorMessage)
 {
-  m_state |= InjectorFailed;
+  d->exitCode = exitCode;
+  d->errorMessage = errorMessage;
+
+  d->state |= InjectorFailed;
   std::cerr << qPrintable(errorMessage) << std::endl;
   std::cerr << "See <https://github.com/KDAB/GammaRay/wiki/Known-Issues> for troubleshooting" <<  std::endl;
-  QCoreApplication::exit(exitCode);
+  checkDone();
 }
 
 void Launcher::timeout()
 {
+  d->state |= InjectorFailed;
+
   std::cerr << "Target not responding - timeout." << std::endl;
   std::cerr << "See <https://github.com/KDAB/GammaRay/wiki/Known-Issues> for troubleshooting" <<  std::endl;
-  m_client.terminate();
-  QCoreApplication::exit(1);
+  checkDone();
 }
 
 void Launcher::checkDone()
 {
-  if (m_state == Complete || (m_options.uiMode() != LaunchOptions::OutOfProcessUi && m_state == InjectorFinished)) {
+  if (d->state == Complete || (d->options.uiMode() != LaunchOptions::OutOfProcessUi && d->state == InjectorFinished)) {
+    emit finished();
+  }
+  else if ((d->state & InjectorFailed) != 0) {
+    d->client.terminate();
+    if (d->exitCode == 0)
+      d->exitCode = 1;
     emit finished();
   }
 }
