@@ -42,3 +42,9 @@ override_dh_installdocs:
 
 override_dh_strip:
 	dh_strip --dbg-package=gammaray-dbg
+
+VERSION=$(shell dpkg-parsechangelog -S Version | cut -d- -f1)
+get-orig-source:
+	uscan --force-download --download-version $(VERSION) \
+		--rename --destdir=$(CURDIR) \
+		--repack --compression xz
