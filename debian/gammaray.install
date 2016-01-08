@@ -1,6 +1,7 @@
 usr/bin
 usr/lib/libgammaray*qt5*.so.*
 usr/lib/libgammaray_client.so.*
+usr/lib/libgammaray_launcher.so.*
 usr/lib/gammaray/libexec
 usr/lib/gammaray/*/qt5*/gammaray_actioninspector*
 usr/lib/gammaray/*/qt5*/gammaray_codecbrowser*
