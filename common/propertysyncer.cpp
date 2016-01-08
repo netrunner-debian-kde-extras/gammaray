@@ -61,8 +61,9 @@ void PropertySyncer::addObject(Protocol::ObjectAddress addr, QObject* obj)
 {
     Q_ASSERT(addr != Protocol::InvalidObjectAddress);
     Q_ASSERT(obj);
+    if (qobjectPropertyOffset() == obj->metaObject()->propertyCount())
+        return; // no properties we could sync
 
-    bool hasProperties = false;
     for (int i = qobjectPropertyOffset(); i < obj->metaObject()->propertyCount(); ++i) {
         const auto prop = obj->metaObject()->property(i);
         if (!prop.hasNotifySignal())
@@ -74,11 +75,6 @@ void PropertySyncer::addObject(Protocol::ObjectAddress addr, QObject* obj)
           prop.notifySignal().methodSignature()
 #endif
           , this, SLOT(propertyChanged()));
-        hasProperties = true;
-    }
-
-    if (!hasProperties) {
-        return;
     }
 
     connect(obj, SIGNAL(destroyed(QObject*)), this, SLOT(objectDestroyed(QObject*)));
@@ -133,12 +129,12 @@ void PropertySyncer::handleMessage(const GammaRay::Message& msg)
             if (it == m_objects.constEnd())
                 break;
 
-            QVector<QPair<QString, QVariant> > values;
+            QVector<QPair<QByteArray, QVariant> > values;
             const auto propCount = (*it).obj->metaObject()->propertyCount();
             values.reserve(propCount);
             for (int i = qobjectPropertyOffset(); i < propCount; ++i) {
                 const auto prop = (*it).obj->metaObject()->property(i);
-                values.push_back(qMakePair(QString(prop.name()), prop.read((*it).obj)));
+                values.push_back(qMakePair(QByteArray(prop.name()), prop.read((*it).obj)));
             }
             Q_ASSERT(!values.isEmpty());
 
@@ -164,11 +160,11 @@ void PropertySyncer::handleMessage(const GammaRay::Message& msg)
                 break;
 
             for (quint32 i = 0; i < changeSize; ++i) {
-                QString propName;
+                QByteArray propName;
                 QVariant propValue;
                 msg.payload() >> propName >> propValue;
                 (*it).recursionLock = true;
-                (*it).obj->setProperty(propName.toUtf8(), propValue);
+                (*it).obj->setProperty(propName, propValue);
 
                 // it can be invalid if as a result of the above call new objects have been registered for example
                 it = std::find_if(m_objects.begin(), m_objects.end(), [addr](const ObjectInfo &info) {
@@ -197,12 +193,12 @@ void PropertySyncer::propertyChanged()
         return;
 
     const auto sigIndex = senderSignalIndex();
-    QVector<QPair<QString, QVariant> > changes;
+    QVector<QPair<QByteArray, QVariant> > changes;
     for (int i = qobjectPropertyOffset(); i < obj->metaObject()->propertyCount(); ++i) {
         const auto prop = obj->metaObject()->property(i);
         if (prop.notifySignalIndex() != sigIndex)
             continue;
-        changes.push_back(qMakePair(QString(prop.name()), prop.read(obj)));
+        changes.push_back(qMakePair(QByteArray(prop.name()), prop.read(obj)));
     }
     Q_ASSERT(!changes.isEmpty());
 

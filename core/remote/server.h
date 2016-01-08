@@ -51,15 +51,25 @@ class GAMMARAY_CORE_EXPORT Server : public Endpoint
     explicit Server(QObject *parent = 0);
     ~Server();
 
+    /** Indicates which parts of a QObject should be exported to the client. */
+    enum ObjectExportOption {
+      ExportNothing = 0x0,
+      ExportSignals = 0x1,
+      ExportProperties = 0x2,
+      ExportEverything = ExportProperties | ExportSignals
+    };
+    Q_DECLARE_FLAGS(ObjectExportOptions, ObjectExportOption)
+
     /**
      * Register a server-side QObject to send/receive messages to/from the client side.
+     * This is equivalent to registerObject(name, object, ExportEverything);
      */
     Protocol::ObjectAddress registerObject(const QString &name, QObject *object) Q_DECL_OVERRIDE;
 
-    /** Register a new object with name @p objectName as a destination for messages.
-     *  New messages to that object are passed to the slot @p messageHandlerName on @p receiver.
+    /**
+     * Register a server-side QObject for exporting to the client.
      */
-    Protocol::ObjectAddress registerObject(const QString &objectName, QObject* receiver, const char* messageHandlerName);
+    Protocol::ObjectAddress registerObject(const QString &name, QObject *object, ObjectExportOptions exportOptions);
 
     /**
      * Register a callback slot @p monitorNotifier on object @p receiver that is called if the usage

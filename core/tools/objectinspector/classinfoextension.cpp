@@ -27,7 +27,6 @@
 */
 
 #include "classinfoextension.h"
-#include "connectionfilterproxymodel.h"
 #include "propertycontroller.h"
 #include "probe.h"
 #include "objectclassinfomodel.h"
@@ -39,7 +38,7 @@ ClassInfoExtension::ClassInfoExtension(PropertyController* controller) :
   PropertyControllerExtension(controller->objectBaseName() + ".classInfo"),
   m_model(new ObjectClassInfoModel(controller))
 {
-  controller->registerModel(m_model, "classInfo");
+  controller->registerModel(m_model, QStringLiteral("classInfo"));
 }
 
 ClassInfoExtension::~ClassInfoExtension()

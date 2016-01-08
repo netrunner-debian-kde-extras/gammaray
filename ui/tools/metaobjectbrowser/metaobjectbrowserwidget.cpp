@@ -28,17 +28,16 @@
 
 #include "metaobjectbrowserwidget.h"
 #include "propertywidget.h"
-#include "deferredresizemodesetter.h"
-#include <deferredtreeviewconfiguration.h>
-
-#include "kde/kfilterproxysearchline.h"
-#include "kde/krecursivefilterproxymodel.h"
+#include <ui/deferredresizemodesetter.h>
+#include <ui/deferredtreeviewconfiguration.h>
+#include <ui/searchlinecontroller.h>
 
 #include <common/objectbroker.h>
 
 #include <QDebug>
 #include <QHBoxLayout>
 #include <QHeaderView>
+#include <QLineEdit>
 #include <QTreeView>
 
 using namespace GammaRay;
@@ -46,26 +45,22 @@ using namespace GammaRay;
 MetaObjectBrowserWidget::MetaObjectBrowserWidget(QWidget *parent)
   : QWidget(parent)
 {
-  QAbstractItemModel *model = ObjectBroker::model("com.kdab.GammaRay.MetaObjectModel");
-
-  QSortFilterProxyModel *objectFilter = new KRecursiveFilterProxyModel(this);
-  objectFilter->setSourceModel(model);
-  objectFilter->setDynamicSortFilter(true);
+  QAbstractItemModel *model = ObjectBroker::model(QStringLiteral("com.kdab.GammaRay.MetaObjectBrowserTreeModel"));
 
   QTreeView *treeView = new QTreeView(this);
   treeView->setIndentation(10);
   treeView->setUniformRowHeights(true);
-  treeView->setModel(objectFilter);
+  treeView->setModel(model);
   new DeferredResizeModeSetter(treeView->header(), 0, QHeaderView::Stretch);
   treeView->setSortingEnabled(true);
-  treeView->setSelectionModel(ObjectBroker::selectionModel(objectFilter));
+  treeView->setSelectionModel(ObjectBroker::selectionModel(model));
 
-  KFilterProxySearchLine *objectSearchLine = new KFilterProxySearchLine(this);
-  objectSearchLine->setProxy(objectFilter);
+  auto objectSearchLine = new QLineEdit(this);
+  new SearchLineController(objectSearchLine, model);
 
   PropertyWidget *propertyWidget = new PropertyWidget(this);
   m_propertyWidget = propertyWidget;
-  m_propertyWidget->setObjectBaseName("com.kdab.GammaRay.MetaObjectBrowser");
+  m_propertyWidget->setObjectBaseName(QStringLiteral("com.kdab.GammaRay.MetaObjectBrowser"));
 
   QVBoxLayout *vbox = new QVBoxLayout;
   vbox->addWidget(objectSearchLine);

@@ -27,9 +27,8 @@
 #include "localeinspectorwidget.h"
 #include "ui_localeinspectorwidget.h"
 
+#include <ui/searchlinecontroller.h>
 #include <common/objectbroker.h>
-
-#include <QSortFilterProxyModel>
 
 using namespace GammaRay;
 
@@ -37,17 +36,14 @@ LocaleInspectorWidget::LocaleInspectorWidget(QWidget *parent)
   : QWidget(parent),
     ui(new Ui::LocaleInspectorWidget)
 {
-  QAbstractItemModel *localeModel = ObjectBroker::model("com.kdab.GammaRay.LocaleModel");
-  QAbstractItemModel *accessorModel = ObjectBroker::model("com.kdab.GammaRay.LocaleAccessorModel");
-
-  QSortFilterProxyModel *proxy = new QSortFilterProxyModel(this);
-  proxy->setSourceModel(localeModel);
+  QAbstractItemModel *localeModel = ObjectBroker::model(QStringLiteral("com.kdab.GammaRay.LocaleModel"));
+  QAbstractItemModel *accessorModel = ObjectBroker::model(QStringLiteral("com.kdab.GammaRay.LocaleAccessorModel"));
 
   ui->setupUi(this);
 
-  ui->localeTable->setModel(proxy);
+  ui->localeTable->setModel(localeModel);
   ui->accessorTable->setModel(accessorModel);
-  ui->localeSearchLine->setProxy(proxy);
+  new SearchLineController(ui->localeSearchLine, localeModel);
 
   ui->accessorTable->resizeColumnsToContents();
   ui->localeTable->resizeColumnsToContents();

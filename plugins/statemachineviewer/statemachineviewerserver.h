@@ -45,6 +45,7 @@ class QAbstractTransition;
 class QStateMachine;
 class QAbstractState;
 class QAbstractItemModel;
+class QAbstractProxyModel;
 class QModelIndex;
 
 namespace GammaRay {
@@ -72,11 +73,11 @@ class StateMachineViewerServer : public StateMachineViewerInterface
     void stateConfigurationChanged();
     void handleTransitionTriggered(QAbstractTransition *);
 
-    void handleMachineClicked(const QModelIndex &);
     void stateSelectionChanged();
 
     void setFilteredStates(const QVector<QAbstractState*> &states);
     void setMaximumDepth(int depth) Q_DECL_OVERRIDE;
+    void selectStateMachine(int row) Q_DECL_OVERRIDE;
     void setSelectedStateMachine(QStateMachine* machine);
 
     void updateStartStop();
@@ -85,11 +86,13 @@ class StateMachineViewerServer : public StateMachineViewerInterface
     void repopulateGraph() Q_DECL_OVERRIDE;
 
   private:
-
+    void registerTypes();
     void updateStateItems();
 
     bool mayAddState(QAbstractState *state);
+    static QString labelForTransition(QAbstractTransition *transition);
 
+    QAbstractProxyModel *m_stateMachinesModel;
     StateModel *m_stateModel;
     TransitionModel *m_transitionModel;
 
@@ -114,10 +117,7 @@ public QObject, public StandardToolFactory<QStateMachine, StateMachineViewerServ
     {
     }
 
-    inline QString name() const
-    {
-      return tr("State Machine Viewer");
-    }
+    QString name() const Q_DECL_OVERRIDE;
 };
 
 }

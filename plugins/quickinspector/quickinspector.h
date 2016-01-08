@@ -104,11 +104,9 @@ class QuickInspector : public QuickInspectorInterface
     void registerVariantHandlers();
     void registerPCExtensions();
     QString findSGNodeType(QSGNode *node) const;
-    void setupPreviewSource();
 
     QQuickItem *recursiveChiltAt(QQuickItem *parent, const QPointF &pos) const;
 
-    QQuickShaderEffectSource *m_source;
     ProbeInterface *m_probe;
     QPointer<QQuickWindow> m_window;
     QPointer<QQuickItem> m_currentItem;
@@ -123,6 +121,7 @@ class QuickInspector : public QuickInspectorInterface
     QImage m_currentFrame;
     bool m_clientViewActive;
     bool m_needsNewFrame;
+    bool m_isGrabbingWindow;
 };
 
 class QuickInspectorFactory : public QObject,

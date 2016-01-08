@@ -24,10 +24,6 @@ if(NOT Qt5Gui_VERSION VERSION_LESS 5.5.0)
   list(APPEND gammaray_widgetinspector_plugin_srcs ${CMAKE_SOURCE_DIR}/3rdparty/qt/5.5/private/qpaintbuffer.cpp)
 endif()
 
-if(NOT Qt5Gui_VERSION VERSION_LESS 5.5.0)
-  list(APPEND gammaray_widgetinspector_plugin_srcs ${CMAKE_SOURCE_DIR}/3rdparty/qt/5.5/private/qpaintbuffer.cpp)
-endif()
-
 gammaray_add_plugin(gammaray_widgetinspector_plugin
   gammaray_widgetinspector.desktop
   ${gammaray_widgetinspector_plugin_srcs}
@@ -35,6 +31,7 @@ gammaray_add_plugin(gammaray_widgetinspector_plugin
 
 target_link_libraries(gammaray_widgetinspector_plugin
   ${QT_QTGUI_LIBRARIES}
+  gammaray_kitemmodels
   gammaray_core
 )
 
@@ -46,6 +43,7 @@ add_library(gammaray_widget_export_actions SHARED
 
 set_target_properties(gammaray_widget_export_actions PROPERTIES
   LIBRARY_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/${PROBE_PLUGIN_INSTALL_DIR}"
+  DEBUG_POSTFIX ""
 )
 
 set(EXTRA_LIBS)

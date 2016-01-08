@@ -56,7 +56,7 @@ Server::Server(QObject *parent) :
   m_broadcastTimer(new QTimer(this)),
   m_signalMapper(new MultiSignalMapper(this))
 {
-  if (!ProbeSettings::value("RemoteAccessEnabled", true).toBool())
+  if (!ProbeSettings::value(QStringLiteral("RemoteAccessEnabled"), true).toBool())
     return;
 
   m_serverDevice = ServerDevice::create(serverAddress(), this);
@@ -80,10 +80,10 @@ Server::Server(QObject *parent) :
   connect(m_signalMapper, SIGNAL(signalEmitted(QObject*,int,QVector<QVariant>)),
           this, SLOT(forwardSignal(QObject*,int,QVector<QVariant>)));
 
-  Endpoint::registerObjectInternal("com.kdab.GammaRay.PropertySyncer", ++m_nextAddress);
+  Endpoint::addObjectNameAddressMapping(QStringLiteral("com.kdab.GammaRay.PropertySyncer"), ++m_nextAddress);
   m_propertySyncer->setAddress(m_nextAddress);
-  Endpoint::registerObject("com.kdab.GammaRay.PropertySyncer", m_propertySyncer);
-  registerMessageHandlerInternal(m_nextAddress, m_propertySyncer, "handleMessage");
+  Endpoint::registerObject(QStringLiteral("com.kdab.GammaRay.PropertySyncer"), m_propertySyncer);
+  registerMessageHandler(m_nextAddress, m_propertySyncer, "handleMessage");
 }
 
 Server::~Server()
@@ -106,9 +106,9 @@ QUrl Server::serverAddress() const
 #ifdef Q_OS_ANDROID
     QUrl url(QString(QLatin1String("local://%1/+gammaray_socket")).arg(QDir::homePath()));
 #else
-    QUrl url(ProbeSettings::value("ServerAddress", QLatin1String("tcp://0.0.0.0/")).toString().toUtf8().constData());
+    QUrl url(ProbeSettings::value(QStringLiteral("ServerAddress"), QStringLiteral("tcp://0.0.0.0/")).toString());
     if (url.scheme().isEmpty())
-        url.setScheme("tcp");
+        url.setScheme(QStringLiteral("tcp"));
     if (url.port() <= 0)
         url.setPort(defaultPort());
 #endif
@@ -187,9 +187,15 @@ void Server::invokeObject(const QString &objectName, const char *method, const Q
 
 Protocol::ObjectAddress Server::registerObject(const QString &name, QObject *object)
 {
-  registerObjectInternal(name, ++m_nextAddress);
+  return registerObject(name, object, ExportEverything);
+}
+
+Protocol::ObjectAddress Server::registerObject(const QString& name, QObject* object, Server::ObjectExportOptions exportOptions)
+{
+  addObjectNameAddressMapping(name, ++m_nextAddress);
   Protocol::ObjectAddress address = Endpoint::registerObject(name, object);
   Q_ASSERT(m_nextAddress);
+  Q_ASSERT(m_nextAddress == address);
 
   if (isConnected()) {
     Message msg(endpointAddress(), Protocol::ObjectAdded);
@@ -197,14 +203,18 @@ Protocol::ObjectAddress Server::registerObject(const QString &name, QObject *obj
     send(msg);
   }
 
-  const QMetaObject *meta = object->metaObject();
-  for(int i = 0; i < meta->methodCount(); ++i) {
-    const QMetaMethod method = meta->method(i);
-    if (method.methodType() == QMetaMethod::Signal) {
-      m_signalMapper->connectToSignal(object, method);
+  if (exportOptions & ExportSignals) {
+    const QMetaObject *meta = object->metaObject();
+    for(int i = 0; i < meta->methodCount(); ++i) {
+      const QMetaMethod method = meta->method(i);
+      if (method.methodType() == QMetaMethod::Signal) {
+        m_signalMapper->connectToSignal(object, method);
+      }
     }
   }
-  m_propertySyncer->addObject(address, object);
+
+  if (exportOptions & ExportProperties)
+    m_propertySyncer->addObject(address, object);
 
   return address;
 }
@@ -234,21 +244,6 @@ void Server::forwardSignal(QObject* sender, int signalIndex, const QVector< QVar
   Endpoint::invokeObject(sender->objectName(), name, v);
 }
 
-Protocol::ObjectAddress Server::registerObject(const QString& objectName, QObject* receiver, const char* messageHandlerName)
-{
-  registerObjectInternal(objectName, ++m_nextAddress);
-  Q_ASSERT(m_nextAddress);
-  registerMessageHandlerInternal(m_nextAddress, receiver, messageHandlerName);
-
-  if (isConnected()) {
-    Message msg(endpointAddress(), Protocol::ObjectAdded);
-    msg.payload() <<  objectName << m_nextAddress;
-    send(msg);
-  }
-
-  return m_nextAddress;
-}
-
 void Server::registerMonitorNotifier(Protocol::ObjectAddress address, QObject* receiver, const char* monitorNotifier)
 {
   Q_ASSERT(address != Protocol::InvalidObjectAddress);
@@ -260,7 +255,7 @@ void Server::registerMonitorNotifier(Protocol::ObjectAddress address, QObject* r
 
 void Server::handlerDestroyed(Protocol::ObjectAddress objectAddress, const QString& objectName)
 {
-  unregisterObjectInternal(objectName);
+  removeObjectNameAddressMapping(objectName);
   m_monitorNotifiers.remove(objectAddress);
 
   if (isConnected()) {
@@ -273,7 +268,7 @@ void Server::handlerDestroyed(Protocol::ObjectAddress objectAddress, const QStri
 void Server::objectDestroyed(Protocol::ObjectAddress /*objectAddress*/, const QString &objectName, QObject *object)
 {
   Q_UNUSED(object);
-  unregisterObjectInternal(objectName);
+  removeObjectNameAddressMapping(objectName);
 
   if (isConnected()) {
     Message msg(endpointAddress(), Protocol::ObjectRemoved);

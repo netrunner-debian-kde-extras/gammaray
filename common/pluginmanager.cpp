@@ -53,7 +53,7 @@ PluginManagerBase::~PluginManagerBase()
 QStringList PluginManagerBase::pluginPaths() const
 {
   QStringList pluginPaths;
-  pluginPaths.push_back(Paths::currentProbePath());
+  pluginPaths.push_back(Paths::currentPluginsPath());
   return pluginPaths;
 }
 
@@ -61,7 +61,7 @@ QStringList PluginManagerBase::pluginFilter() const
 {
   QStringList filter;
 #if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
-  filter.push_back("*.desktop");
+  filter.push_back(QStringLiteral("*.desktop"));
 #elif defined(Q_OS_ANDROID)
   filter.push_back(QLatin1String("libplugins_gammaray_gammaray_*") + Paths::pluginExtension());
 #else
@@ -86,7 +86,7 @@ void PluginManagerBase::scan(const QString &serviceType)
         continue;
       }
 
-      if (pluginInfo.interface() != serviceType) {
+      if (pluginInfo.interfaceId() != serviceType) {
         IF_DEBUG(qDebug() << Q_FUNC_INFO << "skipping" << pluginFile << "not supporting service type" << serviceType << "service types are: " << pluginInfo.interface();)
         continue;
       }

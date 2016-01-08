@@ -28,9 +28,10 @@
 
 
 #include "processinjector.h"
-#include "interactiveprocess.h"
 
 #include <QDebug>
+#include <iostream>
+
 
 using namespace GammaRay;
 
@@ -39,53 +40,77 @@ ProcessInjector::ProcessInjector() :
   mProcessError(QProcess::UnknownError),
   mExitStatus(QProcess::NormalExit)
 {
+#if QT_VERSION >= QT_VERSION_CHECK(5, 2, 0)
+    m_proc.setInputChannelMode(QProcess::ForwardedInputChannel);
+#endif
+    connect(&m_proc, SIGNAL(error(QProcess::ProcessError)), this, SLOT(processFailed()));
+    connect(&m_proc, SIGNAL(finished(int)), this, SLOT(processFinished()));
+    connect(&m_proc, SIGNAL(readyReadStandardError()), this, SLOT(readStdErr()));
+    connect(&m_proc, SIGNAL(readyReadStandardOutput()), this, SLOT(readStdOut()));
 }
 
 ProcessInjector::~ProcessInjector()
 {
 }
 
+void ProcessInjector::stop()
+{
+    m_proc.terminate();
+    if (!m_proc.waitForFinished(1000))
+        m_proc.kill(); // kill it softly
+}
+
 bool ProcessInjector::launchProcess(const QStringList& programAndArgs, const QProcessEnvironment& env)
 {
-  InteractiveProcess proc;
-  proc.setProcessEnvironment(env);
-  proc.setProcessChannelMode(QProcess::ForwardedChannels);
+  m_proc.setProcessEnvironment(env);
 
   QStringList args = programAndArgs;
 
-  if (!env.value("GAMMARAY_TARGET_WRAPPER").isEmpty()) {
-    const QString fullWrapperCmd = env.value("GAMMARAY_TARGET_WRAPPER");
+  if (!env.value(QStringLiteral("GAMMARAY_TARGET_WRAPPER")).isEmpty()) {
+    const QString fullWrapperCmd = env.value(QStringLiteral("GAMMARAY_TARGET_WRAPPER"));
     // ### TODO properly handle quoted arguments!
     QStringList newArgs = fullWrapperCmd.split(' ');
     newArgs += args;
     args = newArgs;
     qDebug() << "Launching with target wrapper:" << args;
-  } else if (env.value("GAMMARAY_GDB").toInt()) {
+  } else if (env.value(QStringLiteral("GAMMARAY_GDB")).toInt()) {
     QStringList newArgs;
-    newArgs << "gdb";
+    newArgs << QStringLiteral("gdb");
 #ifndef Q_OS_MAC
-    newArgs << "--eval-command" << "run";
+    newArgs << QStringLiteral("--eval-command") << QStringLiteral("run");
 #endif
-    newArgs << "--args";
+    newArgs << QStringLiteral("--args");
     newArgs += args;
     args = newArgs;
   }
 
   const QString program = args.takeFirst();
-  proc.start(program, args);
-  proc.waitForFinished(-1);
+  m_proc.start(program, args);
 
-  mExitCode = proc.exitCode();
-  mProcessError = proc.error();
-  mExitStatus = proc.exitStatus();
-  mErrorString = proc.errorString();
+  bool ret = m_proc.waitForStarted(-1);
+  if (ret)
+    emit started();
 
-  if (mProcessError == QProcess::FailedToStart) {
-    mErrorString.prepend(QString("Could not start '%1': ").arg(program));
-  }
+  return ret;
+}
 
-  return mExitCode == EXIT_SUCCESS && mExitStatus == QProcess::NormalExit
-          && mProcessError == QProcess::UnknownError;
+void ProcessInjector::processFailed()
+{
+    mProcessError = m_proc.error();
+    mErrorString = m_proc.errorString();
+}
+
+void ProcessInjector::processFinished()
+{
+    mExitCode = m_proc.exitCode();
+    mExitStatus = m_proc.exitStatus();
+
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+    if (mProcessError == QProcess::FailedToStart) {
+      mErrorString.prepend(QStringLiteral("Could not start '%1': ").arg(m_proc.program()));
+    }
+#endif
+    emit finished();
 }
 
 int ProcessInjector::exitCode()
@@ -106,4 +131,18 @@ QProcess::ProcessError ProcessInjector::processError()
 QString ProcessInjector::errorString()
 {
   return mErrorString;
+}
+
+void ProcessInjector::readStdErr()
+{
+  QString error = m_proc.readAllStandardError();
+  std::cerr << qPrintable(error);
+  emit stderrMessage(error);
+}
+
+void ProcessInjector::readStdOut()
+{
+  QString message = m_proc.readAllStandardOutput();
+  std::cout << qPrintable(message);
+  emit stdoutMessage(message);
 }

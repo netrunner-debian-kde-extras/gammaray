@@ -34,6 +34,7 @@
 #include <QMetaProperty>
 #include <QObject>
 #include <QPointer>
+#include <QVector>
 
 namespace GammaRay {
 
@@ -42,21 +43,42 @@ class GAMMARAY_UI_EXPORT PropertyBinder : public QObject
 {
     Q_OBJECT
 public:
+    /** Creates a new PropertyBinder for syncing properties between @p source and @p destination.
+     *  No properties are synchronized by default, use add() to change this.
+     *  No initial synchronization is performed, called syncSourceToDestination() to change that.
+     */
+    explicit PropertyBinder(QObject *source, QObject *destination);
+
     /** Keeps @p sourceProp of @p source in sync with @p destProp of @p destination.
-     *  At least one property must have a change notification signal.
+     *  At least the source property must have a change notification signal.
+     *  This is a convenience overload for syncing a single property pair, initial synchronization
+     *  from source to destination happens automatically.
      */
     explicit PropertyBinder(QObject *source, const char *sourceProp, QObject *destination, const char *destProp);
+
     ~PropertyBinder();
 
+    /** Adds another binding between @p sourceProp and @p destProp.
+     *  At least the source property must have a change notification signal.
+     */
+    void add(const char *sourceProp, const char *destProp);
+
+public slots:
+    /** Use this for initial/explicit source to destination synchronization. */
+    void syncSourceToDestination();
+
 private slots:
-    void sourceChanged();
-    void destinationChanged();
+    /** Same as the above, for the opposite direction. */
+    void syncDestinationToSource();
 
 private:
     QObject* m_source;
     QPointer<QObject> m_destination;
-    QMetaProperty m_sourceProperty;
-    QMetaProperty m_destinationProperty;
+    struct Binding {
+      QMetaProperty sourceProperty;
+      QMetaProperty destinationProperty;
+    };
+    QVector<Binding> m_properties;
     bool m_lock;
 };
 }

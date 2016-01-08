@@ -34,7 +34,7 @@
 
 #include "injector/injectorfactory.h"
 
-#include <common/probeabi.h>
+#include <launcher/probeabi.h>
 
 #include <QFileInfo>
 #include <QStandardItemModel>
@@ -67,7 +67,7 @@ void SelfTestPage::testProbe()
   int validProbeCount = 0;
   const QVector<ProbeABI> probeABIs = ProbeFinder::listProbeABIs();
   foreach (const ProbeABI &abi, probeABIs) {
-    const QString probePath = ProbeFinder::findProbe(QLatin1String(GAMMARAY_PROBE_NAME), abi);
+    const QString probePath = ProbeFinder::findProbe(QStringLiteral(GAMMARAY_PROBE_NAME), abi);
     if (probePath.isEmpty()) {
       error(tr("No probe found for ABI %1.").arg(abi.id()));
       continue;
@@ -79,12 +79,12 @@ void SelfTestPage::testProbe()
       continue;
     }
 
-    information(tr("Found valid probe for ABI %1 at %2.").arg(abi.id()).arg(probePath));
+    information(tr("Found valid probe for ABI %1 at %2.").arg(abi.id(), probePath));
     ++validProbeCount;
   }
 
   if (validProbeCount == 0) {
-    error(tr("No probes found - GammaRay no functional."));
+    error(tr("No probes found - GammaRay not functional."));
   }
 }
 
@@ -97,7 +97,7 @@ void SelfTestPage::testAvailableInjectors()
   }
 
   information(tr("The following injectors are available: %1").
-              arg(injectors.join(QLatin1String(", "))));
+              arg(injectors.join(QStringLiteral(", "))));
 }
 
 void SelfTestPage::testInjectors()

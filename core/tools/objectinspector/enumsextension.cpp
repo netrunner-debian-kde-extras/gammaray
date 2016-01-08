@@ -27,7 +27,6 @@
 */
 
 #include "enumsextension.h"
-#include "connectionfilterproxymodel.h"
 #include "propertycontroller.h"
 #include "probe.h"
 #include <objectenummodel.h>
@@ -39,7 +38,7 @@ EnumsExtension::EnumsExtension(PropertyController* controller) :
   PropertyControllerExtension(controller->objectBaseName() + ".enums"),
   m_model(new ObjectEnumModel(controller))
 {
-  controller->registerModel(m_model, "enums");
+  controller->registerModel(m_model, QStringLiteral("enums"));
 }
 
 EnumsExtension::~EnumsExtension()

@@ -30,6 +30,7 @@
 #include "ui_statemachineviewer.h"
 
 #include "statemachineviewerclient.h"
+#include "statemodeldelegate.h"
 
 #include <common/objectbroker.h>
 #include <ui/deferredresizemodesetter.h>
@@ -81,19 +82,17 @@ StateMachineViewerWidgetNG::StateMachineViewerWidgetNG(QWidget* parent, Qt::Wind
   m_interface = ObjectBroker::object<StateMachineViewerInterface*>();
 
   m_ui->setupUi(this);
+  m_ui->depthGroupBox->hide(); // we have that in the KDSME view already
 
   m_ui->graphicsView->setDragMode(QGraphicsView::ScrollHandDrag);
   m_ui->graphicsView->setScene(new QGraphicsScene(this));
   m_ui->graphicsView->setRenderHint(QPainter::Antialiasing);
 
-  QAbstractItemModel *stateMachineModel = ObjectBroker::model("com.kdab.GammaRay.StateMachineModel");
+  QAbstractItemModel *stateMachineModel = ObjectBroker::model(QStringLiteral("com.kdab.GammaRay.StateMachineModel"));
   m_ui->stateMachinesView->setModel(stateMachineModel);
-  m_ui->stateMachinesView->setSelectionModel(ObjectBroker::selectionModel(stateMachineModel));
-  new DeferredResizeModeSetter(m_ui->stateMachinesView->header(), 0, QHeaderView::Stretch);
-  new DeferredResizeModeSetter(m_ui->stateMachinesView->header(), 1, QHeaderView::ResizeToContents);
-  new DeferredTreeViewConfiguration(m_ui->stateMachinesView, false);
+  connect(m_ui->stateMachinesView, SIGNAL(currentIndexChanged(int)), m_interface, SLOT(selectStateMachine(int)));
 
-  QAbstractItemModel *stateModel = ObjectBroker::model("com.kdab.GammaRay.StateModel");
+  QAbstractItemModel *stateModel = ObjectBroker::model(QStringLiteral("com.kdab.GammaRay.StateModel"));
   connect(stateModel, SIGNAL(modelReset()), this, SLOT(stateModelReset()));
 
   m_ui->singleStateMachineView->setModel(stateModel);
@@ -101,13 +100,17 @@ StateMachineViewerWidgetNG::StateMachineViewerWidgetNG(QWidget* parent, Qt::Wind
   new DeferredResizeModeSetter(m_ui->singleStateMachineView->header(), 0, QHeaderView::Stretch);
   new DeferredResizeModeSetter(m_ui->singleStateMachineView->header(), 1, QHeaderView::ResizeToContents);
   new DeferredTreeViewConfiguration(m_ui->singleStateMachineView, true, false);
+  m_ui->singleStateMachineView->setItemDelegate(new StateModelDelegate(this));
 
   connect(m_ui->depthSpinBox, SIGNAL(valueChanged(int)), m_interface, SLOT(setMaximumDepth(int)));
-  connect(m_ui->startStopButton, SIGNAL(clicked()), m_interface, SLOT(toggleRunning()));
+  connect(m_ui->actionStartStopStateMachine, SIGNAL(triggered()), m_interface, SLOT(toggleRunning()));
+  addAction(m_ui->actionStartStopStateMachine);
 
   // TODO: Re-enable?
   //connect(m_ui->exportButton, SIGNAL(clicked()), SLOT(exportAsImage()));
-  m_ui->exportButton->setDisabled(true);
+  m_ui->exportButton->hide();
+  m_ui->maxMegaPixelsLabel->hide();
+  m_ui->maxMegaPixelsSpinBox->hide();
 
   m_ui->maxMegaPixelsSpinBox->setValue(maximumMegaPixels());
   connect(m_ui->maxMegaPixelsSpinBox, SIGNAL(valueChanged(int)), SLOT(setMaximumMegaPixels(int)));
@@ -148,12 +151,12 @@ StateMachineViewerWidgetNG::~StateMachineViewerWidgetNG()
 
 int StateMachineViewerWidgetNG::maximumMegaPixels() const
 {
-  return QSettings().value("StateMachineViewerServer/maximumMegaPixels", 10).toInt();
+  return QSettings().value(QStringLiteral("StateMachineViewerServer/maximumMegaPixels"), 10).toInt();
 }
 
 void StateMachineViewerWidgetNG::setMaximumMegaPixels(int megaPixels)
 {
-  QSettings().setValue("StateMachineViewerServer/maximumMegaPixels", megaPixels);
+  QSettings().setValue(QStringLiteral("StateMachineViewerServer/maximumMegaPixels"), megaPixels);
 }
 
 void StateMachineViewerWidgetNG::showMessage(const QString& message)
@@ -240,14 +243,14 @@ void StateMachineViewerWidgetNG::statusChanged(const bool haveStateMachine, cons
     m_machine->runtimeController()->setIsRunning(running);
   }
 
+  m_ui->actionStartStopStateMachine->setEnabled(haveStateMachine);
   if (!running) {
-    m_ui->startStopButton->setChecked(false);
-    m_ui->startStopButton->setIcon(style()->standardIcon(QStyle::SP_MediaPlay));
+    m_ui->actionStartStopStateMachine->setText(tr("Start State Machine"));
+    m_ui->actionStartStopStateMachine->setIcon(style()->standardIcon(QStyle::SP_MediaPlay));
   } else {
-    m_ui->startStopButton->setChecked(true);
-    m_ui->startStopButton->setIcon(style()->standardIcon(QStyle::SP_MediaStop));
+    m_ui->actionStartStopStateMachine->setText(tr("Stop State Machine"));
+    m_ui->actionStartStopStateMachine->setIcon(style()->standardIcon(QStyle::SP_MediaStop));
   }
-  m_ui->startStopButton->setEnabled(haveStateMachine);
 }
 
 void StateMachineViewerWidgetNG::transitionTriggered(TransitionId transitionId, const QString& label)

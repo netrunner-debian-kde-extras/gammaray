@@ -2,8 +2,6 @@
 # Shared non-UI code between probe and client
 #
 set(gammaray_common_srcs
-  ${CMAKE_SOURCE_DIR}/3rdparty/kde/klinkitemselectionmodel.cpp
-  ${CMAKE_SOURCE_DIR}/3rdparty/kde/kmodelindexproxymapper.cpp
   ${CMAKE_SOURCE_DIR}/3rdparty/lz4/lz4.c
 
   methodargument.cpp
@@ -13,6 +11,7 @@ set(gammaray_common_srcs
   endpoint.cpp
   paths.cpp
   propertysyncer.cpp
+  modelevent.cpp
 )
 
 add_library(gammaray_common SHARED ${gammaray_common_srcs})
@@ -23,11 +22,11 @@ set_target_properties(gammaray_common PROPERTIES
 )
 
 if(Qt5Core_FOUND)
-  target_link_libraries(gammaray_common LINK_PUBLIC Qt5::Core LINK_PRIVATE Qt5::Network)
+  target_link_libraries(gammaray_common LINK_PUBLIC Qt5::Core LINK_PRIVATE Qt5::Network gammaray_kitemmodels)
 else()
   target_link_libraries(gammaray_common
     LINK_PUBLIC ${QT_QTCORE_LIBRARIES}
-    LINK_PRIVATE ${QT_QTGUI_LIBRARIES} ${QT_QTNETWORK_LIBRARIES}
+    LINK_PRIVATE ${QT_QTGUI_LIBRARIES} ${QT_QTNETWORK_LIBRARIES} gammaray_kitemmodels
   )
 endif()
 
@@ -43,23 +42,12 @@ set(gammaray_common_internal_srcs
   resourcebrowserinterface.cpp
   networkselectionmodel.cpp
   streamoperators.cpp
-  probeabi.cpp
-  probeabidetector.cpp
 
   tools/objectinspector/propertiesextensioninterface.cpp
   tools/objectinspector/methodsextensioninterface.cpp
   tools/objectinspector/connectionsextensioninterface.cpp
+  tools/messagehandler/messagehandlerinterface.cpp
 )
-
-if(WIN32)
-  list(APPEND gammaray_common_internal_srcs probeabidetector_win.cpp)
-elseif(APPLE)
-  list(APPEND gammaray_common_internal_srcs probeabidetector_mac.cpp)
-elseif(UNIX AND NOT QNXNTO)
-  list(APPEND gammaray_common_internal_srcs probeabidetector_elf.cpp)
-else()
-  list(APPEND gammaray_common_internal_srcs probeabidetector_dummy.cpp)
-endif()
 
 add_library(gammaray_common_internal STATIC ${gammaray_common_internal_srcs})
 set_target_properties(gammaray_common_internal PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -73,13 +61,6 @@ else()
     ${QT_QTGUI_LIBRARIES}
     ${QT_QTNETWORK_LIBRARIES}
   )
-endif()
-
-if(WIN32)
-  target_link_libraries(gammaray_common_internal version)
-endif()
-if(APPLE)
-  target_link_libraries(gammaray_common_internal "-framework CoreFoundation")
 endif()
 
 if (ANDROID)

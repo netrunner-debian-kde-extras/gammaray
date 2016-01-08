@@ -32,6 +32,7 @@
 #include "gammaray_common_export.h"
 #include "protocol.h"
 
+#include <QMetaMethod>
 #include <QObject>
 #include <QPointer>
 
@@ -114,6 +115,14 @@ public:
    */
   virtual QUrl serverAddress() const = 0;
 
+  /** Register the slot @p messageHandlerName on @p receiver as the handler for messages to/from @p objectAddress.
+   *  @see dispatchMessage()
+   */
+  virtual void registerMessageHandler(Protocol::ObjectAddress objectAddress, QObject *receiver, const char* messageHandlerName);
+
+  /** Unregister the message handler for @p objectAddress. */
+  virtual void unregisterMessageHandler(Protocol::ObjectAddress objectAddress);
+
 public slots:
   /** Convenience overload of send(), to directly send message delivered via signals. */
   void sendMessage(const GammaRay::Message &msg);
@@ -140,17 +149,9 @@ protected:
   virtual void messageReceived(const Message &msg) = 0;
 
   /** Call this when learning about a new object <-> address mapping. */
-  void registerObjectInternal(const QString &objectName, Protocol::ObjectAddress objectAddress);
+  void addObjectNameAddressMapping(const QString &objectName, Protocol::ObjectAddress objectAddress);
   /** Call this when learning about a dissolved object <-> address mapping. */
-  void unregisterObjectInternal(const QString& objectName);
-
-  /** Register the slot @p messageHandlerName on @p receiver as the handler for messages to/from @p objectAddress.
-   *  @see dispatchMessage()
-   */
-  void registerMessageHandlerInternal(Protocol::ObjectAddress objectAddress, QObject *receiver, const char* messageHandlerName);
-
-  /** Unregister the message handler for @p objectAddress. */
-  void unregisterMessageHandlerInternal(Protocol::ObjectAddress objectAddress);
+  void removeObjectNameAddressMapping(const QString& objectName);
 
   /** Called when the current handler of the object identified by @p objectAddress has been destroyed. */
   virtual void handlerDestroyed(Protocol::ObjectAddress objectAddress, const QString &objectName) = 0;
@@ -197,9 +198,8 @@ private:
     QObject *object;
 
     // custom message handling support
-    // TODO: obsolete this
     QObject *receiver;
-    QByteArray messageHandler;
+    QMetaMethod messageHandler;
   };
 
   /** Inserts @p oi into all maps. */

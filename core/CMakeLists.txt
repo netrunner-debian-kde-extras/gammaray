@@ -6,25 +6,20 @@ set(gammaray_srcs
   metaobjecttreemodel.cpp
   metaobjectrepository.cpp
   metaproperty.cpp
-  metapropertymodel.cpp
   probe.cpp
   probeguard.cpp
   probesettings.cpp
   probecontroller.cpp
-#  proxydetacher.cpp
   objectlistmodel.cpp
-  objectpropertymodel.cpp
-  objectdynamicpropertymodel.cpp
-  objectstaticpropertymodel.cpp
   objectclassinfomodel.cpp
   objectmethodmodel.cpp
   objectenummodel.cpp
   objecttreemodel.cpp
-  connectionmodel.cpp
-  connectionfilterproxymodel.cpp
+  objecttypefilterproxymodel.cpp
   methodargumentmodel.cpp
   multisignalmapper.cpp
   signalspycallbackset.cpp
+  singlecolumnobjectproxymodel.cpp
   toolmodel.cpp
   toolpluginmodel.cpp
   toolpluginerrormodel.cpp
@@ -33,6 +28,17 @@ set(gammaray_srcs
   proxytoolfactory.cpp
   util.cpp
   varianthandler.cpp
+
+  propertyadaptor.cpp
+  propertyaggregator.cpp
+  propertydata.cpp
+  dynamicpropertyadaptor.cpp
+  qmetapropertyadaptor.cpp
+  metapropertyadaptor.cpp
+  associativepropertyadaptor.cpp
+  sequentialpropertyadaptor.cpp
+  objectinstance.cpp
+  propertyadaptorfactory.cpp
 
   tools/modelinspector/modeltester.cpp
   tools/modelinspector/modelmodel.cpp
@@ -44,9 +50,7 @@ set(gammaray_srcs
   tools/textdocumentinspector/textdocumentmodel.cpp
   tools/textdocumentinspector/textdocumentformatmodel.cpp
   tools/messagehandler/messagehandler.cpp
-  tools/messagehandler/messagehandlerinterface.cpp
   tools/messagehandler/messagemodel.cpp
-  tools/connectioninspector/connectioninspector.cpp
   tools/localeinspector/localeinspector.cpp
   tools/metaobjectbrowser/metaobjectbrowser.cpp
   tools/metatypebrowser/metatypebrowser.cpp
@@ -106,7 +110,7 @@ add_library(gammaray_core SHARED
 
 target_link_libraries(gammaray_core
   LINK_PUBLIC gammaray_common
-  LINK_PRIVATE gammaray_common_internal
+  LINK_PRIVATE gammaray_common_internal gammaray_kitemmodels
 )
 set_target_properties(gammaray_core PROPERTIES
   ${GAMMARAY_DEFAULT_LIBRARY_PROPERTIES}

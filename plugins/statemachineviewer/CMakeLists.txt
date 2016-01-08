@@ -23,24 +23,33 @@ target_link_libraries(gammaray_statemachineviewer_plugin
   gammaray_core
 )
 
-
 # UI part - dependencies
-set(GRAPHVIZ_MIN_VERSION "2.20")
-find_package(Graphviz)
-set_package_properties(Graphviz PROPERTIES
-  TYPE RECOMMENDED
-  DESCRIPTION "Graph visualization software"
-  URL "http://www.graphviz.org/"
-  PURPOSE "Needed for the state machine visualizer plugin."
-)
-set(HAVE_GRAPHVIZ ${GRAPHVIZ_FOUND})
+# There is no 64-bit Graphviz available for Windows.
+include(CheckTypeSize)
+check_type_size("void*" SIZEOF_VOID_P BUILTIN_TYPES_ONLY)
+if(WIN32 AND SIZEOF_VOID_P EQUAL 8)
+  set(GRAPHVIZ_FOUND FALSE)
+  add_feature_info("Graph visualization software" FALSE "A 64-bit Graphviz library does not exist for Windows at this time.")
+else()
+  set(GRAPHVIZ_MIN_VERSION "2.20")
+  find_package(Graphviz)
+  set_package_properties(Graphviz PROPERTIES
+    TYPE RECOMMENDED
+    DESCRIPTION "Graph visualization software"
+    URL "http://www.graphviz.org/"
+    PURPOSE "Needed for the state machine visualizer plugin."
+  )
+  set(HAVE_GRAPHVIZ ${GRAPHVIZ_FOUND})
+endif()
 if(GRAPHVIZ_FOUND)
   add_definitions(-DGRAPHVIZ_MAJOR_VERSION=${GRAPHVIZ_MAJOR_VERSION} -DGRAPHVIZ_MINOR_VERSION=${GRAPHVIZ_MINOR_VERSION})
 endif()
 
-set_package_properties(KDSME PROPERTIES URL "https://github.com/KDAB/KDStateMachineEditor" DESCRIPTION "KDAB State Machine Editor framework" TYPE OPTIONAL PURPOSE "Provide Next-gen graphical state machine viewer for the statmeachineviewer plugin.")
+set_package_properties(KDSME PROPERTIES URL "https://github.com/KDAB/KDStateMachineEditor" DESCRIPTION "KDAB State Machine Editor framework" TYPE OPTIONAL PURPOSE "Provide Next-gen graphical state machine viewer for the statemachineviewer plugin.")
 if (Qt5_FOUND)
   find_package(KDSME CONFIG QUIET)
+else()
+  add_feature_info("KDAB State Machine Editor framework" FALSE "KDStateMachineEditor is not available when building with Qt4.")
 endif()
 
 # UI part
@@ -63,6 +72,7 @@ if (KDSME_FOUND AND Qt5Quick_FOUND)
   # new KDSME varaint
   list(APPEND gammaray_statemachineviewer_ui_plugin_srcs
     statemachineviewerwidgetng.cpp
+    statemodeldelegate.cpp
   )
   list(APPEND gammaray_statemachineviewer_ui_plugin_libs
     KDSME::Core

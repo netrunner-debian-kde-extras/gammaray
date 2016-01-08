@@ -1,5 +1,5 @@
 Name:           gammaray-qt4
-Version:        2.3.0
+Version:        2.3.99
 Release:        1
 Summary:        An introspection tool for Qt applications
 Source:         gammaray-%{version}.tar.gz
@@ -19,6 +19,9 @@ BuildRequires: libqt4-devel libQtWebKit-devel libkde4-devel
 
 %if %{defined fedora}
 BuildRequires: qt-devel qtwebkit-devel kdelibs-devel
+%if 0%{?fedora} >= 22
+BuildRequires: qca
+%endif
 %endif
 
 
@@ -47,7 +50,7 @@ Plug-ins for the GammaRay introspection tool to debug KDE4 applications,
 such as a KJob tracker.
 
 %prep
-%setup -q
+%setup -n gammaray-%{version}
 
 %build
 %if %{defined fedora}
@@ -108,6 +111,8 @@ cmake . -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -DGAMMARAY_PROBE_
 %{_libdir}/gammaray/*/*/gammaray_kjobtracker_ui.desktop
 
 %changelog
+* Sun Dec 20 2015 Allen Winter <allen.winter@kdab.com> 2.3.99
+  2.4.0 release candidate 1
 * Fri Jul 10 2015 Allen Winter <allen.winter@kdab.com> 2.3.0
   2.3.0 final
 * Tue Jan 27 2015 Allen Winter <allen.winter@kdab.com> 2.2.1

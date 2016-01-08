@@ -48,6 +48,16 @@ DebuggerInjector::~DebuggerInjector()
 {
 }
 
+void DebuggerInjector::stop()
+{
+    if (m_process) {
+        m_process->terminate();
+        if (!m_process->waitForFinished(1000))
+            m_process->kill(); // kill it softly
+    }
+    emit finished();
+}
+
 QString DebuggerInjector::errorString()
 {
   return mErrorString;
@@ -70,38 +80,60 @@ QProcess::ProcessError DebuggerInjector::processError()
 
 void DebuggerInjector::readyReadStandardOutput()
 {
+  emit stdoutMessage(m_process->readAllStandardOutput());
+}
+
+void DebuggerInjector::processFinished()
+{
+    mExitCode = m_process->exitCode();
+    mExitStatus = m_process->exitStatus();
+    if (!mManualError) {
+      mProcessError = m_process->error();
+      mErrorString = m_process->errorString();
+    }
+    emit attached();
 }
 
 void DebuggerInjector::readyReadStandardError()
 {
   const QString error = m_process->readAllStandardError();
   std::cerr << qPrintable(error) << std::endl;
+  emit stderrMessage(error);
 }
 
-bool DebuggerInjector::startDebugger(const QStringList& args)
+bool DebuggerInjector::startDebugger(const QStringList& args, const QProcessEnvironment &env)
 {
   m_process.reset(new QProcess);
+  if (!env.isEmpty())
+    m_process->setProcessEnvironment(env);
   connect(m_process.data(), SIGNAL(readyReadStandardError()),
           this, SLOT(readyReadStandardError()));
   connect(m_process.data(), SIGNAL(readyReadStandardOutput()),
           this, SLOT(readyReadStandardOutput()));
+  connect(m_process.data(), SIGNAL(started()),
+          this, SIGNAL(started()));
+  connect(m_process.data(), SIGNAL(finished(int)),
+          this, SLOT(processFinished()));
   m_process->setProcessChannelMode(QProcess::SeparateChannels);
   m_process->start(debuggerExecutable(), args);
   bool status = m_process->waitForStarted(-1);
 
-  mExitCode = m_process->exitCode();
-  mExitStatus = m_process->exitStatus();
-  if (!mManualError) {
-    mProcessError = m_process->error();
-    mErrorString = m_process->errorString();
+  if (!status) {
+    mExitCode = m_process->exitCode();
+    mExitStatus = m_process->exitStatus();
+    if (!mManualError) {
+      mProcessError = m_process->error();
+      mErrorString = m_process->errorString();
+    }
+  } else {
+      emit started();
   }
-
   return status;
 }
 
 bool DebuggerInjector::selfTest()
 {
-  if (startDebugger(QStringList() << QLatin1String("--version"))) {
+  if (startDebugger(QStringList() << QStringLiteral("--version"))) {
     return m_process->waitForFinished(-1);
   }
   return false;
@@ -121,14 +153,14 @@ void DebuggerInjector::waitForMain()
   execCmd("continue");
 }
 
-int DebuggerInjector::injectAndDetach(const QString &probeDll, const QString &probeFunc)
+bool DebuggerInjector::injectAndDetach(const QString &probeDll, const QString &probeFunc)
 {
   Q_ASSERT(m_process);
   loadSymbols("dl");
-  execCmd(QString::fromLatin1("call (void) dlopen(\"%1\", %2)").
+  execCmd(QStringLiteral("call (void) dlopen(\"%1\", %2)").
           arg(probeDll).arg(RTLD_NOW).toUtf8());
   loadSymbols(probeDll.toUtf8());
-  execCmd(QString::fromLatin1("call (void) %1()").arg(probeFunc).toUtf8());
+  execCmd(QStringLiteral("call (void) %1()").arg(probeFunc).toUtf8());
 
   if (qgetenv("GAMMARAY_UNITTEST") != "1") {
     execCmd("detach");
@@ -140,18 +172,10 @@ int DebuggerInjector::injectAndDetach(const QString &probeDll, const QString &pr
     // if we hit a crash or anything, print backtrace and quit
     execCmd("backtrace", false);
     execCmd("quit", false);
+
   }
 
-  m_process->waitForFinished(-1);
-
-  mExitCode = m_process->exitCode();
-  mExitStatus = m_process->exitStatus();
-  if (!mManualError) {
-    mProcessError = m_process->error();
-    mErrorString = m_process->errorString();
-  }
-
-  return mExitCode == EXIT_SUCCESS && mExitStatus == QProcess::NormalExit;
+  return true;
 }
 
 void DebuggerInjector::loadSymbols(const QByteArray& library)

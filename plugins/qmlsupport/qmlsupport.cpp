@@ -27,11 +27,15 @@
 */
 
 #include "qmlsupport.h"
+#include "qmllistpropertyadaptor.h"
+#include "qmlattachedpropertyadaptor.h"
+#include "qjsvaluepropertyadaptor.h"
 
 #include <core/metaobject.h>
 #include <core/metaobjectrepository.h>
 #include <core/varianthandler.h>
 #include <core/util.h>
+#include <core/propertyadaptorfactory.h>
 
 #include <QDateTime>
 #include <QDebug>
@@ -47,7 +51,7 @@ using namespace GammaRay;
 
 static QString qmlErrorToString(const QQmlError &error)
 {
-  return QString::fromLatin1("%1:%2:%3: %4")
+  return QStringLiteral("%1:%2:%3: %4")
     .arg(error.url().toString())
     .arg(error.line())
     .arg(error.column())
@@ -63,46 +67,40 @@ static QString qmlListPropertyToString(const QVariant &value, bool *ok)
   QQmlListProperty<QObject> *prop = reinterpret_cast<QQmlListProperty<QObject>*>(const_cast<void*>(value.data()));
   const int count = prop->count(prop);
   if (!count)
-    return QObject::tr("<empty>");
-
-  QStringList l;
-  l.reserve(count);
-  for (int i = 0; i < prop->count(prop); ++i) {
-    l.push_back(Util::displayString(prop->at(prop, i)));
-  }
-  return l.join(QLatin1String(", "));
+    return QmlSupport::tr("<empty>");
+  return QmlSupport::tr("<%1 entries>").arg(count);
 }
 
 static QString qjsValueToString(const QJSValue &v)
 {
   if (v.isArray()) {
-    return "<array>";
+    return QStringLiteral("<array>");
   } else if (v.isBool()) {
-    return v.toBool() ? "true" : "false";
+    return v.toBool() ? QStringLiteral("true") : QStringLiteral("false");
   } else if (v.isCallable()) {
-    return "<callable>";
+    return QStringLiteral("<callable>");
   } else if (v.isDate()) {
     return v.toDateTime().toString();
   } else if (v.isError()) {
-    return "<error>";
+    return QStringLiteral("<error>");
   } else if (v.isNull()) {
-    return "<null>";
+    return QStringLiteral("<null>");
   } else if (v.isNumber()) {
     return QString::number(v.toNumber());
   } else if (v.isObject()) {
-    return "<object>";
+    return QStringLiteral("<object>");
   } else if (v.isQObject()) {
     return Util::displayString(v.toQObject());
   } else if (v.isRegExp()) {
-    return "<regexp>";
+    return QStringLiteral("<regexp>");
   } else if (v.isString()) {
     return v.toString();
   } else if (v.isUndefined()) {
-    return "<undefined>";
+    return QStringLiteral("<undefined>");
   } else if (v.isVariant()) {
     return VariantHandler::displayString(v.toVariant());
   }
-  return "<unknown QJSValue>";
+  return QStringLiteral("<unknown QJSValue>");
 }
 
 QmlSupport::QmlSupport(GammaRay::ProbeInterface* probe, QObject* parent) :
@@ -135,6 +133,10 @@ QmlSupport::QmlSupport(GammaRay::ProbeInterface* probe, QObject* parent) :
   VariantHandler::registerStringConverter<QJSValue>(qjsValueToString);
   VariantHandler::registerStringConverter<QQmlError>(qmlErrorToString);
   VariantHandler::registerGenericStringConverter(qmlListPropertyToString);
+
+  PropertyAdaptorFactory::registerFactory(QmlListPropertyAdaptorFactory::instance());
+  PropertyAdaptorFactory::registerFactory(QmlAttachedPropertyAdaptorFactory::instance());
+  PropertyAdaptorFactory::registerFactory(QJSValuePropertyAdaptorFactory::instance());
 }
 
 QString QmlSupportFactory::name() const

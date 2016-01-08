@@ -33,6 +33,7 @@
 #include "geometryextension/sggeometryextension.h"
 #include "materialextension/materialextension.h"
 
+#include <common/modelevent.h>
 #include <common/objectbroker.h>
 
 #include <core/metaobject.h>
@@ -41,8 +42,11 @@
 #include <core/probeinterface.h>
 #include <core/propertycontroller.h>
 #include <core/remote/server.h>
+#include <core/remote/serverproxymodel.h>
 #include <core/singlecolumnobjectproxymodel.h>
 #include <core/varianthandler.h>
+
+#include <3rdparty/kde/krecursivefilterproxymodel.h>
 
 #include <QQuickItem>
 #include <QQuickWindow>
@@ -73,6 +77,8 @@
 
 Q_DECLARE_METATYPE(QQmlError)
 
+Q_DECLARE_METATYPE(QQuickItem::Flags)
+Q_DECLARE_METATYPE(QQuickPaintedItem::PerformanceHints)
 Q_DECLARE_METATYPE(QSGNode *)
 Q_DECLARE_METATYPE(QSGBasicGeometryNode *)
 Q_DECLARE_METATYPE(QSGGeometryNode *)
@@ -91,74 +97,105 @@ Q_DECLARE_METATYPE(QSGMaterial *)
 Q_DECLARE_METATYPE(QSGMaterial::Flags)
 Q_DECLARE_METATYPE(QSGTexture::WrapMode)
 Q_DECLARE_METATYPE(QSGTexture::Filtering)
+#if QT_VERSION < QT_VERSION_CHECK(5, 5, 0)
+Q_DECLARE_METATYPE(Qt::MouseButtons)
+#endif
 using namespace GammaRay;
+
+static QString qQuickItemFlagsToString(QQuickItem::Flags flags)
+{
+  QStringList list;
+  if (flags & QQuickItem::ItemClipsChildrenToShape)
+    list << QStringLiteral("ItemClipsChildrenToShape");
+  if (flags & QQuickItem::ItemAcceptsInputMethod)
+    list << QStringLiteral("ItemAcceptsInputMethod");
+  if (flags & QQuickItem::ItemIsFocusScope)
+    list << QStringLiteral("ItemIsFocusScope");
+  if (flags & QQuickItem::ItemHasContents)
+    list << QStringLiteral("ItemHasContents");
+  if (flags & QQuickItem::ItemAcceptsDrops)
+    list << QStringLiteral("ItemAcceptsDrops");
+  if (list.isEmpty())
+    return QStringLiteral("<none>");
+  return list.join(QStringLiteral(" | "));
+}
+
+static QString qQuickPaintedItemPerformanceHintsToString(QQuickPaintedItem::PerformanceHints hints)
+{
+  QStringList list;
+  if (hints & QQuickPaintedItem::FastFBOResizing)
+    list << QStringLiteral("FastFBOResizing");
+  if (list.isEmpty())
+    return QStringLiteral("<none>");
+  return list.join(QStringLiteral(" | "));
+}
 
 static QString qSGNodeFlagsToString(QSGNode::Flags flags)
 {
   QStringList list;
   if (flags & QSGNode::OwnedByParent) {
-    list << "OwnedByParent";
+    list << QStringLiteral("OwnedByParent");
   }
   if (flags & QSGNode::UsePreprocess) {
-    list << "UsePreprocess";
+    list << QStringLiteral("UsePreprocess");
   }
   if (flags & QSGNode::OwnsGeometry) {
-    list << "OwnsGeometry";
+    list << QStringLiteral("OwnsGeometry");
   }
   if (flags & QSGNode::OwnsMaterial) {
-    list << "OwnsMaterial";
+    list << QStringLiteral("OwnsMaterial");
   }
   if (flags & QSGNode::OwnsOpaqueMaterial) {
-    list << "OwnsOpaqueMaterial";
+    list << QStringLiteral("OwnsOpaqueMaterial");
   }
   if (list.isEmpty())
-    return "<none>";
-  return list.join(" | ");
+    return QStringLiteral("<none>");
+  return list.join(QStringLiteral(" | "));
 }
 static QString qSGNodeDirtyStateToString(QSGNode::DirtyState flags)
 {
   QStringList list;
 #if QT_VERSION >= QT_VERSION_CHECK(5, 2, 0)
   if (flags & QSGNode::DirtySubtreeBlocked) {
-    list << "DirtySubtreeBlocked";
+    list << QStringLiteral("DirtySubtreeBlocked");
   }
 #endif
   if (flags & QSGNode::DirtyMatrix) {
-    list << "DirtyMatrix";
+    list << QStringLiteral("DirtyMatrix");
   }
   if (flags & QSGNode::DirtyNodeAdded) {
-    list << "DirtyNodeAdded";
+    list << QStringLiteral("DirtyNodeAdded");
   }
   if (flags & QSGNode::DirtyNodeRemoved) {
-    list << "DirtyNodeRemoved";
+    list << QStringLiteral("DirtyNodeRemoved");
   }
   if (flags & QSGNode::DirtyGeometry) {
-    list << "DirtyGeometry";
+    list << QStringLiteral("DirtyGeometry");
   }
   if (flags & QSGNode::DirtyMaterial) {
-    list << "DirtyMaterial";
+    list << QStringLiteral("DirtyMaterial");
   }
   if (flags & QSGNode::DirtyOpacity) {
-    list << "DirtyOpacity";
+    list << QStringLiteral("DirtyOpacity");
   }
   if (flags & QSGNode::DirtyForceUpdate) {
-    list << "DirtyForceUpdate";
+    list << QStringLiteral("DirtyForceUpdate");
   }
   if (flags & QSGNode::DirtyUsePreprocess) {
-    list << "DirtyUsePreprocess";
+    list << QStringLiteral("DirtyUsePreprocess");
   }
   if (flags & QSGNode::DirtyPropagationMask) {
-    list << "DirtyPropagationMask";
+    list << QStringLiteral("DirtyPropagationMask");
   }
   if (list.isEmpty())
-    return "Clean";
-  return list.join(" | ");
+    return QStringLiteral("Clean");
+  return list.join(QStringLiteral(" | "));
 }
 
 static QString qsgMaterialFlagsToString(QSGMaterial::Flags flags)
 {
   QStringList list;
-#define F(f) if (flags & QSGMaterial::f) list.push_back(#f);
+#define F(f) if (flags & QSGMaterial::f) list.push_back(QStringLiteral(#f));
   F(Blending)
   F(RequiresDeterminant)
   F(RequiresFullMatrixExceptTranslate)
@@ -167,40 +204,40 @@ static QString qsgMaterialFlagsToString(QSGMaterial::Flags flags)
 #undef F
 
   if (list.isEmpty())
-    return "<none>";
-  return list.join(" | ");
+    return QStringLiteral("<none>");
+  return list.join(QStringLiteral(" | "));
 }
 
 static QString qsgTextureFilteringToString(QSGTexture::Filtering filtering)
 {
   switch (filtering) {
-    case QSGTexture::None: return "None";
-    case QSGTexture::Nearest: return "Nearest";
-    case QSGTexture::Linear: return "Linear";
+    case QSGTexture::None: return QStringLiteral("None");
+    case QSGTexture::Nearest: return QStringLiteral("Nearest");
+    case QSGTexture::Linear: return QStringLiteral("Linear");
   }
-  return QString("Unknown: %1").arg(filtering);
+  return QStringLiteral("Unknown: %1").arg(filtering);
 }
 
 static QString qsgTextureWrapModeToString(QSGTexture::WrapMode wrapMode)
 {
   switch (wrapMode) {
-    case QSGTexture::Repeat: return "Repeat";
-    case QSGTexture::ClampToEdge: return "ClampToEdge";
+    case QSGTexture::Repeat: return QStringLiteral("Repeat");
+    case QSGTexture::ClampToEdge: return QStringLiteral("ClampToEdge");
   }
-  return QString("Unknown: %1").arg(wrapMode);
+  return QStringLiteral("Unknown: %1").arg(wrapMode);
 }
 
 QuickInspector::QuickInspector(ProbeInterface *probe, QObject *parent)
   : QuickInspectorInterface(parent),
-    m_source(0),
     m_probe(probe),
     m_currentSgNode(0),
     m_itemModel(new QuickItemModel(this)),
     m_sgModel(new QuickSceneGraphModel(this)),
-    m_itemPropertyController(new PropertyController("com.kdab.GammaRay.QuickItem", this)),
-    m_sgPropertyController(new PropertyController("com.kdab.GammaRay.QuickSceneGraph", this)),
+    m_itemPropertyController(new PropertyController(QStringLiteral("com.kdab.GammaRay.QuickItem"), this)),
+    m_sgPropertyController(new PropertyController(QStringLiteral("com.kdab.GammaRay.QuickSceneGraph"), this)),
     m_clientViewActive(false),
-    m_needsNewFrame(false)
+    m_needsNewFrame(false),
+    m_isGrabbingWindow(false)
 {
   registerPCExtensions();
   Server::instance()->registerMonitorNotifier(
@@ -215,8 +252,11 @@ QuickInspector::QuickInspector(ProbeInterface *probe, QObject *parent)
   QAbstractProxyModel * proxy = new SingleColumnObjectProxyModel(this);
   proxy->setSourceModel(windowModel);
   m_windowModel = proxy;
-  probe->registerModel("com.kdab.GammaRay.QuickWindowModel", m_windowModel);
-  probe->registerModel("com.kdab.GammaRay.QuickItemModel", m_itemModel);
+  probe->registerModel(QStringLiteral("com.kdab.GammaRay.QuickWindowModel"), m_windowModel);
+
+  auto filterProxy = new ServerProxyModel<KRecursiveFilterProxyModel>(this);
+  filterProxy->setSourceModel(m_itemModel);
+  probe->registerModel(QStringLiteral("com.kdab.GammaRay.QuickItemModel"), filterProxy);
 
   connect(probe->probe(), SIGNAL(objectCreated(QObject*)),
           m_itemModel, SLOT(objectAdded(QObject*)));
@@ -227,13 +267,15 @@ QuickInspector::QuickInspector(ProbeInterface *probe, QObject *parent)
   connect(probe->probe(), SIGNAL(nonQObjectSelected(void*,QString)),
           SLOT(objectSelected(void*,QString)));
 
-  m_itemSelectionModel = ObjectBroker::selectionModel(m_itemModel);
+  m_itemSelectionModel = ObjectBroker::selectionModel(filterProxy);
   connect(m_itemSelectionModel, &QItemSelectionModel::selectionChanged,
           this, &QuickInspector::itemSelectionChanged);
 
-  probe->registerModel("com.kdab.GammaRay.QuickSceneGraphModel", m_sgModel);
+  filterProxy = new ServerProxyModel<KRecursiveFilterProxyModel>(this);
+  filterProxy->setSourceModel(m_sgModel);
+  probe->registerModel(QStringLiteral("com.kdab.GammaRay.QuickSceneGraphModel"), filterProxy);
 
-  m_sgSelectionModel = ObjectBroker::selectionModel(m_sgModel);
+  m_sgSelectionModel = ObjectBroker::selectionModel(filterProxy);
   connect(m_sgSelectionModel, &QItemSelectionModel::selectionChanged,
           this, &QuickInspector::sgSelectionChanged);
   connect(m_sgModel, &QuickSceneGraphModel::nodeDeleted, this, &QuickInspector::sgNodeDeleted);
@@ -264,46 +306,17 @@ void QuickInspector::selectWindow(QQuickWindow *window)
     // make sure we have selected something for the property editor to not be entirely empty
     selectItem(m_window->contentItem());
 
-    // Insert a ShaderEffectSource to the scene, with the contentItem as its source, in
-    // order to use it to generate a preview of the window as QImage to show on the client.
-    QQuickItem *contentItem = m_window->contentItem();
-#if QT_VERSION < QT_VERSION_CHECK(5, 3, 0) // working around the 0-sized contentItem in older Qt
-    if (contentItem->height() == 0 && contentItem->width() == 0) {
-      contentItem->setWidth(contentItem->childrenRect().width());
-      contentItem->setHeight(contentItem->childrenRect().height());
-    }
-#endif
-    delete m_source;
-    m_source = new QQuickShaderEffectSource(contentItem);
-    m_source->setParent(this); // hides the item in the object tree (note: parent != parentItem)
-    QQuickItemPrivate::get(m_source)->anchors()->setFill(contentItem);
-    m_source->setScale(0); // The item shouldn't be visible in the original scene, but it still
-                           // needs to be rendered. (i.e. setVisible(false) would cause it to
-                           // not be rendered anymore)
-    setupPreviewSource();
-    connect(window, &QQuickWindow::afterRendering,
-            this, &QuickInspector::slotSceneChanged, Qt::DirectConnection);
+    connect(window, &QQuickWindow::frameSwapped, this, &QuickInspector::slotSceneChanged);
 
     m_window->update();
   }
 }
 
-void QuickInspector::setupPreviewSource()
-{
-  Q_ASSERT(m_window);
-  QQuickItem *contentItem = m_window->contentItem();
-  const QList<QQuickItem*> children = contentItem->childItems();
-  if (children.size() == 2) { // prefer non-recursive shader sources, then we don't re-render all the time
-    m_source->setSourceItem(children.at(children.indexOf(m_source) == 1 ? 0 : 1));
-  } else {
-    m_source->setRecursive(true);
-    m_source->setSourceItem(contentItem);
-  }
-}
-
 void QuickInspector::selectItem(QQuickItem *item)
 {
-  const QAbstractItemModel *model = m_itemModel;
+  const QAbstractItemModel *model = m_itemSelectionModel->model();
+  Model::used(model);
+
   const QModelIndexList indexList =
     model->match(model->index(0, 0),
                  ObjectModel::ObjectRole,
@@ -323,7 +336,8 @@ void QuickInspector::selectItem(QQuickItem *item)
 
 void QuickInspector::selectSGNode(QSGNode *node)
 {
-  const QAbstractItemModel *model = m_sgModel;
+  const QAbstractItemModel *model = m_sgSelectionModel->model();
+  Model::used(model);
 
   const QModelIndexList indexList = model->match(model->index(0, 0), ObjectModel::ObjectRole,
     QVariant::fromValue(node), 1, Qt::MatchExactly | Qt::MatchRecursive);
@@ -349,7 +363,7 @@ void QuickInspector::objectSelected(QObject *object)
 
 void QuickInspector::objectSelected(void *object, const QString &typeName)
 {
-  if (MetaObjectRepository::instance()->metaObject(typeName)->inherits("QSGNode")) {
+  if (MetaObjectRepository::instance()->metaObject(typeName)->inherits(QStringLiteral("QSGNode"))) {
     selectSGNode(reinterpret_cast<QSGNode*>(object));
   }
 }
@@ -366,69 +380,61 @@ void QuickInspector::renderScene()
 
 void QuickInspector::sendRenderedScene()
 {
-  QVariantMap previewData;
-  previewData.insert("rawImage", QVariant::fromValue(TransferImage(m_currentFrame))); // wrap to allow bypassing expensive PNG compression
+  QuickItemGeometry itemGeometry;
+  TransferImage rawImage = TransferImage(m_currentFrame); // wrap to allow bypassing expensive PNG compression
   if (m_currentItem) {
     QQuickItem *parent = m_currentItem->parentItem();
 
     if (parent) {
-      previewData.insert("itemRect",
-                         m_currentItem->parentItem()->mapRectToScene(
+      itemGeometry.itemRect =  m_currentItem->parentItem()->mapRectToScene(
                            QRectF(m_currentItem->x(), m_currentItem->y(),
-                                  m_currentItem->width(), m_currentItem->height())));
+                                  m_currentItem->width(), m_currentItem->height()));
     } else {
-      previewData.insert("itemRect", QRectF(0, 0, m_currentItem->width(), m_currentItem->height()));
+      itemGeometry.itemRect =  QRectF(0, 0, m_currentItem->width(), m_currentItem->height());
     }
 
-    previewData.insert("boundingRect",
-                       m_currentItem->mapRectToScene(m_currentItem->boundingRect()));
-    previewData.insert("childrenRect",
-                       m_currentItem->mapRectToScene(m_currentItem->childrenRect()));
-    previewData.insert("transformOriginPoint",
-                       m_currentItem->mapToScene(m_currentItem->transformOriginPoint()));
+    itemGeometry.boundingRect =
+                       m_currentItem->mapRectToScene(m_currentItem->boundingRect());
+    itemGeometry.childrenRect =
+                       m_currentItem->mapRectToScene(m_currentItem->childrenRect());
+    itemGeometry.transformOriginPoint =
+                       m_currentItem->mapToScene(m_currentItem->transformOriginPoint());
 
     QQuickAnchors *anchors = m_currentItem->property("anchors").value<QQuickAnchors*>();
 
     if (anchors) {
       QQuickAnchors::Anchors usedAnchors = anchors->usedAnchors();
-      previewData.insert("left",
-                         (bool)(usedAnchors & QQuickAnchors::LeftAnchor) || anchors->fill());
-      previewData.insert("right",
-                         (bool)(usedAnchors & QQuickAnchors::RightAnchor) || anchors->fill());
-      previewData.insert("top",
-                         (bool)(usedAnchors & QQuickAnchors::TopAnchor) || anchors->fill());
-      previewData.insert("bottom",
-                         (bool)(usedAnchors & QQuickAnchors::BottomAnchor) || anchors->fill());
-      previewData.insert("baseline",
-                         (bool)(usedAnchors & QQuickAnchors::BaselineAnchor));
-      previewData.insert("horizontalCenter",
-                         (bool)(usedAnchors & QQuickAnchors::HCenterAnchor) || anchors->centerIn());
-      previewData.insert("verticalCenter",
-                         (bool)(usedAnchors & QQuickAnchors::VCenterAnchor) || anchors->centerIn());
-      previewData.insert("leftMargin", anchors->leftMargin());
-      previewData.insert("rightMargin", anchors->rightMargin());
-      previewData.insert("topMargin", anchors->topMargin());
-      previewData.insert("bottomMargin", anchors->bottomMargin());
-      previewData.insert("horizontalCenterOffset", anchors->horizontalCenterOffset());
-      previewData.insert("verticalCenterOffset", anchors->verticalCenterOffset());
-      previewData.insert("baselineOffset", anchors->baselineOffset());
-      previewData.insert("margins", anchors->margins());
+      itemGeometry.left = (bool)(usedAnchors & QQuickAnchors::LeftAnchor) || anchors->fill();
+      itemGeometry.right = (bool)(usedAnchors & QQuickAnchors::RightAnchor) || anchors->fill();
+      itemGeometry.top = (bool)(usedAnchors & QQuickAnchors::TopAnchor) || anchors->fill();
+      itemGeometry.bottom = (bool)(usedAnchors & QQuickAnchors::BottomAnchor) || anchors->fill();
+      itemGeometry.baseline = (bool)(usedAnchors & QQuickAnchors::BaselineAnchor);
+      itemGeometry.horizontalCenter = (bool)(usedAnchors & QQuickAnchors::HCenterAnchor) || anchors->centerIn();
+      itemGeometry.verticalCenter = (bool)(usedAnchors & QQuickAnchors::VCenterAnchor) || anchors->centerIn();
+      itemGeometry.leftMargin =  anchors->leftMargin();
+      itemGeometry.rightMargin =  anchors->rightMargin();
+      itemGeometry.topMargin =  anchors->topMargin();
+      itemGeometry.bottomMargin =  anchors->bottomMargin();
+      itemGeometry.horizontalCenterOffset =  anchors->horizontalCenterOffset();
+      itemGeometry.verticalCenterOffset =  anchors->verticalCenterOffset();
+      itemGeometry.baselineOffset =  anchors->baselineOffset();
+      itemGeometry.margins = anchors->margins();
     }
-    previewData.insert("x", m_currentItem->x());
-    previewData.insert("y", m_currentItem->y());
+    itemGeometry.x =  m_currentItem->x();
+    itemGeometry.y =  m_currentItem->y();
     QQuickItemPrivate *itemPriv = QQuickItemPrivate::get(m_currentItem);
-    previewData.insert("transform", itemPriv->itemToWindowTransform());
+    itemGeometry.transform =  itemPriv->itemToWindowTransform();
     if (parent) {
       QQuickItemPrivate *parentPriv = QQuickItemPrivate::get(parent);
-      previewData.insert("parentTransform", parentPriv->itemToWindowTransform());
+      itemGeometry.parentTransform =  parentPriv->itemToWindowTransform();
     }
   }
-  emit sceneRendered(previewData);
+  emit sceneRendered(rawImage, itemGeometry);
 }
 
 void QuickInspector::slotSceneChanged()
 {
-  if (!m_clientViewActive || !m_window) {
+  if (!m_clientViewActive || !m_window || m_isGrabbingWindow) {
     return;
   }
 
@@ -437,23 +443,10 @@ void QuickInspector::slotSceneChanged()
     return;
   }
 
-  const QSGTextureProvider *provider = m_source->textureProvider();
-  Q_ASSERT(provider);
-
-#if QT_VERSION < QT_VERSION_CHECK(5, 4, 0)
-  const QQuickShaderEffectTexture *texture =
-    qobject_cast<QQuickShaderEffectTexture*>(provider->texture());
-  Q_ASSERT(texture);
-#else
-  const QSGLayer *texture = qobject_cast<QSGLayer*>(provider->texture());
-  Q_ASSERT(texture);
-#endif
-
-  QOpenGLContext *ctx =
-    QQuickItemPrivate::get(m_source)->sceneGraphRenderContext()->openglContext();
-  if (ctx->makeCurrent(ctx->surface())) {
-    m_currentFrame = texture->toImage();
-  }
+  Q_ASSERT(QThread::currentThread() == QCoreApplication::instance()->thread());
+  m_isGrabbingWindow = true;
+  m_currentFrame = m_window->grabWindow();
+  m_isGrabbingWindow = false;
 
   m_needsNewFrame = false;
   QMetaObject::invokeMethod(this, "sendRenderedScene", Qt::AutoConnection); // we are in the render thread here
@@ -518,22 +511,23 @@ void QuickInspector::setCustomRenderMode(
                               customRenderMode == VisualizeBatches  ? "batches"  :
                               customRenderMode == VisualizeChanges  ? "changes"  :
                               "";
-  m_window->update();
-#if QT_VERSION >= QT_VERSION_CHECK(5, 5, 0)
-  if (customRenderMode == VisualizeBatches) {
-    // Work around a performance optimization done in Qt 5.5, that breaks batch
-    // visualization completely. Because it breaks batch visualization,
-    // QSGBatchRenderer will only apply it if no batch visualization is applied.
-    // This workaround forces the batch renderer to reevaluate that, so that it
-    // recognizes it now is applied.
-    QQuickItemPrivate *contentPriv = QQuickItemPrivate::get(m_window->contentItem());
-    QSGNode *rootNode = contentPriv->itemNode();
-    while(rootNode->type() != QSGNode::RootNodeType)
-        rootNode = rootNode->parent();
-    winPriv->renderer->nodeChanged(rootNode, QSGNode::DirtyNodeRemoved);
-    winPriv->renderer->nodeChanged(rootNode, QSGNode::DirtyNodeAdded);
+#if QT_VERSION >= QT_VERSION_CHECK(5, 5, 0) && 0 // FIXME this crashes on scene updates with Qt >= 5.5.1 and the multithreaded renderer
+  // Qt does some performance optimizations that break custom render modes.
+  // Thus the optimizations are only applied if there is no custom render mode set.
+  // So we need to make the scenegraph recheck whether a custom render mode is set.
+  // We do this by simply recreating the renderer.
+
+  QQuickItemPrivate *contentPriv = QQuickItemPrivate::get(m_window->contentItem());
+  QSGNode *rootNode = contentPriv->itemNode();
+  while(rootNode->parent()) {
+      rootNode = rootNode->parent();
   }
+
+  delete winPriv->renderer;
+  winPriv->renderer = winPriv->context->createRenderer();
+  winPriv->renderer->setRootNode(static_cast<QSGRootNode*>(rootNode));
 #endif
+  m_window->update();
 
 #else
   Q_UNUSED(customRenderMode);
@@ -544,8 +538,12 @@ void QuickInspector::checkFeatures()
 {
   emit features(
     Features(
-#if QT_VERSION >= QT_VERSION_CHECK(5, 3, 0)
-    CustomRenderModes
+#if QT_VERSION >= QT_VERSION_CHECK(5, 6, 0) // FIXME any render mode crashes on first scene change
+      NoFeatures
+#elif QT_VERSION >= QT_VERSION_CHECK(5, 5, 0) // batching crashes when enabled at runtime >= 5.5.0
+      CustomRenderModeChanges | CustomRenderModeClipping | CustomRenderModeOverdraw
+#elif QT_VERSION >= QT_VERSION_CHECK(5, 3, 0)
+      AllCustomRenderModes
 #endif
     )
   );
@@ -565,7 +563,9 @@ void QuickInspector::itemSelectionChanged(const QItemSelection &selection)
   // node of the Item. In this case we don't want to overwrite that selection.
   if (m_sgModel->itemForSgNode(m_currentSgNode) != m_currentItem) {
     m_currentSgNode = m_sgModel->sgNodeForItem(m_currentItem);
-    m_sgSelectionModel->select(m_sgModel->indexForNode(m_currentSgNode),
+    const auto sourceIdx = m_sgModel->indexForNode(m_currentSgNode);
+    auto proxy = qobject_cast<const QAbstractProxyModel*>(m_sgSelectionModel->model());
+    m_sgSelectionModel->select(proxy->mapFromSource(sourceIdx),
                                QItemSelectionModel::Select |
                                QItemSelectionModel::Clear |
                                QItemSelectionModel::Rows |
@@ -613,30 +613,15 @@ void QuickInspector::setSceneViewActive(bool active)
   m_clientViewActive = active;
 
   if (active && m_window) {
-    if (m_source)
-      setupPreviewSource();
     m_window->update();
   }
-  if (!active && m_source)
-    m_source->setSourceItem(0); // no need to render the screenshot as well if nobody is watching
 }
 
 QQuickItem *QuickInspector::recursiveChiltAt(QQuickItem *parent, const QPointF &pos) const
 {
   Q_ASSERT(parent);
 
-  // we can't use childAt() as that will find m_source, but that's not what we are looking for
-  QQuickItem *child = Q_NULLPTR;
-  auto children = parent->childItems();
-  std::stable_sort(children.begin(), children.end(), [](QQuickItem *lhs, QQuickItem *rhs) { return lhs->z() < rhs->z(); });
-  std::reverse(children.begin(), children.end());
-  foreach (QQuickItem *c, children) {
-    const QPointF p = parent->mapToItem(c, pos);
-    if (c != m_source && c->isVisible() && p.x() >= 0 && c->width() >= p.x() && p.y() >= 0 && c->height() >= p.y()) {
-      child = c;
-      break;
-    }
-  }
+  QQuickItem *child = parent->childAt(pos.x(), pos.y());
 
   if (child) {
     return recursiveChiltAt(child, parent->mapToItem(child, pos));
@@ -678,6 +663,26 @@ void QuickInspector::registerMetaTypes()
   MO_ADD_PROPERTY_RO(QQuickView, QSize, initialSize);
   MO_ADD_PROPERTY_RO(QQuickView, QQmlContext *, rootContext);
   MO_ADD_PROPERTY_RO(QQuickView, QQuickItem *, rootObject);
+
+  MO_ADD_METAOBJECT1(QQuickItem, QObject);
+  MO_ADD_PROPERTY   (QQuickItem, bool, acceptHoverEvents, setAcceptHoverEvents);
+  MO_ADD_PROPERTY   (QQuickItem, Qt::MouseButtons, acceptedMouseButtons, setAcceptedMouseButtons);
+  MO_ADD_PROPERTY_CR(QQuickItem, QCursor, cursor, setCursor);
+  MO_ADD_PROPERTY   (QQuickItem, bool, filtersChildMouseEvents, setFiltersChildMouseEvents);
+  MO_ADD_PROPERTY   (QQuickItem, QQuickItem::Flags, flags, setFlags);
+  MO_ADD_PROPERTY_RO(QQuickItem, bool, isFocusScope);
+  MO_ADD_PROPERTY_RO(QQuickItem, bool, isTextureProvider);
+  MO_ADD_PROPERTY   (QQuickItem, bool, keepMouseGrab, setKeepMouseGrab);
+  MO_ADD_PROPERTY   (QQuickItem, bool, keepTouchGrab, setKeepTouchGrab);
+  //MO_ADD_PROPERTY_RO(QQuickItem, QQuickItem*, nextItemInFocusChain); // FIXME fails on the default argument
+  MO_ADD_PROPERTY_RO(QQuickItem, QQuickItem*, scopedFocusItem);
+  MO_ADD_PROPERTY_RO(QQuickItem, QQuickWindow*, window);
+
+  MO_ADD_METAOBJECT1(QQuickPaintedItem, QQuickItem);
+  MO_ADD_PROPERTY_RO(QQuickPaintedItem, QRectF, contentsBoundingRect);
+  MO_ADD_PROPERTY   (QQuickPaintedItem, bool, mipmap, setMipmap);
+  MO_ADD_PROPERTY   (QQuickPaintedItem, bool, opaquePainting, setOpaquePainting);
+  MO_ADD_PROPERTY   (QQuickPaintedItem, QQuickPaintedItem::PerformanceHints, performanceHints, setPerformanceHints);
 
   MO_ADD_METAOBJECT1(QSGTexture, QObject);
   MO_ADD_PROPERTY   (QSGTexture, QSGTexture::Filtering, filtering, setFiltering);
@@ -745,6 +750,8 @@ void QuickInspector::registerMetaTypes()
 
 void QuickInspector::registerVariantHandlers()
 {
+  VariantHandler::registerStringConverter<QQuickItem::Flags>(qQuickItemFlagsToString);
+  VariantHandler::registerStringConverter<QQuickPaintedItem::PerformanceHints>(qQuickPaintedItemPerformanceHintsToString);
   VariantHandler::registerStringConverter<QSGNode*>(Util::addressToString);
   VariantHandler::registerStringConverter<QSGBasicGeometryNode*>(Util::addressToString);
   VariantHandler::registerStringConverter<QSGGeometryNode*>(Util::addressToString);
@@ -771,8 +778,8 @@ void QuickInspector::registerPCExtensions()
 }
 
 #define QSG_CHECK_TYPE(Class) \
-  if(dynamic_cast<Class*>(node) && MetaObjectRepository::instance()->hasMetaObject(#Class)) \
-    return QLatin1String(#Class)
+  if(dynamic_cast<Class*>(node) && MetaObjectRepository::instance()->hasMetaObject(QStringLiteral(#Class))) \
+    return QStringLiteral(#Class)
 
 QString QuickInspector::findSGNodeType(QSGNode *node) const
 {
@@ -784,7 +791,7 @@ QString QuickInspector::findSGNodeType(QSGNode *node) const
     QSG_CHECK_TYPE(QSGRootNode);
     QSG_CHECK_TYPE(QSGOpacityNode);
 
-    return QLatin1String("QSGNode");
+    return QStringLiteral("QSGNode");
 }
 
 QString QuickInspectorFactory::name() const

@@ -1,3 +1,5 @@
+add_subdirectory(shared)
+
 ### BENCH SUITE
 
 if(Qt5Widgets_FOUND OR QT_QTGUI_FOUND)
@@ -97,13 +99,15 @@ add_test(multisignalmappertest ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/multisignalmapp
 
 ### Probe ABI test
 
+if(NOT GAMMARAY_PROBE_ONLY_BUILD)
 add_executable(probeabitest probeabitest.cpp)
-target_link_libraries(probeabitest gammaray_common_internal ${QT_QTTEST_LIBRARIES})
+target_link_libraries(probeabitest gammaray_launcher ${QT_QTTEST_LIBRARIES} ${QT_QTGUI_LIBRARIES})
 add_test(probeabitest ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/probeabitest)
 
 add_executable(probeabidetectortest probeabidetectortest.cpp)
-target_link_libraries(probeabidetectortest gammaray_common_internal ${QT_QTTEST_LIBRARIES})
+target_link_libraries(probeabidetectortest gammaray_launcher ${QT_QTTEST_LIBRARIES} ${QT_QTGUI_LIBRARIES})
 add_test(probeabidetectortest ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/probeabidetectortest)
+endif()
 
 ### Remote model tests
 
@@ -121,20 +125,57 @@ endif()
 
 add_executable(signalspycallbacktest
   signalspycallbacktest.cpp
-  ../hooking/probecreator.cpp
+  ../probe/probecreator.cpp
 )
 target_link_libraries(signalspycallbacktest gammaray_core ${QT_QTTEST_LIBRARIES})
 add_test(NAME signalspycallbacktest COMMAND signalspycallbacktest)
 
-### QAction test
+### multi-threading test
 
 if(Qt5Core_FOUND AND NOT Qt5Core_VERSION_MINOR LESS 4) # requires QHooks
+add_executable(multithreadingtest
+  multithreadingtest.cpp
+  ../probe/probecreator.cpp
+  ../probe/hooks.cpp
+)
+target_link_libraries(multithreadingtest gammaray_core ${QT_QTTEST_LIBRARIES})
+add_test(NAME multithreadingtest COMMAND multithreadingtest)
+
+### QTranslator test
+add_executable(translatortest
+  translatortest.cpp
+  ../probe/probecreator.cpp
+  ../probe/hooks.cpp
+    ${CMAKE_SOURCE_DIR}/3rdparty/qt/modeltest.cpp
+)
+target_link_libraries(translatortest gammaray_core ${QT_QTTEST_LIBRARIES})
+add_test(NAME translatortest COMMAND translatortest)
+
+endif()
+
+### QWidget test
+
+if(Qt5Widgets_FOUND AND NOT Qt5Core_VERSION_MINOR LESS 4) # requires QHooks
+add_executable(widgettest
+  widgettest.cpp
+  ../probe/probecreator.cpp
+  ../probe/hooks.cpp
+    ${CMAKE_SOURCE_DIR}/3rdparty/qt/modeltest.cpp
+)
+target_link_libraries(widgettest gammaray_core ${QT_QTTEST_LIBRARIES} ${QT_QTWIDGETS_LIBRARIES})
+
+add_test(NAME widgettest COMMAND widgettest)
+endif()
+
+### QAction test
+
+if(Qt5Widgets_FOUND AND NOT Qt5Core_VERSION_MINOR LESS 4) # requires QHooks
 add_executable(actiontest
   actiontest.cpp
-  ../hooking/probecreator.cpp
-  ../hooking/hooks.cpp
+  ../probe/probecreator.cpp
+  ../probe/hooks.cpp
 )
-target_link_libraries(actiontest gammaray_core ${QT_QTTEST_LIBRARIES} ${QT_QTGUI_LIBRARIES})
+target_link_libraries(actiontest gammaray_core ${QT_QTTEST_LIBRARIES} ${QT_QTWIDGETS_LIBRARIES})
 
 add_test(NAME actiontest COMMAND actiontest)
 endif()
@@ -157,6 +198,63 @@ if(GAMMARAY_BUILD_UI)
 add_executable(propertybindertest propertybindertest.cpp)
 target_link_libraries(propertybindertest gammaray_ui ${QT_QTTEST_LIBRARIES})
 add_test(NAME propertybindertest COMMAND propertybindertest)
+endif()
+
+### Property Adaptor test
+
+add_executable(propertyadaptortest propertyadaptortest.cpp)
+target_link_libraries(propertyadaptortest gammaray_core ${QT_QTTEST_LIBRARIES} gammaray_shared_test_data)
+add_test(NAME propertyadaptortest COMMAND propertyadaptortest)
+
+### Property model test
+
+add_executable(propertymodeltest
+  propertymodeltest.cpp
+  ${CMAKE_SOURCE_DIR}/3rdparty/qt/modeltest.cpp
+)
+target_link_libraries(propertymodeltest gammaray_core ${QT_QTTEST_LIBRARIES} gammaray_shared_test_data)
+add_test(NAME propertymodeltest COMMAND propertymodeltest)
+
+### Font plugin
+
+add_executable(fontdatabasemodeltest
+  fontdatabasemodeltest.cpp
+  ${CMAKE_SOURCE_DIR}/plugins/fontbrowser/fontdatabasemodel.cpp
+  ${CMAKE_SOURCE_DIR}/3rdparty/qt/modeltest.cpp
+)
+target_link_libraries(fontdatabasemodeltest ${QT_QTGUI_LIBRARIES} ${QT_QTTEST_LIBRARIES})
+add_test(NAME fontdatabasemodeltest COMMAND fontdatabasemodeltest)
+
+### QML support
+
+if(Qt5Quick_FOUND)
+  add_executable(qmlsupporttest
+    qmlsupporttest.cpp
+    ${CMAKE_SOURCE_DIR}/plugins/qmlsupport/qmllistpropertyadaptor.cpp
+    ${CMAKE_SOURCE_DIR}/plugins/qmlsupport/qmlattachedpropertyadaptor.cpp
+    ${CMAKE_SOURCE_DIR}/plugins/qmlsupport/qjsvaluepropertyadaptor.cpp
+  )
+  include_directories(SYSTEM ${Qt5Qml_PRIVATE_INCLUDE_DIRS})
+  target_link_libraries(qmlsupporttest gammaray_core Qt5::Quick Qt5::Test)
+  add_test(NAME qmlsupporttest COMMAND qmlsupporttest)
+endif()
+
+### Quick inspector
+
+if(Qt5Quick_FOUND AND NOT Qt5Core_VERSION_MINOR LESS 4) # requires QHooks
+set(quickinspectortest_srcs
+  quickinspectortest.cpp
+  ../probe/probecreator.cpp
+  ../probe/hooks.cpp
+  ../plugins/quickinspector/quickinspectorinterface.cpp
+  ../plugins/quickinspector/transferimage.cpp
+  ../plugins/quickinspector/quickitemgeometry.cpp
+    ${CMAKE_SOURCE_DIR}/3rdparty/qt/modeltest.cpp
+)
+qt4_add_resources(quickinspectortest_srcs quickinspectortest.qrc)
+add_executable(quickinspectortest ${quickinspectortest_srcs})
+target_link_libraries(quickinspectortest gammaray_core Qt5::Test Qt5::Quick)
+add_test(NAME quickinspectortest COMMAND quickinspectortest)
 endif()
 
 

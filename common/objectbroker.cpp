@@ -28,6 +28,7 @@
 
 #include "objectbroker.h"
 #include "endpoint.h"
+#include "modelevent.h"
 
 #include <kde/klinkitemselectionmodel.h>
 
@@ -80,7 +81,7 @@ QObject* ObjectBroker::objectInternal(const QString& name, const QByteArray &typ
 
   if (!type.isEmpty()) {
     Q_ASSERT(s_objectBroker()->clientObjectFactories.contains(type));
-    obj = s_objectBroker()->clientObjectFactories[type](name, qApp);
+    obj = s_objectBroker()->clientObjectFactories.value(type)(name, qApp);
   } else {
     // fallback
     obj = new QObject(qApp);
@@ -90,7 +91,7 @@ QObject* ObjectBroker::objectInternal(const QString& name, const QByteArray &typ
 
   Q_ASSERT(obj);
   // ensure it was registered
-  Q_ASSERT_X(s_objectBroker()->objects.value(name, 0) == obj, Q_FUNC_INFO, qPrintable(QString("Object %1 was not registered in the broker.").arg(name)));
+  Q_ASSERT_X(s_objectBroker()->objects.value(name, 0) == obj, Q_FUNC_INFO, qPrintable(QStringLiteral("Object %1 was not registered in the broker.").arg(name)));
 
   return obj;
 }
@@ -110,9 +111,12 @@ void ObjectBroker::registerModelInternal(const QString& name, QAbstractItemModel
 
 QAbstractItemModel* ObjectBroker::model(const QString& name)
 {
+  ModelEvent event(true);
   const QHash<QString, QAbstractItemModel*>::const_iterator it = s_objectBroker()->models.constFind(name);
-  if (it != s_objectBroker()->models.constEnd())
+  if (it != s_objectBroker()->models.constEnd()) {
+    QCoreApplication::sendEvent(it.value(), &event);
     return it.value();
+  }
 
   if (s_objectBroker()->modelCallback) {
     QAbstractItemModel* model = s_objectBroker()->modelCallback(name);
@@ -120,6 +124,7 @@ QAbstractItemModel* ObjectBroker::model(const QString& name)
       model->setObjectName(name);
       s_objectBroker()->models.insert(name, model);
       s_objectBroker()->ownedObjects.push_back(model);
+      QCoreApplication::sendEvent(model, &event);
       return model;
     }
   }

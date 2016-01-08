@@ -8,6 +8,7 @@ if(Qt5Quick_FOUND AND HAVE_PRIVATE_Qt5Quick_HEADERS AND NOT ${Qt5Quick_VERSION} 
   # shared stuff
   set(gammaray_quickinspector_shared_srcs
         quickinspectorinterface.cpp
+        quickitemgeometry.cpp
         transferimage.cpp
         materialextension/materialextensioninterface.cpp
         geometryextension/sggeometryextensioninterface.cpp
@@ -17,7 +18,7 @@ if(Qt5Quick_FOUND AND HAVE_PRIVATE_Qt5Quick_HEADERS AND NOT ${Qt5Quick_VERSION} 
   target_link_libraries(gammaray_quickinspector_shared gammaray_common Qt5::Gui)
   set_target_properties(gammaray_quickinspector_shared PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-  include_directories(${Qt5Quick_PRIVATE_INCLUDE_DIRS})
+  include_directories(SYSTEM ${Qt5Quick_PRIVATE_INCLUDE_DIRS})
 
   set(gammaray_quickinspector_srcs
     quickinspector.cpp
@@ -37,6 +38,7 @@ if(Qt5Quick_FOUND AND HAVE_PRIVATE_Qt5Quick_HEADERS AND NOT ${Qt5Quick_VERSION} 
   target_link_libraries(gammaray_quickinspector
     gammaray_quickinspector_shared
     gammaray_core Qt5::Quick
+    gammaray_kitemmodels
   )
 
   if(GAMMARAY_BUILD_UI)
@@ -47,7 +49,7 @@ if(Qt5Quick_FOUND AND HAVE_PRIVATE_Qt5Quick_HEADERS AND NOT ${Qt5Quick_VERSION} 
       quickclientitemmodel.cpp
       quickitemdelegate.cpp
       quickitemtreewatcher.cpp
-      annotatedscenepreview.cpp
+      quickscenepreviewwidget.cpp
 
       materialextension/materialextensionclient.cpp
       materialextension/materialtab.cpp

@@ -39,9 +39,9 @@ PropertyColorEditor::PropertyColorEditor(QWidget *parent)
 
 void PropertyColorEditor::edit()
 {
-  const QColor color = QColorDialog::getColor(value().value<QColor>(), this);
+  const QColor color = QColorDialog::getColor(value().value<QColor>(), this, QString(), QColorDialog::ShowAlphaChannel);
   if (color.isValid()) {
-    setValue(QVariant::fromValue(color));
+    save(QVariant::fromValue(color));
   }
 }
 

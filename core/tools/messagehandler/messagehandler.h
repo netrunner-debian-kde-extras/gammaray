@@ -30,7 +30,7 @@
 
 #include "toolfactory.h"
 
-#include "messagehandlerinterface.h"
+#include <common/tools/messagehandler/messagehandlerinterface.h>
 
 namespace GammaRay {
 
@@ -64,10 +64,7 @@ class MessageHandlerFactory : public QObject, public StandardToolFactory<QObject
   public:
     explicit MessageHandlerFactory(QObject *parent);
 
-    virtual inline QString name() const
-    {
-      return tr("Messages");
-    }
+    QString name() const Q_DECL_OVERRIDE;
 };
 
 }

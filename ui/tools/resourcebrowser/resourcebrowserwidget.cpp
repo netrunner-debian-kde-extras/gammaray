@@ -32,7 +32,8 @@
 #include "resourcebrowserclient.h"
 #include "clientresourcemodel.h"
 
-#include <deferredtreeviewconfiguration.h>
+#include <ui/deferredtreeviewconfiguration.h>
+#include <ui/searchlinecontroller.h>
 #include <3rdparty/qt/resourcemodel.h>
 #include <common/objectbroker.h>
 
@@ -64,11 +65,12 @@ ResourceBrowserWidget::ResourceBrowserWidget(QWidget *parent)
   connect(m_interface, SIGNAL(resourceDownloaded(QString,QByteArray)), this, SLOT(resourceDownloaded(QString,QByteArray)));
 
   ui->setupUi(this);
+  auto resModel = ObjectBroker::model(QStringLiteral("com.kdab.GammaRay.ResourceModel"));
   ClientResourceModel* model = new ClientResourceModel(this);
-  model->setSourceModel(ObjectBroker::model("com.kdab.GammaRay.ResourceModel"));
+  model->setSourceModel(resModel);
   ui->treeView->setModel(model);
   ui->treeView->setSelectionModel(ObjectBroker::selectionModel(ui->treeView->model()));
-  ui->searchLine->setProxy(model);
+  new SearchLineController(ui->searchLine, resModel);
 
   DeferredTreeViewConfiguration *config = new DeferredTreeViewConfiguration(ui->treeView);
   config->hideColumn(3);
@@ -203,7 +205,7 @@ void ResourceBrowserWidget::handleCustomContextMenu(const QPoint &pos)
     return;
 
   QMenu menu;
-  menu.addAction(tr("Save As..."));
+  menu.addAction(style()->standardIcon(QStyle::SP_DialogSaveButton), tr("Save As..."));
   if (!menu.exec(ui->treeView->mapToGlobal(pos)))
     return;
 
@@ -217,7 +219,7 @@ void ResourceBrowserWidget::handleCustomContextMenu(const QPoint &pos)
         continue;
 
       QDir dir(targetDirectory + '/' + directoryPath);
-      dir.mkpath(".");
+      dir.mkpath(QStringLiteral("."));
     }
 
     // request all resource files

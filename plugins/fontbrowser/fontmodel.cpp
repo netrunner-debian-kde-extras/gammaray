@@ -35,7 +35,7 @@
 using namespace GammaRay;
 
 FontModel::FontModel(QObject *parent)
-  : QAbstractItemModel(parent)
+  : QAbstractTableModel(parent)
   , m_size(12)
   , m_bold(false)
   , m_italic(false)
@@ -43,13 +43,25 @@ FontModel::FontModel(QObject *parent)
 {
 }
 
-QList<QFont> FontModel::currentFonts() const
+QVector<QFont> FontModel::currentFonts() const
 {
   return m_fonts;
 }
 
-void FontModel::updateFonts(const QList<QFont> &fonts)
+void FontModel::updateFonts(const QVector<QFont> &fonts)
 {
+  if (!m_fonts.isEmpty()) {
+    beginRemoveRows(QModelIndex(), 0, m_fonts.size() - 1);
+    m_fonts.clear();
+    endRemoveRows();
+  }
+
+  if (fonts.isEmpty())
+    return;
+
+  beginInsertRows(QModelIndex(), 0, fonts.size() - 1);
+  m_fonts = fonts;
+
   for (int i = 0; i < m_fonts.size(); ++i) {
     QFont &font = m_fonts[i];
     font.setPointSize(m_size);
@@ -58,9 +70,7 @@ void FontModel::updateFonts(const QList<QFont> &fonts)
     font.setUnderline(m_underline);
   }
 
-  beginResetModel();
-  m_fonts = fonts;
-  endResetModel();
+  endInsertRows();
 }
 
 void FontModel::updateText(const QString &text)
@@ -68,9 +78,8 @@ void FontModel::updateText(const QString &text)
   if (text == m_text) {
     return;
   }
-  beginResetModel();
   m_text = text;
-  endResetModel();
+  fontDataChanged();
 }
 
 QVariant FontModel::headerData(int section, Qt::Orientation orientation, int role) const
@@ -84,7 +93,7 @@ QVariant FontModel::headerData(int section, Qt::Orientation orientation, int rol
       return "Text Preview";
     }
   }
-  return QAbstractItemModel::headerData(section, orientation, role);
+  return QAbstractTableModel::headerData(section, orientation, role);
 }
 
 int FontModel::rowCount(const QModelIndex &parent) const
@@ -93,23 +102,6 @@ int FontModel::rowCount(const QModelIndex &parent) const
     return 0;
   }
   return m_fonts.size();
-}
-
-QModelIndex FontModel::index(int row, int column, const QModelIndex &parent) const
-{
-  if (parent.isValid()) {
-    return QModelIndex();
-  }
-  if (!hasIndex(row, column, parent)) {
-    return QModelIndex();
-  }
-  return createIndex(row, column);
-}
-
-QModelIndex FontModel::parent(const QModelIndex &child) const
-{
-  Q_UNUSED(child);
-  return QModelIndex();
 }
 
 int FontModel::columnCount(const QModelIndex &parent) const
@@ -126,11 +118,7 @@ QVariant FontModel::data(const QModelIndex &index, int role) const
     }
   } else if (index.column() == 1) {
     if (role == Qt::DisplayRole) {
-#if QT_VERSION >= 0x040800
       return m_fonts.at(index.row()).styleName();
-#else
-      return tr("N/A");
-#endif
     }
   } else if (index.column() == 2) {
     if (role == Qt::DecorationRole || role == Qt::SizeHintRole) {

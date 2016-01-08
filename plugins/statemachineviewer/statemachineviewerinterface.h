@@ -30,6 +30,7 @@
 #include <QObject>
 #include <QMetaType>
 #include <QDataStream>
+#include <QVector>
 
 class QAbstractState;
 class QAbstractTransition;
@@ -41,9 +42,6 @@ namespace GammaRay {
 // to the meta type system)...
 struct TransitionId
 {
-  TransitionId(const TransitionId &id)
-  : id(id.id)
-  {}
   explicit TransitionId(QAbstractTransition *transition = 0)
   : id(reinterpret_cast<quint64>(transition))
   {}
@@ -68,9 +66,6 @@ inline QDataStream &operator>>(QDataStream &in, TransitionId &value)
 
 struct StateId
 {
-  StateId(const StateId &id)
-  : id(id.id)
-  {}
   explicit StateId(QAbstractState *state= 0)
   : id(reinterpret_cast<quint64>(state))
   {}
@@ -115,7 +110,7 @@ inline QDataStream &operator>>(QDataStream &in, StateType &value)
   return in;
 }
 
-typedef QList<StateId> StateMachineConfiguration;
+typedef QVector<StateId> StateMachineConfiguration;
 
 class StateMachineViewerInterface : public QObject
 {
@@ -125,6 +120,7 @@ class StateMachineViewerInterface : public QObject
     virtual ~StateMachineViewerInterface();
 
   public slots:
+    virtual void selectStateMachine(int index) = 0;
     virtual void toggleRunning() = 0;
     virtual void setMaximumDepth(int depth) = 0;
 
@@ -149,6 +145,7 @@ class StateMachineViewerInterface : public QObject
 }
 
 Q_DECLARE_METATYPE(GammaRay::StateId)
+Q_DECLARE_TYPEINFO(GammaRay::StateId, Q_PRIMITIVE_TYPE);
 Q_DECLARE_METATYPE(GammaRay::TransitionId)
 Q_DECLARE_METATYPE(GammaRay::StateMachineConfiguration)
 Q_DECLARE_METATYPE(GammaRay::StateType)

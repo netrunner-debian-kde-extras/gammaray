@@ -32,6 +32,7 @@
 #include "backtrace.h"
 
 #include <core/probeguard.h>
+#include <core/remote/serverproxymodel.h>
 
 #include "common/objectbroker.h"
 #include "common/endpoint.h"
@@ -39,9 +40,10 @@
 #include <QCoreApplication>
 #include <QDebug>
 #include <QMutex>
+#include <QSortFilterProxyModel>
 #include <QThread>
 
-static QTextStream cerr(stdout);
+#include <iostream>
 
 using namespace GammaRay;
 
@@ -75,6 +77,12 @@ static void handleMessage(QtMsgType type, const QMessageLogContext &context, con
   message.type = type;
   message.message = msg;
   message.time = QTime::currentTime();
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+  message.category = context.category;
+  message.file = context.file;
+  message.function = context.function;
+  message.line = context.line;
+#endif
 
   if (type == QtCriticalMsg || type == QtFatalMsg || (type == QtWarningMsg && !ProbeGuard::insideProbe())) {
     message.backtrace = getBacktrace(50);
@@ -95,14 +103,14 @@ static void handleMessage(QtMsgType type, const QMessageLogContext &context, con
 
   if (!message.backtrace.isEmpty() && (qgetenv("GAMMARAY_UNITTEST") == "1" || type == QtFatalMsg)) {
     if (type == QtFatalMsg) {
-      cerr << "QFatal in " << qPrintable(qApp->applicationName()) << " (" << qPrintable(qApp->applicationFilePath()) << ')' << endl;
+      std::cerr << "QFatal in " << qPrintable(qApp->applicationName()) << " (" << qPrintable(qApp->applicationFilePath()) << ')' << std::endl;
     }
-    cerr << "START BACKTRACE:" << endl;
+    std::cerr << "START BACKTRACE:" << std::endl;
     int i = 0;
     foreach (const QString &frame, message.backtrace) {
-      cerr << (++i) << "\t" << frame << endl;
+      std::cerr << (++i) << "\t" << qPrintable(frame) << std::endl;
     }
-    cerr << "END BACKTRACE" << endl;
+    std::cerr << "END BACKTRACE" << std::endl;
   }
 
   if (type == QtFatalMsg && qgetenv("GAMMARAY_GDB") != "1" && qgetenv("GAMMARAY_UNITTEST") != "1") {
@@ -150,7 +158,13 @@ MessageHandler::MessageHandler(ProbeInterface *probe, QObject *parent)
   Q_ASSERT(s_model == 0);
   s_model = m_messageModel;
 
-  probe->registerModel("com.kdab.GammaRay.MessageModel", m_messageModel);
+  auto proxy = new ServerProxyModel<QSortFilterProxyModel>(this);
+  proxy->addRole(MessageModelRole::Type);
+  proxy->addRole(MessageModelRole::Line);
+  proxy->addRole(MessageModelRole::Backtrace);
+  proxy->setSourceModel(m_messageModel);
+  proxy->setSortRole(MessageModelRole::Sort);
+  probe->registerModel(QStringLiteral("com.kdab.GammaRay.MessageModel"), proxy);
 
   // install handler directly, catches most cases,
   // i.e. user has no special handler or the handler
@@ -204,3 +218,7 @@ MessageHandlerFactory::MessageHandlerFactory(QObject* parent): QObject(parent)
 {
 }
 
+QString MessageHandlerFactory::name() const
+{
+  return tr("Messages");
+}

@@ -28,8 +28,8 @@
 
 #include <config-gammaray.h>
 
-#include "common/probeabi.h"
-#include "common/probeabidetector.h"
+#include <launcher/probeabi.h>
+#include <launcher/probeabidetector.h>
 
 #include <QtTest/qtest.h>
 #include <QObject>
@@ -43,15 +43,17 @@ private slots:
   void testDetectExecutable()
   {
     ProbeABIDetector detector;
+    QVERIFY(!detector.qtCoreForExecutable(QCoreApplication::applicationFilePath()).isEmpty());
     const ProbeABI abi = detector.abiForExecutable(QCoreApplication::applicationFilePath());
-    QCOMPARE(abi.id(), QString(GAMMARAY_PROBE_ABI));
+    QCOMPARE(abi.id(), QStringLiteral(GAMMARAY_PROBE_ABI));
   }
 
   void testDetectProcess()
   {
     ProbeABIDetector detector;
+    QVERIFY(!detector.qtCoreForProcess(QCoreApplication::applicationPid()).isEmpty());
     const ProbeABI abi = detector.abiForProcess(QCoreApplication::applicationPid());
-    QCOMPARE(abi.id(), QString(GAMMARAY_PROBE_ABI));
+    QCOMPARE(abi.id(), QStringLiteral(GAMMARAY_PROBE_ABI));
   }
 
   void testContainsQtCore_data()
@@ -75,6 +77,7 @@ private slots:
     QTest::newRow("mac5") << "/path/to/QtCore.dylib" << true;
     QTest::newRow("mac debug1") << "QtCore_debug" << true;
     QTest::newRow("mac debug2") << "QtCore_debug.dylib" << true;
+    QTest::newRow("mac qt55 framework") << "QtCore.framework/Versions/5/QtCore" << true;
 
     QTest::newRow("win1") << "QtCore.dll" << true;
     QTest::newRow("win2") << "Qt5Core.dll" << true;

@@ -29,21 +29,28 @@
 #ifndef GAMMARAY_LAUNCHOPTIONS_H
 #define GAMMARAY_LAUNCHOPTIONS_H
 
-#include <common/probeabi.h>
+#include "gammaray_launcher_export.h"
 
 #include <QHash>
-#include <QStringList>
+#include <QSharedDataPointer>
 
+class QStringList;
 class QVariant;
+class QProcessEnvironment;
 
 namespace GammaRay {
 
-/** Describes the injection and probe options used for launching/attacing to a host process. */
-class LaunchOptions
+class ProbeABI;
+class LaunchOptionsPrivate;
+
+/** @brief Describes the injection and probe options used for launching/attacing to a host process. */
+class GAMMARAY_LAUNCHER_EXPORT LaunchOptions
 {
 public:
   LaunchOptions();
+  LaunchOptions(const LaunchOptions &other);
   ~LaunchOptions();
+  LaunchOptions &operator=(const LaunchOptions &other);
 
   enum UiMode {
     InProcessUi,
@@ -88,16 +95,27 @@ public:
   ProbeABI probeABI() const;
   void setProbeABI(const ProbeABI &abi);
 
+  /** Full path to the probe being used. This overrides specifying a probe ABI and
+   *  can be useful on non-standard installation layouts of the probes.
+   */
+  void setProbePath(const QString &path);
+  QString probePath() const;
+
+  /** Full path to root gammarary path. This overrides specifying a probe ABI and
+   *  can be useful on non-standard installation layouts of the probes.
+   */
+  void setRootPath(const QString &path);
+  QString rootPath() const;
+
+  /** Process environment for the launched target. By default the environment of the launcher process is used. */
+  void setProcessEnvironment(const QProcessEnvironment &env);
+  QProcessEnvironment processEnvironment() const;
+
   /** execute this launch options with the given command-line launcher. */
   bool execute(const QString& launcherPath) const;
 
 private:
-  QStringList m_launchArguments;
-  QString m_injectorType;
-  ProbeABI m_probeABI;
-  int m_pid;
-  UiMode m_uiMode;
-  QHash<QByteArray, QByteArray> m_probeSettings;
+  QSharedDataPointer<LaunchOptionsPrivate> d;
 };
 }
 

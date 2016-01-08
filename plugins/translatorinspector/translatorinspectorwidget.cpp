@@ -31,6 +31,7 @@
 
 #include <QSortFilterProxyModel>
 
+#include <ui/searchlinecontroller.h>
 #include <common/objectbroker.h>
 #include <common/endpoint.h>
 
@@ -53,22 +54,21 @@ TranslatorInspectorWidget::TranslatorInspectorWidget(QWidget *parent) :
   QWidget(parent), ui(new Ui::TranslatorInspectorWidget)
 {
   ui->setupUi(this);
-  QAbstractItemModel *translators = ObjectBroker::model("com.kdab.GammaRay.TranslatorsModel");
+  QAbstractItemModel *translators = ObjectBroker::model(QStringLiteral("com.kdab.GammaRay.TranslatorsModel"));
   ui->translatorList->setModel(translators);
   ui->translatorList->setSelectionModel(ObjectBroker::selectionModel(translators));
 
-  m_inspector = ObjectBroker::object<TranslatorInspectorInterface *>("com.kdab.GammaRay.TranslatorInspector");
+  m_inspector = ObjectBroker::object<TranslatorInspectorInterface *>(QStringLiteral("com.kdab.GammaRay.TranslatorInspector"));
 
   connect(ui->languageChangeButton, SIGNAL(clicked()), m_inspector, SLOT(sendLanguageChangeEvent()));
   connect(ui->resetTranslationsButton, SIGNAL(clicked()), m_inspector, SLOT(resetTranslations()));
 
   // searching for translations
   {
-    QSortFilterProxyModel *translationsFilter = new QSortFilterProxyModel(this);
-    translationsFilter->setSourceModel(ObjectBroker::model("com.kdab.GammaRay.TranslationsModel"));
-    ui->translationsView->setModel(translationsFilter);
-    ui->translationsSearchLine->setProxy(translationsFilter);
-    ui->translationsView->setSelectionModel(ObjectBroker::selectionModel(translationsFilter));
+    auto translationsModel = ObjectBroker::model(QStringLiteral("com.kdab.GammaRay.TranslationsModel"));
+    ui->translationsView->setModel(translationsModel);
+    new SearchLineController(ui->translationsSearchLine, translationsModel);
+    ui->translationsView->setSelectionModel(ObjectBroker::selectionModel(translationsModel));
   }
 }
 TranslatorInspectorWidget::~TranslatorInspectorWidget()

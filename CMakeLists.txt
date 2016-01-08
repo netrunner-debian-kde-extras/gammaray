@@ -15,9 +15,13 @@
 #  Build only an additional probe configuration for an already existing launcher.
 #  Default=false
 #
-# -DGAMMARAY_UNKNOWN_CXX_MANGLED_NAMES=[true|false]
-#  Enable if your compiler uses an unsupported C++ name mangling scheme.
+# -DGAMMARAY_INSTALL_QT_LAYOUT=[true|false]
+#  Install GammaRay in Qt folder using Qt layout folders:
+#    - plugins will go in <qt_folder>/plugins/gammaray
+#    - all the other libs, including probe library will go in <qt_folder>/lib
+#    - qmake mkspecs file
 #  Default=false
+#  Only use for Android or when you know what you are doing.
 #
 # To build the man page from POD, run 'make man' after CMake (assumes perl is available)
 # To install the resulting man page, run 'make install'
@@ -37,16 +41,22 @@ endif()
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/ ${CMAKE_MODULE_PATH})
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
-set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
-set(CMAKE_MACOSX_RPATH TRUE)
+if(NOT DEFINED CMAKE_INSTALL_RPATH_USE_LINK_PATH)
+  set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+endif()
+if(NOT DEFINED CMAKE_MACOSX_RPATH)
+  set(CMAKE_MACOSX_RPATH TRUE)
+endif()
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
 endif()
 
 include(CheckCXXCompilerFlag)
+include(CheckCXXSymbolExists)
 include(CheckIncludeFiles)
 include(CheckLibraryExists)
+include(CheckSymbolExists)
 include(GammaRayMacros)
 include(GammaRayMacrosInternal)
 include(FeatureSummary)
@@ -61,7 +71,7 @@ if(MSVC)
     set(BAD_CXX_MESSAGE "MSVC 2008 or higher")
   endif()
 endif()
-if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+if(${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
   if(${CMAKE_CXX_COMPILER_VERSION} VERSION_LESS 3.1.0)
     set(BAD_CXX_MESSAGE "Clang v3.1.0 or higher")
   endif()
@@ -75,12 +85,12 @@ enable_testing()
 
 # Version setup
 set(GAMMARAY_VERSION_MAJOR "2")
-set(GAMMARAY_VERSION_MINOR "3")
+set(GAMMARAY_VERSION_MINOR "4")
 set(GAMMARAY_VERSION_PATCH "0")
 set(GAMMARAY_VERSION "${GAMMARAY_VERSION_MAJOR}.${GAMMARAY_VERSION_MINOR}.${GAMMARAY_VERSION_PATCH}")
 set(GAMMARAY_VERSION_STRING "${GAMMARAY_VERSION}")
-set(GAMMARAY_SOVERSION "2.3.0")
-set(GAMMARAY_PLUGIN_VERSION "2.3")
+set(GAMMARAY_SOVERSION "2.4.0")
+set(GAMMARAY_PLUGIN_VERSION "2.4")
 set(PROJECT_VERSION_STRING "${GAMMARAY_VERSION_STRING}")
 if(ANDROID)
   # non-rooted Android doesn't like .so versions...
@@ -131,18 +141,13 @@ option(
   OFF
 )
 
-# TODO: find a nicer way for all this. ideally auto-detect the name mangling
-# format, but at least guess a default based on OS + compiler.
-option(
-  GAMMARAY_UNKNOWN_CXX_MANGLED_NAMES
-  "Enable if your compiler uses an unsupported C++ name mangling scheme"
-  OFF
-)
+option(GAMMARAY_ENABLE_GPL_ONLY_FEATURES "Enable features only available under GPL license." OFF)
+
 
 #
 # Compiler & linker settings
 #
-if(CMAKE_COMPILER_IS_GNUCXX OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+if(CMAKE_COMPILER_IS_GNUCXX OR ${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
   check_cxx_compiler_flag(-Wunused-but-set-variable HAVE_GXX_UNUSED_BUT_SET)
   check_cxx_compiler_flag(-Wlogical-op HAVE_GXX_LOGICAL_OP)
   check_cxx_compiler_flag(-Wsizeof-pointer-memaccess HAVE_GXX_POINTER_MEMACCESS)
@@ -180,15 +185,15 @@ if(CMAKE_COMPILER_IS_GNUCXX OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility=hidden")
   endif()
 endif()
-if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+if(${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Qunused-arguments")
 endif()
-if("${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")
+if(${CMAKE_C_COMPILER_ID} STREQUAL "Clang")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Qunused-arguments")
 endif()
 
 if(WIN32)
-  add_definitions(-DUNICODE -D_UNICODE)
+  add_definitions(-DUNICODE -D_UNICODE -D_USING_V110_SDK71_=1)
 endif()
 if(QNXNTO)
   add_definitions(-D_QNX_SOURCE)
@@ -220,6 +225,7 @@ if(Qt5Core_FOUND)
     Bluetooth
     Concurrent
     Designer
+    Positioning
     PrintSupport
     Qml
     Quick
@@ -267,7 +273,7 @@ if(Qt5Core_FOUND)
   # TODO: Remove me once fixed in ECM module
   # more hacks: find qpa/... includes
   # also see https://codereview.qt-project.org/#change,30483
-  include_directories(${Qt5Gui_PRIVATE_INCLUDE_DIRS})
+  include_directories(SYSTEM ${Qt5Gui_PRIVATE_INCLUDE_DIRS})
 
   # TODO warnings rather than build errors for the deprecated methods would be nice...
   add_definitions(-DQT_DISABLE_DEPRECATED_BEFORE=0)
@@ -288,6 +294,13 @@ if(Qt5Core_FOUND)
   set_package_properties(Qt5Svg PROPERTIES TYPE OPTIONAL PURPOSE "Required for widget SVG export.")
   set_package_properties(Qt5PrintSupport PROPERTIES TYPE OPTIONAL PURPOSE "Required for widget PDF export.")
   add_feature_info("QPainter analyzer" HAVE_PRIVATE_QT_HEADERS "Requires private Qt headers to be available.")
+
+  # debug suffixes for qmake compatibility (Qt5 only, otherwise we break .desktop-based plugin loading)
+  if(WIN32)
+    set(CMAKE_DEBUG_POSTFIX "d")
+  elseif(APPLE)
+    set(CMAKE_DEBUG_POSTFIX "_debug")
+  endif()
 
 # Qt4
 else()
@@ -314,7 +327,7 @@ else()
 
   if(QT_PRIVATE_INCLUDE_DIR AND HARFBUZZ_INCLUDE_DIR)
     set(HAVE_PRIVATE_QT_HEADERS TRUE)
-    include_directories(${HARFBUZZ_INCLUDE_DIR})
+    include_directories(SYSTEM ${HARFBUZZ_INCLUDE_DIR})
   else()
     set(HAVE_PRIVATE_QT_HEADERS FALSE)
     # needs to go before Qt includes, in case we have non-working headers with the same name there
@@ -326,11 +339,18 @@ else()
     "You must have a build version of Qt available. Make sure the qmake found first in your execute comes from this build version."
   )
 
-  # C++11 compatibility with Qt5
-  add_definitions(-DQ_DECL_OVERRIDE=)
+  # C++11/Qt5 compatibility
+  if(MSVC)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /FI\"${CMAKE_SOURCE_DIR}\\compat\\qt4compat.h\"")
+  else()
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -include \"${CMAKE_SOURCE_DIR}/compat/qt4compat.h\"")
+  endif()
+
+  # Qt4 moc limitation workaround (Qt4 moc cannot evaluate QT_VERSION preprocessor conditionals
+  add_definitions(-DQT4_MOC_WORKAROUND)
 endif()
 
-add_definitions(-DQT_USE_FAST_CONCATENATION -DQT_USE_FAST_OPERATOR_PLUS)
+add_definitions(-DQT_USE_FAST_CONCATENATION -DQT_USE_FAST_OPERATOR_PLUS -DQT_NO_CAST_TO_ASCII -DQT_NO_URL_CAST_FROM_STRING)
 # disable QT_STRICT_ITERATORS on the Qt5+Windows combo
 # see: https://bugreports.qt-project.org/browse/QTBUG-29608
 if(NOT (Qt5Core_FOUND AND WIN32))
@@ -369,34 +389,16 @@ else()
 endif()
 
 check_include_files(stdint.h HAVE_STDINT_H)
-
-#VTK discovery works a lot better if you give CMake a hint using the VTK_DIR variable
-find_path(VTK_DIR VTKConfig.cmake
-  /usr/lib64/vtk /usr/lib/vtk /usr/local/lib64/vtk /usr/local/lib/vtk
-)
-find_package(VTK)
-set_package_properties(VTK PROPERTIES
-  TYPE OPTIONAL
-  DESCRIPTION "Visualization Toolkit"
-  PURPOSE "Needed for the object visualizer plugin."
-  URL "http://www.vtk.org"
-)
-if(VTK_FOUND)
-  find_path(VTK_QT_INCLUDE_DIR NAMES QVTKWidget.h HINTS ${VTK_INCLUDE_DIRS})
-  if(NOT VTK_QT_INCLUDE_DIR)
-    message(STATUS "Cannot locate QVTKWidget.h in ${VTK_INCLUDE_DIRS}")
-    set(VTK_FOUND FALSE)
-    add_feature_info("QVTKWidget header" VTK_FOUND "Object visualizer plugin requires QVTKWidget.h header.")
-  endif()
-endif()
-set(HAVE_VTK ${VTK_FOUND})
+check_symbol_exists(backtrace execinfo.h HAVE_BACKTRACE)
+check_cxx_symbol_exists(abi::__cxa_demangle cxxabi.h HAVE_CXA_DEMANGLE)
 
 # ELF header for ABI detection
-find_file(ELF_H elf.h PATH_SUFFIXES sys)
-if(ELF_H)
-  set(HAVE_ELF_H TRUE)
+find_file(HAVE_ELF_H elf.h)
+find_file(HAVE_SYS_ELF_H sys/elf.h)
+if(HAVE_ELF_H OR HAVE_SYS_ELF_H)
+  set(HAVE_ELF TRUE)
 endif()
-add_feature_info("ELF ABI detection" HAVE_ELF_H "Automatic probe ABI detection on ELF-based systems. Requires elf.h.")
+add_feature_info("ELF ABI detection" HAVE_ELF "Automatic probe ABI detection on ELF-based systems. Requires elf.h.")
 
 #
 # Determine probe ABI
@@ -406,6 +408,9 @@ include(GammaRayProbeABI)
 #
 # Installation settings
 #
+if(ANDROID)
+  set(GAMMARAY_INSTALL_QT_LAYOUT ON)
+endif()
 if(APPLE)
   # Make sure default prefix on mac is /Applications, dunnow why but it does not default to it
   # probably because we do not enabled built in bundle support in the main project
@@ -447,22 +452,33 @@ else()
   endif()
 endif()
 
-if(ANDROID)
+if(GAMMARAY_INSTALL_QT_LAYOUT)
+  set(PROBE_INSTALL_DIR ${LIB_INSTALL_DIR})
   # Android doesn't support sub-directories in lib/
-  set(PROBE_PLUGIN_INSTALL_DIR "plugins/gammaray")
+  if (ANDROID)
+    set(PROBE_PLUGIN_INSTALL_DIR "lib")
+  else()
+    set(PROBE_PLUGIN_INSTALL_DIR "plugins/gammaray")
+  endif()
+  set(PLUGIN_INSTALL_DIR ${PROBE_PLUGIN_INSTALL_DIR})
+  set(PROBE_NAME "libgammaray_probe")
 else()
-  set(PROBE_PLUGIN_INSTALL_DIR "${PLUGIN_INSTALL_DIR}/${GAMMARAY_PLUGIN_VERSION}/${GAMMARAY_PROBE_ABI}")
+  set(PROBE_INSTALL_DIR "${PLUGIN_INSTALL_DIR}/${GAMMARAY_PLUGIN_VERSION}/${GAMMARAY_PROBE_ABI}")
+  set(PROBE_PLUGIN_INSTALL_DIR ${PROBE_INSTALL_DIR})
+  set(PROBE_NAME "gammaray_probe")
 endif()
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/${BIN_INSTALL_DIR})
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/${LIB_INSTALL_DIR})
 
-# set RPATH only when installing to a non-default location
-list(FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/${LIB_INSTALL_DIR}" _isSystemPlatformLibDir)
-list(FIND CMAKE_C_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/${LIB_INSTALL_DIR}" _isSystemCLibDir)
-list(FIND CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/${LIB_INSTALL_DIR}" _isSystemCxxLibDir)
-if(${_isSystemPlatformLibDir} EQUAL -1 AND ${_isSystemCLibDir} EQUAL -1 AND ${_isSystemCxxLibDir} EQUAL -1)
-  set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${LIB_INSTALL_DIR}")
+# set RPATH only when installing to a non-default location and not set in cache
+if(NOT CMAKE_INSTALL_RPATH)
+  list(FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/${LIB_INSTALL_DIR}" _isSystemPlatformLibDir)
+  list(FIND CMAKE_C_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/${LIB_INSTALL_DIR}" _isSystemCLibDir)
+  list(FIND CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/${LIB_INSTALL_DIR}" _isSystemCxxLibDir)
+  if(${_isSystemPlatformLibDir} EQUAL -1 AND ${_isSystemCLibDir} EQUAL -1 AND ${_isSystemCxxLibDir} EQUAL -1)
+    set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${LIB_INSTALL_DIR}")
+  endif()
 endif()
 
 set(
@@ -475,8 +491,9 @@ set(
 
 # "inverse" install dirs, to find the base location again
 gammaray_inverse_dir(GAMMARAY_INVERSE_BIN_DIR "${BIN_INSTALL_DIR}")
-gammaray_inverse_dir(GAMMARAY_INVERSE_PROBE_DIR "${PROBE_PLUGIN_INSTALL_DIR}")
+gammaray_inverse_dir(GAMMARAY_INVERSE_PROBE_DIR "${PROBE_INSTALL_DIR}")
 gammaray_inverse_dir(GAMMARAY_INVERSE_LIBEXEC_DIR "${LIBEXEC_INSTALL_DIR}")
+
 
 #
 # actually build the stuff
@@ -492,9 +509,10 @@ include_directories(
 )
 
 add_subdirectory(cmake)
+add_subdirectory(3rdparty/kde)
 add_subdirectory(common)
 add_subdirectory(core)
-add_subdirectory(hooking)
+add_subdirectory(probe)
 add_subdirectory(launcher)
 if(GAMMARAY_BUILD_UI AND (Qt5Widgets_FOUND OR QT_QTGUI_FOUND))
   add_subdirectory(ui)

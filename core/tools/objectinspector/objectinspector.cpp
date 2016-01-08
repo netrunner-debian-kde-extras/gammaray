@@ -38,6 +38,8 @@
 #include <common/objectbroker.h>
 #include <common/objectmodel.h>
 
+#include <3rdparty/kde/krecursivefilterproxymodel.h>
+
 #include <QCoreApplication>
 #include <QItemSelectionModel>
 
@@ -48,9 +50,13 @@ ObjectInspector::ObjectInspector(ProbeInterface *probe, QObject *parent)
 {
   registerPCExtensions();
 
-  m_propertyController = new PropertyController("com.kdab.GammaRay.ObjectInspector", this);
+  m_propertyController = new PropertyController(QStringLiteral("com.kdab.GammaRay.ObjectInspector"), this);
 
-  m_selectionModel = ObjectBroker::selectionModel(ObjectBroker::model("com.kdab.GammaRay.ObjectTree"));
+  auto proxy = new KRecursiveFilterProxyModel(this);
+  proxy->setSourceModel(probe->objectTreeModel());
+  probe->registerModel(QStringLiteral("com.kdab.GammaRay.ObjectInspectorTree"), proxy);
+
+  m_selectionModel = ObjectBroker::selectionModel(proxy);
 
   connect(m_selectionModel,
           SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
@@ -122,4 +128,9 @@ void ObjectInspector::registerPCExtensions()
   PropertyController::registerExtension<EnumsExtension>();
   PropertyController::registerExtension<PropertiesExtension>();
   PropertyController::registerExtension<ConnectionsExtension>();
+}
+
+QString ObjectInspectorFactory::name() const
+{
+  return tr("Objects");
 }

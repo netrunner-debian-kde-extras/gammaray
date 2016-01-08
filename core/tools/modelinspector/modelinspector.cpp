@@ -39,39 +39,49 @@
 #include "remote/remotemodelserver.h"
 #include "remote/selectionmodelserver.h"
 
+#include <3rdparty/kde/krecursivefilterproxymodel.h>
 #include <QDebug>
 
 using namespace GammaRay;
 
 ModelInspector::ModelInspector(ProbeInterface* probe, QObject *parent) :
   ModelInspectorInterface(parent),
+  m_probe(probe),
   m_modelModel(0),
   m_modelContentServer(0),
   m_modelContentSelectionModel(0),
   m_safetyFilterProxyModel(0),
   m_modelTester(0)
 {
-  m_modelModel = new ModelModel(this);
+  auto modelModelSource = new ModelModel(this);
   connect(probe->probe(), SIGNAL(objectCreated(QObject*)),
-          m_modelModel, SLOT(objectAdded(QObject*)));
+          modelModelSource, SLOT(objectAdded(QObject*)));
   connect(probe->probe(), SIGNAL(objectDestroyed(QObject*)),
-          m_modelModel, SLOT(objectRemoved(QObject*)));
-  probe->registerModel("com.kdab.GammaRay.ModelModel", m_modelModel);
+          modelModelSource, SLOT(objectRemoved(QObject*)));
+
+  auto modelModelProxy = new KRecursiveFilterProxyModel(this);
+  modelModelProxy->setSourceModel(modelModelSource);
+  m_modelModel = modelModelProxy;
+  probe->registerModel(QStringLiteral("com.kdab.GammaRay.ModelModel"), m_modelModel);
 
   m_modelSelectionModel = ObjectBroker::selectionModel(m_modelModel);
   connect(m_modelSelectionModel, SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
           SLOT(modelSelected(QItemSelection)));
   connect(probe->probe(), SIGNAL(objectSelected(QObject*,QPoint)), SLOT(objectSelected(QObject*)) );
 
-  m_modelContentServer = new RemoteModelServer("com.kdab.GammaRay.ModelContent", this);
+  m_modelContentServer = new RemoteModelServer(QStringLiteral("com.kdab.GammaRay.ModelContent"), this);
 
   m_cellModel = new ModelCellModel(this);
-  probe->registerModel("com.kdab.GammaRay.ModelCellModel", m_cellModel);
+  probe->registerModel(QStringLiteral("com.kdab.GammaRay.ModelCellModel"), m_cellModel);
   selectionChanged(QItemSelection());
 
   m_modelTester = new ModelTester(this);
   connect(probe->probe(), SIGNAL(objectCreated(QObject*)),
           m_modelTester, SLOT(objectAdded(QObject*)));
+
+  if (!m_probe->hasReliableObjectTracking()) {
+    connect(m_probe->probe(), SIGNAL(objectCreated(QObject*)), SLOT(objectCreated(QObject*)));
+  }
 }
 
 QString ModelInspectorFactory::name() const
@@ -103,7 +113,7 @@ void ModelInspector::modelSelected(const QItemSelection& selected)
       m_modelContentServer->setModel(model);
     }
 
-    m_modelContentSelectionModel = new SelectionModelServer("com.kdab.GammaRay.ModelContent.selection", m_modelContentServer->model(), this);
+    m_modelContentSelectionModel = new SelectionModelServer(QStringLiteral("com.kdab.GammaRay.ModelContent.selection"), m_modelContentServer->model(), this);
     ObjectBroker::registerSelectionModel(m_modelContentSelectionModel);
     connect(m_modelContentSelectionModel,
             SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
@@ -145,3 +155,11 @@ void ModelInspector::selectionChanged(const QItemSelection& selected)
   emit cellSelected(index.row(), index.column(), QString::number(index.internalId()), Util::addressToString(index.internalPointer()));
 }
 
+void ModelInspector::objectCreated(QObject* object)
+{
+  if (!object)
+    return;
+
+  if (auto proxy = qobject_cast<QAbstractProxyModel*>(object))
+    m_probe->discoverObject(proxy->sourceModel());
+}

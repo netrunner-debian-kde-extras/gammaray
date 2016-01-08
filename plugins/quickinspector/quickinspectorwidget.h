@@ -37,15 +37,13 @@
 #include <QWidget>
 #include <QVariant>
 
-class QQuickItem;
-class QQuickView;
 class QTimer;
 class QLabel;
 class QImage;
 class QItemSelection;
 
 namespace GammaRay {
-class QuickSceneImageProvider;
+class QuickScenePreviewWidget;
 
 namespace Ui {
   class QuickInspectorWidget;
@@ -54,6 +52,11 @@ namespace Ui {
 class QuickInspectorWidget : public QWidget
 {
   Q_OBJECT
+
+  enum Action {
+      NavigateToCode
+  };
+
   public:
     explicit QuickInspectorWidget(QWidget *parent = 0);
     ~QuickInspectorWidget();
@@ -64,22 +67,21 @@ class QuickInspectorWidget : public QWidget
 
   private slots:
     void sceneChanged();
-    void sceneRendered(const QVariantMap &previewData);
+    void sceneRendered (const GammaRay::TransferImage &image, const GammaRay::QuickItemGeometry &itemGeometry);
     void itemSelectionChanged(const QItemSelection &selection);
     void requestRender();
     void setFeatures(GammaRay::QuickInspectorInterface::Features features);
     void setSplitterSizes();
-    void itemModelDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight);
+    void itemModelDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight, const QVector<int> &roles);
+    void itemContextMenu(const QPoint &pos);
 
   private:
     QScopedPointer<Ui::QuickInspectorWidget> ui;
+    QuickScenePreviewWidget *m_previewWidget;
     QuickInspectorInterface *m_interface;
     QTimer *m_renderTimer;
     bool m_sceneChangedSinceLastRequest;
     bool m_waitingForImage;
-    QuickSceneImageProvider *m_imageProvider;
-    QQuickItem *m_rootItem;
-    QQuickView *m_preview;
 };
 
 class QuickInspectorUiFactory : public QObject, public StandardToolUiFactory<QuickInspectorWidget>

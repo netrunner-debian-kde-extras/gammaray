@@ -29,25 +29,89 @@
 #ifndef GAMMARAY_SERVERPROXYMODEL_H
 #define GAMMARAY_SERVERPROXYMODEL_H
 
+#include <common/modelevent.h>
+
+#include <QCoreApplication>
 #include <QSortFilterProxyModel>
 #include <QVector>
 
 namespace GammaRay {
 
-/** Sort/filter proxy model for server-side use to pass through extra roles in itemData(). */
-class ServerProxyModel : public QSortFilterProxyModel
+/** Sort/filter proxy model for server-side use to pass through extra roles in itemData().
+ *  Every remoted proxy model should be wrapped into this template, unless you already have
+ *  a special implementation for itemData() handling this.
+ */
+template <typename BaseProxy> class ServerProxyModel : public BaseProxy
 {
-    Q_OBJECT
 public:
-    explicit ServerProxyModel(QObject *parent = 0);
+    explicit ServerProxyModel(QObject *parent = 0) :
+        BaseProxy(parent),
+        m_sourceModel(Q_NULLPTR),
+        m_active(false)
+    {
+    }
 
-    void addRole(int role);
+    /** Additional roles used from the source model for transfer to the client. */
+    void addRole(int role)
+    {
+        m_extraRoles.push_back(role);
+    }
 
-    QMap<int, QVariant> itemData(const QModelIndex &index) const Q_DECL_OVERRIDE;
+    /** Additional roles used from the proxy model itself for transfer to the client.
+     *  This is useful if @tparam BaseProxy overrides data().
+     */
+    void addProxyRole(int role)
+    {
+        m_extraProxyRoles.push_back(role);
+    }
+
+    QMap<int, QVariant> itemData(const QModelIndex &index) const Q_DECL_OVERRIDE
+    {
+        const QModelIndex sourceIndex = BaseProxy::mapToSource(index);
+        auto d = BaseProxy::sourceModel()->itemData(sourceIndex);
+        foreach (int role, m_extraRoles) {
+            d.insert(role, sourceIndex.data(role));
+        }
+        foreach (int role, m_extraProxyRoles) {
+            d.insert(role, index.data(role));
+        }
+        return d;
+    }
+
+    void setSourceModel(QAbstractItemModel *sourceModel) Q_DECL_OVERRIDE
+    {
+        m_sourceModel = sourceModel;
+        if (m_active && sourceModel) {
+            Model::used(sourceModel);
+            BaseProxy::setSourceModel(sourceModel);
+        }
+    }
+
+protected:
+    void customEvent(QEvent* event) Q_DECL_OVERRIDE
+    {
+        if (event->type() == ModelEvent::eventType()) {
+            auto mev = static_cast<ModelEvent*>(event);
+            m_active = mev->used();
+            if (m_sourceModel) {
+                QCoreApplication::sendEvent(m_sourceModel, event);
+                if (mev->used() && BaseProxy::sourceModel() != m_sourceModel) {
+                    BaseProxy::setSourceModel(m_sourceModel);
+                } else if (!mev->used()) {
+                    BaseProxy::setSourceModel(0);
+                }
+            }
+        }
+        BaseProxy::customEvent(event);
+    }
 
 private:
     QVector<int> m_extraRoles;
+    QVector<int> m_extraProxyRoles;
+    QAbstractItemModel *m_sourceModel;
+    bool m_active;
 };
+
 }
 
 #endif // GAMMARAY_SERVERPROXYMODEL_H

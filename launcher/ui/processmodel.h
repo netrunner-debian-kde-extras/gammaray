@@ -29,7 +29,7 @@
 #ifndef GAMMARAY_PROCESSMODEL_H
 #define GAMMARAY_PROCESSMODEL_H
 
-#include <common/probeabi.h>
+#include <launcher/probeabi.h>
 
 #include <QAbstractTableModel>
 #include <QVector>
@@ -40,6 +40,7 @@ namespace GammaRay {
 
 class ProcessModel : public QAbstractTableModel
 {
+  Q_OBJECT
   public:
     explicit ProcessModel(QObject *parent = 0);
     virtual ~ProcessModel();

@@ -31,8 +31,10 @@
 #include <core/probeguard.h>
 #include <common/protocol.h>
 #include <common/message.h>
+#include <common/modelevent.h>
 
 #include <QAbstractItemModel>
+#include <QSortFilterProxyModel>
 #include <QDataStream>
 #include <QDebug>
 #include <QBuffer>
@@ -84,7 +86,8 @@ void RemoteModelServer::setModel(QAbstractItemModel *model)
 void RemoteModelServer::connectModel()
 {
   Q_ASSERT(m_model);
-  connect(m_model, SIGNAL(dataChanged(QModelIndex,QModelIndex)), SLOT(dataChanged(QModelIndex,QModelIndex)));
+  Model::used(m_model);
+
   connect(m_model, SIGNAL(headerDataChanged(Qt::Orientation,int,int)), SLOT(headerDataChanged(Qt::Orientation,int,int)));
   connect(m_model, SIGNAL(rowsInserted(QModelIndex,int,int)), SLOT(rowsInserted(QModelIndex,int,int)));
   connect(m_model, SIGNAL(rowsAboutToBeMoved(QModelIndex,int,int,QModelIndex,int)), SLOT(rowsAboutToBeMoved(QModelIndex,int,int,QModelIndex,int)));
@@ -93,7 +96,14 @@ void RemoteModelServer::connectModel()
   connect(m_model, SIGNAL(columnsInserted(QModelIndex,int,int)), SLOT(columnsInserted(QModelIndex,int,int)));
   connect(m_model, SIGNAL(columnsMoved(QModelIndex,int,int,QModelIndex,int)), SLOT(columnsMoved(QModelIndex,int,int,QModelIndex,int)));
   connect(m_model, SIGNAL(columnsRemoved(QModelIndex,int,int)), SLOT(columnsRemoved(QModelIndex,int,int)));
+#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
+  connect(m_model, SIGNAL(dataChanged(QModelIndex,QModelIndex)), SLOT(dataChanged(QModelIndex,QModelIndex)));
   connect(m_model, SIGNAL(layoutChanged()), SLOT(layoutChanged()));
+#else
+  connect(m_model, SIGNAL(dataChanged(QModelIndex,QModelIndex,QVector<int>)), SLOT(dataChanged(QModelIndex,QModelIndex,QVector<int>)));
+  connect(m_model, SIGNAL(layoutChanged(QList<QPersistentModelIndex>,QAbstractItemModel::LayoutChangeHint)),
+          this, SLOT(layoutChanged(QList<QPersistentModelIndex>,QAbstractItemModel::LayoutChangeHint)));
+#endif
   connect(m_model, SIGNAL(modelReset()), SLOT(modelReset()));
   connect(m_model, SIGNAL(destroyed(QObject*)), SLOT(modelDeleted()));
 }
@@ -101,7 +111,8 @@ void RemoteModelServer::connectModel()
 void RemoteModelServer::disconnectModel()
 {
   Q_ASSERT(m_model);
-  disconnect(m_model, SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(dataChanged(QModelIndex,QModelIndex)));
+  Model::unused(m_model);
+
   disconnect(m_model, SIGNAL(headerDataChanged(Qt::Orientation,int,int)), this, SLOT(headerDataChanged(Qt::Orientation,int,int)));
   disconnect(m_model, SIGNAL(rowsInserted(QModelIndex,int,int)), this, SLOT(rowsInserted(QModelIndex,int,int)));
   disconnect(m_model, SIGNAL(rowsAboutToBeMoved(QModelIndex,int,int,QModelIndex,int)), this, SLOT(rowsAboutToBeMoved(QModelIndex,int,int,QModelIndex,int)));
@@ -110,7 +121,14 @@ void RemoteModelServer::disconnectModel()
   disconnect(m_model, SIGNAL(columnsInserted(QModelIndex,int,int)), this, SLOT(columnsInserted(QModelIndex,int,int)));
   disconnect(m_model, SIGNAL(columnsMoved(QModelIndex,int,int,QModelIndex,int)), this, SLOT(columnsMoved(QModelIndex,int,int,QModelIndex,int)));
   disconnect(m_model, SIGNAL(columnsRemoved(QModelIndex,int,int)), this, SLOT(columnsRemoved(QModelIndex,int,int)));
+#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
+  disconnect(m_model, SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(dataChanged(QModelIndex,QModelIndex)));
   disconnect(m_model, SIGNAL(layoutChanged()), this, SLOT(layoutChanged()));
+#else
+  disconnect(m_model, SIGNAL(dataChanged(QModelIndex,QModelIndex,QVector<int>)), this, SLOT(dataChanged(QModelIndex,QModelIndex,QVector<int>)));
+  disconnect(m_model, SIGNAL(layoutChanged(QList<QPersistentModelIndex>,QAbstractItemModel::LayoutChangeHint)),
+             this, SLOT(layoutChanged(QList<QPersistentModelIndex>,QAbstractItemModel::LayoutChangeHint)));
+#endif
   disconnect(m_model, SIGNAL(modelReset()), this, SLOT(modelReset()));
   disconnect(m_model, SIGNAL(destroyed(QObject*)), this, SLOT(modelDeleted()));
 }
@@ -128,8 +146,14 @@ void RemoteModelServer::newRequest(const GammaRay::Message &msg)
       msg.payload() >> index;
       const QModelIndex qmIndex = Protocol::toQModelIndex(m_model, index);
 
+      qint32 rowCount = -1, columnCount = -1;
+      if (index.isEmpty() || qmIndex.isValid()) {
+        rowCount = m_model->rowCount(qmIndex);
+        columnCount = m_model->columnCount(qmIndex);
+      }
+
       Message msg(m_myAddress, Protocol::ModelRowColumnCountReply);
-      msg.payload() << index << m_model->rowCount(qmIndex) << m_model->columnCount(qmIndex);
+      msg.payload() << index << rowCount << columnCount;
       sendMessage(msg);
       break;
     }
@@ -190,6 +214,14 @@ void RemoteModelServer::newRequest(const GammaRay::Message &msg)
       msg.payload() >> index >> role >> value;
 
       m_model->setData(Protocol::toQModelIndex(m_model, index), value, role);
+      break;
+    }
+
+    case Protocol::ModelSortRequest:
+    {
+      quint32 column, order;
+      msg.payload() >> column >> order;
+      m_model->sort(column, (Qt::SortOrder)order);
       break;
     }
 
@@ -264,13 +296,12 @@ void RemoteModelServer::modelMonitored(bool monitored)
   }
 }
 
-void RemoteModelServer::dataChanged(const QModelIndex& begin, const QModelIndex& end)
+void RemoteModelServer::dataChanged(const QModelIndex& begin, const QModelIndex& end, const QVector<int> &roles)
 {
-  // TODO check if somebody is listening (here or in Server?)
   if (!isConnected())
     return;
   Message msg(m_myAddress, Protocol::ModelContentChanged);
-  msg.payload() << Protocol::fromQModelIndex(begin) << Protocol::fromQModelIndex(end);
+  msg.payload() << Protocol::fromQModelIndex(begin) << Protocol::fromQModelIndex(end) << roles;
   sendMessage(msg);
 }
 
@@ -329,11 +360,31 @@ void RemoteModelServer::columnsRemoved(const QModelIndex& parent, int start, int
   sendAddRemoveMessage(Protocol::ModelColumnsRemoved, parent, start, end);
 }
 
+#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
 void RemoteModelServer::layoutChanged()
+{
+  sendLayoutChanged();
+}
+
+#else
+
+void RemoteModelServer::layoutChanged(const QList<QPersistentModelIndex> &parents, QAbstractItemModel::LayoutChangeHint hint)
+{
+  QVector<Protocol::ModelIndex> indexes;
+  indexes.reserve(parents.size());
+  foreach (const auto &index, parents)
+    indexes.push_back(Protocol::fromQModelIndex(index));
+  sendLayoutChanged(indexes, hint);
+}
+#endif
+
+void RemoteModelServer::sendLayoutChanged(const QVector< Protocol::ModelIndex >& parents, quint32 hint)
 {
   if (!isConnected())
     return;
-  sendMessage(Message(m_myAddress, Protocol::ModelLayoutChanged));
+  Message msg(m_myAddress, Protocol::ModelLayoutChanged);
+  msg.payload() << parents << hint;
+  sendMessage(msg);
 }
 
 void RemoteModelServer::modelReset()
@@ -376,7 +427,8 @@ void RemoteModelServer::registerServer()
     s_registerServerCallback();
     return;
   }
-  m_myAddress = Server::instance()->registerObject(objectName(), this, "newRequest");
+  m_myAddress = Server::instance()->registerObject(objectName(), this, Server::ExportProperties);
+  Server::instance()->registerMessageHandler(m_myAddress, this, "newRequest");
   Server::instance()->registerMonitorNotifier(m_myAddress, this, "modelMonitored");
   connect(Endpoint::instance(), SIGNAL(disconnected()), this, SLOT(modelMonitored()));
 }
@@ -389,4 +441,56 @@ bool RemoteModelServer::isConnected() const
 void RemoteModelServer::sendMessage(const Message& msg) const
 {
   Endpoint::send(msg);
+}
+
+bool RemoteModelServer::proxyDynamicSortFilter() const
+{
+  if (auto proxy = qobject_cast<QSortFilterProxyModel*>(m_model))
+    return proxy->dynamicSortFilter();
+  return false;
+}
+
+void RemoteModelServer::setProxyDynamicSortFilter(bool dynamicSortFilter)
+{
+  if (auto proxy = qobject_cast<QSortFilterProxyModel*>(m_model))
+    return proxy->setDynamicSortFilter(dynamicSortFilter);
+}
+
+Qt::CaseSensitivity RemoteModelServer::proxyFilterCaseSensitivity() const
+{
+  if (auto proxy = qobject_cast<QSortFilterProxyModel*>(m_model))
+    return proxy->filterCaseSensitivity();
+  return Qt::CaseSensitive;
+}
+
+void RemoteModelServer::setProxyFilterCaseSensitivity(Qt::CaseSensitivity caseSensitivity)
+{
+  if (auto proxy = qobject_cast<QSortFilterProxyModel*>(m_model))
+    return proxy->setFilterCaseSensitivity(caseSensitivity);
+}
+
+int RemoteModelServer::proxyFilterKeyColumn() const
+{
+  if (auto proxy = qobject_cast<QSortFilterProxyModel*>(m_model))
+    return proxy->filterKeyColumn();
+  return 0;
+}
+
+void RemoteModelServer::setProxyFilterKeyColumn(int column)
+{
+  if (auto proxy = qobject_cast<QSortFilterProxyModel*>(m_model))
+    return proxy->setFilterKeyColumn(column);
+}
+
+QRegExp RemoteModelServer::proxyFilterRegExp() const
+{
+  if (auto proxy = qobject_cast<QSortFilterProxyModel*>(m_model))
+    return proxy->filterRegExp();
+  return QRegExp();
+}
+
+void RemoteModelServer::setProxyFilterRegExp(const QRegExp& regExp)
+{
+  if (auto proxy = qobject_cast<QSortFilterProxyModel*>(m_model))
+    return proxy->setFilterRegExp(regExp);
 }
