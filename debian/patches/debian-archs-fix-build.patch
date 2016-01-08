@@ -3,15 +3,15 @@ Date: Wed, 16 Jul 2014 15:27:00 +0200
 Subject: debian-archs-fix-build
 
 ---
- cmake/GammaRayProbeABI.cmake    | 22 ++++++++++++++++++++++
- common/probeabidetector_elf.cpp |  5 +++++
+ cmake/GammaRayProbeABI.cmake      | 22 ++++++++++++++++++++++
+ launcher/probeabidetector_elf.cpp |  5 +++++
  2 files changed, 27 insertions(+)
 
 diff --git a/cmake/GammaRayProbeABI.cmake b/cmake/GammaRayProbeABI.cmake
-index a7415d6..6fc7580 100644
+index 8cd29e2..88914b3 100644
 --- a/cmake/GammaRayProbeABI.cmake
 +++ b/cmake/GammaRayProbeABI.cmake
-@@ -53,10 +53,32 @@ elseif(APPLE)
+@@ -56,10 +56,32 @@ elseif(APPLE)
      set(GAMMARAY_PROBE_ABI "${GAMMARAY_PROBE_ABI}-${CMAKE_SYSTEM_PROCESSOR}")
    endif()
  
@@ -44,19 +44,19 @@ index a7415d6..6fc7580 100644
    else()
      set(GAMMARAY_PROBE_ABI "${GAMMARAY_PROBE_ABI}-${CMAKE_SYSTEM_PROCESSOR}")
    endif()
-diff --git a/common/probeabidetector_elf.cpp b/common/probeabidetector_elf.cpp
-index 03ba082..94f72e4 100644
---- a/common/probeabidetector_elf.cpp
-+++ b/common/probeabidetector_elf.cpp
-@@ -153,6 +153,11 @@ static QString archFromELFHeader(const uchar *data, quint64 size)
-     case EM_X86_64: return "x86_64";
+diff --git a/launcher/probeabidetector_elf.cpp b/launcher/probeabidetector_elf.cpp
+index b9a12e3..0386372 100644
+--- a/launcher/probeabidetector_elf.cpp
++++ b/launcher/probeabidetector_elf.cpp
+@@ -159,6 +159,11 @@ static QString archFromELFHeader(const uchar *data, quint64 size)
+     case EM_X86_64: return QStringLiteral("x86_64");
  #endif
-     case EM_ARM: return "arm";
-+    case EM_MIPS: return "mips";
-+    case EM_PPC: return "ppc";
-+    case EM_S390: return "s390x";
-+    case EM_PPC64: return "ppc64";
-+    case EM_AARCH64: return "aarch64";
+     case EM_ARM: return QStringLiteral("arm");
++    case EM_MIPS: return QStringLiteral("mips");
++    case EM_PPC: return QStringLiteral("ppc");
++    case EM_S390: return QStringLiteral("s390x");
++    case EM_PPC64: return QStringLiteral("ppc64");
++    case EM_AARCH64: return QStringLiteral("aarch64");
    }
  
    qWarning() << "Unsupported ELF machine type:" << hdr->e_machine;

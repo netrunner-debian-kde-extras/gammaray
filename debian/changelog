@@ -1,6 +1,10 @@
 gammaray (2.4.0-1) UNRELEASED; urgency=medium
 
   * New upstream release.
+  * Refresh patches:
+    - debian-archs-fix-build.patch
+    - disable-qt4-objectvisualizer.patch
+    - fix-objectvisualizer-build.patch.
 
  -- Jakub Adam <jakub.adam@ktknet.cz>  Fri, 08 Jan 2016 00:52:03 +0100
 
