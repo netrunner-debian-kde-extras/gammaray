@@ -32,7 +32,7 @@ endif
 override_dh_auto_install:
 	dh_auto_install -B obj-qt5
 	dh_auto_install -B obj-qt4
-	rm -f debian/tmp/usr/share/doc/gammaray/License.txt
+	rm -f debian/tmp/usr/share/doc/gammaray/LICENSE.*
 
 override_dh_auto_clean:
 	dh_auto_clean -B obj-qt5

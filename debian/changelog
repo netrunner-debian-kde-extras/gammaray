@@ -7,6 +7,7 @@ gammaray (2.4.0-1) UNRELEASED; urgency=medium
     - fix-objectvisualizer-build.patch.
   * Enable QtBluetooth and Qt5Positioning support.
   * Enable build of KJob tracker plug-in for KDE Frameworks 5.
+  * Don't install extra license files.
 
  -- Jakub Adam <jakub.adam@ktknet.cz>  Fri, 08 Jan 2016 00:52:03 +0100
 
