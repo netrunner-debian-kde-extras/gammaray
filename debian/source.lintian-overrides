@@ -1,0 +1,2 @@
+# Upstream doesn't provide signed releases
+gammaray source: debian-watch-may-check-gpg-signature
