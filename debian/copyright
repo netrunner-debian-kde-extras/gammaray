@@ -39,17 +39,13 @@ Copyright: 2010, Ariya Hidayat <ariya.hidayat@gmail.com>
            2012-2014, Klarälvdalens Datakonsult AB, a KDAB Group company <info@kdab.com>
 License: GPL-2+
 
-Files: core/tools/messagehandler/StackWalker.cpp
-       core/tools/messagehandler/StackWalker.h
+Files: 3rdparty/StackWalker/*
 Copyright: 2005-2011, Jochen Kalmbach
 License: BSD-2-clause
 
-Files: core/tools/modelinspector/modeltest.cpp
-       core/tools/modelinspector/modeltest.h
-       tests/modeltest.cpp
-       tests/modeltest.h
-Copyright: 2007 Trolltech ASA
-License: GPL-2
+Files: 3rdparty/qt/modeltest.*
+Copyright: 2015, The Qt Company Ltd.
+License: LGPL-2.1
 
 Files: core/tools/messagehandler/backtrace_unix.cpp
 Copyright: 2002 Holger Freyther (freyther@kde.org)
@@ -60,14 +56,6 @@ License: LGPL-2+
 Files: debian/*
 Copyright: 2012-2014, Debian KDE Extras Team <pkg-kde-extras@lists.alioth.debian.org>
 License: GPL-2+
-
-Files: launcher/injector/interactiveprocess.*
-Copyright: 2006, Bradley T. Hughes
-License: GPL-2+
-
-License: GPL-2
- For full text of GNU General Public License v2 see
- /usr/share/common-licenses/GPL-2.
 
 License: GPL-2+
  You may use the software under the terms of GNU General Public License v2 or,
